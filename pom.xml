@@ -28,7 +28,7 @@
 <!--        <module>nexai-module-wms</module>-->
 <!--        <module>nexai-module-im</module>-->
 <!-- 请参考 https://doc.iocoder.cn/ai/build/ 文档，完成 AI 模块的启动！！！ -->
-<!--        <module>nexai-module-ai</module>-->
+        <module>nexai-module-ai</module>
     </modules>
 
     <name>${project.artifactId}</name>
