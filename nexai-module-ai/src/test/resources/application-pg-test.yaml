@@ -1,0 +1,42 @@
+spring:
+  main:
+    lazy-initialization: true # 开启懒加载，加快速度
+    banner-mode: off # 单元测试，禁用 Banner
+
+--- #################### 数据库相关配置 ####################
+
+spring:
+  # 数据源配置项：真实 PostgreSQL（会话运行时链路依赖 PG 专属能力——agentscope 状态存储、
+  # text 快照列等——H2 无法保真，工单 06 起 S1 接缝测试直连 PG；凭据可用环境变量覆盖）
+  datasource:
+    name: nexai-pg-test
+    url: ${NEXAI_TEST_PG_URL:jdbc:postgresql://1p.inas.club:15432/nex-ai}
+    driver-class-name: org.postgresql.Driver
+    username: ${NEXAI_TEST_PG_USERNAME:nex-ai}
+    password: ${NEXAI_TEST_PG_PASSWORD:abcd1234}
+    druid:
+      async-init: true # 单元测试，异步初始化 Druid 连接池，提升启动速度
+      initial-size: 1 # 单元测试，配置为 1，提升启动速度
+  sql:
+    init:
+      # 外部数据库必须显式开启脚本初始化（默认 EMBEDDED 只对内存库生效）
+      mode: always
+      # 幂等 PG 方言建表（CREATE IF NOT EXISTS）：共享库已有表则跳过，缺表则补齐
+      schema-locations: classpath:/sql/pg/create_tables.sql
+
+  # Redis 配置。Redisson 默认的配置足够使用，一般不需要进行调优
+  data:
+    redis:
+      host: 127.0.0.1 # 地址
+      port: 16379 # 端口（单元测试，使用 16379 端口）
+      database: 0 # 数据库索引
+
+mybatis:
+  lazy-initialization: true # 单元测试，设置 MyBatis Mapper 延迟加载，加速每个单元测试
+
+--- #################### 芋道相关配置 ####################
+
+# 芋道配置项，设置当前项目所有自定义的配置
+nexai:
+  info:
+    base-package: com.gkht.ai.nexai.module

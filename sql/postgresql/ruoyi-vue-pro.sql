@@ -3524,6 +3524,10 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6418, '规格更新', 'ai:spec:update', 3, 3, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6419, '规格删除', 'ai:spec:delete', 3, 4, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6420, '规格发布', 'ai:spec:publish', 3, 5, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6421, '调试会话', '', 2, 3, 6400, 'session', 'ep:chat-line-round', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6422, '会话查询', 'ai:session:query', 3, 1, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6423, '会话创建', 'ai:session:create', 3, 2, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6424, '会话发消息', 'ai:session:message', 3, 3, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
@@ -6181,5 +6185,48 @@ COMMENT ON TABLE ai_agent_spec_version IS 'AI 平台智能体规格版本表（�
 
 DROP SEQUENCE IF EXISTS ai_agent_spec_version_seq;
 CREATE SEQUENCE ai_agent_spec_version_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_session（NexAI 智能体平台：会话，工单 06）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_session;
+CREATE TABLE ai_session (
+    id int8 NOT NULL,
+    session_key varchar(64) NOT NULL,
+    type int2 NOT NULL,
+    spec_id int8 NOT NULL,
+    version_no int4 NOT NULL,
+    title varchar(128) NULL DEFAULT NULL,
+    message_rounds int4 NOT NULL DEFAULT 0,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_session ADD CONSTRAINT pk_ai_session PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_session.id IS '会话编号';
+COMMENT ON COLUMN ai_session.session_key IS '会话标识（agentscope 状态存储寻址键，全局唯一；对话消息本体存于 agentscope 状态存储，不经本表）';
+COMMENT ON COLUMN ai_session.type IS '会话类型（10 调试 / 20 终端用户）';
+COMMENT ON COLUMN ai_session.spec_id IS '绑定的规格编号（ai_agent_spec.id）';
+COMMENT ON COLUMN ai_session.version_no IS '绑定的规格版本号（不可变快照定位键，会话绑定稳定版本）';
+COMMENT ON COLUMN ai_session.title IS '会话标题';
+COMMENT ON COLUMN ai_session.message_rounds IS '已发送的消息轮数';
+COMMENT ON COLUMN ai_session.creator IS '创建者';
+COMMENT ON COLUMN ai_session.create_time IS '创建时间';
+COMMENT ON COLUMN ai_session.updater IS '更新者';
+COMMENT ON COLUMN ai_session.update_time IS '更新时间';
+COMMENT ON COLUMN ai_session.deleted IS '是否删除';
+COMMENT ON COLUMN ai_session.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_session IS 'AI 平台会话表（调试会话 type=debug 与终端用户会话同聚合）';
+
+CREATE UNIQUE INDEX uk_ai_session_key ON ai_session (session_key);
+
+DROP SEQUENCE IF EXISTS ai_session_seq;
+CREATE SEQUENCE ai_session_seq
     START 1;
 

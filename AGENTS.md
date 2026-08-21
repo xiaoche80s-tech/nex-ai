@@ -85,7 +85,7 @@ framework/                       # 模块内 Spring 配置
 
 依赖方向与关键规则：
 
-- 依赖只向内：`interfaces → application → domain`；`infrastructure → domain`（实现端口）；`api → application`。domain 层只依赖 JDK 与纯工具库（如 hutool-core、slf4j-api），禁止 MyBatis、Spring、`nexai-common` 框架设施（`CommonResult`、`ServiceException` 等）——能脱离 UI 和数据库单测领域逻辑即边界正确。
+- 依赖只向内：`interfaces → application → domain`；`infrastructure → domain`（实现端口）；`api → application`。domain 层只依赖 JDK 与纯工具库（如 hutool-core、slf4j-api、reactor-core——运行时端口返回 `Flux` 属此类，与 slf4j 同级），禁止 MyBatis、Spring、`nexai-common` 框架设施（`CommonResult`、`ServiceException` 等）——能脱离 UI 和数据库单测领域逻辑即边界正确。
 - 充血模型：业务规则进实体/值对象；应用服务只做编排。出现"实体只有 getter/setter、逻辑全在服务"即为贫血反模式，需回移。
 - Controller 禁止直接调 Repository，必须经应用服务。出入参**直接复用 application 层的 command/query/dto，不另设控制器旁 VO**（芋道 `*ReqVO/*RespVO` 惯例仅存在于存量模块）；简单列表查询可由应用服务经 Mapper 直查转 DTO，无需绕经领域模型（轻量读写分离即可，勿引入完整 CQRS/Event Sourcing，除非确有诉求）。
 - 聚合边界：同一事务内必须一致的属同一聚合；跨聚合只读可直接调对方 Repository 查询，**修改必须走领域事件**（最终一致），禁止跨聚合直接 save；外部只引用聚合根 ID。
@@ -108,7 +108,7 @@ framework/                       # 模块内 Spring 配置
 - 逻辑删除通过 `deleted` 字段：1 = 已删除，0 = 存活。
 - Lombok + MapStruct 注解处理器在根 pom 的 `annotationProcessorPaths` 中装配（含 `lombok-mapstruct-binding`）；新增处理器需修改该列表。
 - 禁止使用 BeanUtils 做对象转换（Spring `BeanUtils`、Apache `BeanUtils`、hutool `BeanUtil`，以及 `nexai-common` 封装的 `BeanUtils.toBean()` 等运行时反射拷贝均含）：同名异义字段会静默错配且无法在编译期暴露。新写代码一律用 MapStruct 编译期生成——DDD 模块放 `{aggregate}/infrastructure/converter/`，存量模块放 `convert/`；存量代码不做专项迁移，仅当改动到某处转换时顺手替换为 MapStruct。
-- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。唯一例外：DDD 的 domain 层用纯 JUnit 直接构造实体测试，不继承任何基类。
+- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。两个例外：① DDD 的 domain 层用纯 JUnit 直接构造实体测试，不继承任何基类；② **用户已确立**：依赖 PG 专属能力（agentscope 状态存储、PG 方言 DDL）的运行时链路测试经 `nexai-module-ai` 测试源集的 `BasePgDbAndRedisUnitTest`（profile `pg-test`）直连真实 PostgreSQL（连接信息 `application-pg-test.yaml`，环境变量可覆盖；测试数据落专用租户、按租户清理）。
 
 ### 存量芋道分层（维护 system/infra 时遵循）
 

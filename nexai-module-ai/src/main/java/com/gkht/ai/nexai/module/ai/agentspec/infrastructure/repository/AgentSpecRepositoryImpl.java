@@ -79,6 +79,12 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
                 .map(this::reconstituteVersion).toList();
     }
 
+    @Override
+    public AgentSpecVersion findVersion(Long specId, Integer versionNo) {
+        AgentSpecVersionDO dataObject = agentSpecVersionMapper.selectBySpecIdAndVersionNo(specId, versionNo);
+        return dataObject == null ? null : reconstituteVersion(dataObject);
+    }
+
     private AgentSpec reconstitute(AgentSpecDO dataObject) {
         return AgentSpec.reconstitute(dataObject.getId(), dataObject.getName(),
                 dataObject.getDescription(), dataObject.getIcon(), dataObject.getLatestVersionNo(),

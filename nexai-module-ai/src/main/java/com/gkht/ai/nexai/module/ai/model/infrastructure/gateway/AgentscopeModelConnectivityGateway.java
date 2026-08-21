@@ -2,25 +2,20 @@ package com.gkht.ai.nexai.module.ai.model.infrastructure.gateway;
 
 import com.gkht.ai.nexai.module.ai.model.domain.gateway.ModelConnectivityGateway;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Channel;
-import com.gkht.ai.nexai.module.ai.model.domain.valueobject.ChannelProvider;
 import com.gkht.ai.nexai.module.ai.model.domain.valueobject.ConnectivityResult;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.GenerateOptions;
-import io.agentscope.extensions.model.anthropic.AnthropicChatModel;
-import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
-import io.agentscope.extensions.model.gemini.GeminiChatModel;
-import io.agentscope.extensions.model.ollama.OllamaChatModel;
-import io.agentscope.extensions.model.openai.OpenAIChatModel;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.List;
 
 /**
- * 连通性探测网关（agentscope 适配器）：按渠道提供商构造 ChatModel，
- * 以 maxTokens=1 的单条消息做一次轻量真实调用——能收到任一响应即证明
- * 端点、凭据与模型标识可用，与运行时装配（工单 06）走同一套模型构造路径。
+ * 连通性探测网关（agentscope 适配器）：经 {@link ChatModelFactory} 按渠道提供商构造 ChatModel
+ * （与运行时装配走同一套模型构造路径），以 maxTokens=1 的单条消息做一次轻量真实调用——
+ * 能收到任一响应即证明端点、凭据与模型标识可用。
  */
 @Component
 public class AgentscopeModelConnectivityGateway implements ModelConnectivityGateway {
@@ -34,12 +29,14 @@ public class AgentscopeModelConnectivityGateway implements ModelConnectivityGate
 
     private static final String PROBE_USER_ID = "nexai-connectivity-probe";
 
+    @Resource
+    private ChatModelFactory chatModelFactory;
+
     @Override
     public ConnectivityResult probe(Channel channel, String modelId) {
         long startNanos = System.nanoTime();
         try {
-            io.agentscope.core.model.Model chatModel = createChatModel(channel, modelId);
-            ChatResponse response = chatModel
+            ChatResponse response = chatModelFactory.create(channel, modelId)
                     .stream(List.of(new UserMessage(PROBE_USER_ID, "ping")), null,
                             new GenerateOptions.Builder().maxTokens(PROBE_MAX_TOKENS).build())
                     .next()
@@ -54,33 +51,6 @@ public class AgentscopeModelConnectivityGateway implements ModelConnectivityGate
         } catch (Exception ex) {
             return ConnectivityResult.failure(elapsedMs(startNanos), rootMessage(ex));
         }
-    }
-
-    /**
-     * 按提供商构造 agentscope ChatModel。渠道未配置 baseUrl 时各提供商用自身默认端点。
-     */
-    private io.agentscope.core.model.Model createChatModel(Channel channel, String modelId) {
-        ChannelProvider provider = channel.getProvider();
-        String baseUrl = channel.getBaseUrl();
-        String apiKey = channel.getApiKey();
-        // 每请求新建 Model 实例（agentscope 线程模型：单 agent 单 session 串行，探测不复用）
-        return switch (provider) {
-            case OPENAI, OPENAI_COMPAT -> OpenAIChatModel.builder()
-                    .apiKey(apiKey).baseUrl(baseUrl).modelName(modelId).stream(true)
-                    .build();
-            case DASHSCOPE -> DashScopeChatModel.builder()
-                    .apiKey(apiKey).baseUrl(baseUrl).modelName(modelId).stream(true)
-                    .build();
-            case ANTHROPIC -> AnthropicChatModel.builder()
-                    .apiKey(apiKey).baseUrl(baseUrl).modelName(modelId).stream(true)
-                    .build();
-            case GEMINI -> GeminiChatModel.builder()
-                    .apiKey(apiKey).baseUrl(baseUrl).modelName(modelId).streamEnabled(true)
-                    .build();
-            case OLLAMA -> OllamaChatModel.builder()
-                    .baseUrl(baseUrl).modelName(modelId).stream(true)
-                    .build();
-        };
     }
 
     private long elapsedMs(long startNanos) {

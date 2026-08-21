@@ -26,4 +26,9 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_004_001, "规格当前没有可发布的草稿，请先编辑生成新草稿");
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_002, "规格版本不存在");
 
+    // ========== 会话 SESSION 1-022-005-000 ==========
+    ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");
+    ErrorCode SESSION_SPEC_NOT_PUBLISHED = new ErrorCode(1_022_005_001, "规格尚未发布任何版本，无法发起会话");
+    ErrorCode SESSION_MODEL_UNAVAILABLE = new ErrorCode(1_022_005_002, "会话绑定的模型或渠道已停用或不存在，无法装配运行时");
+
 }

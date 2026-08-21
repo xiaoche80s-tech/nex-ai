@@ -38,4 +38,9 @@ public interface AgentSpecRepository {
      */
     List<AgentSpecVersion> findVersionsBySpecId(Long specId);
 
+    /**
+     * 查询规格的指定版本（运行时装配按会话绑定定位不可变快照用），不存在返回 null
+     */
+    AgentSpecVersion findVersion(Long specId, Integer versionNo);
+
 }

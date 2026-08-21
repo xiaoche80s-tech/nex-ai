@@ -103,37 +103,12 @@
 
         <!-- AI 大模型相关模块。默认注释，保证编译速度 -->
 
-        <!-- NexAI 智能体平台业务模块（聚合垂直切分，工单 02 起承载 feedback 等聚合） -->
+        <!-- NexAI 智能体平台业务模块（聚合垂直切分；agentscope-java v2 运行时依赖已随
+             工单 06 收拢进本模块：模型构造 + PG 会话状态存储，经传递依赖生效） -->
         <dependency>
             <groupId>com.gkht.ai</groupId>
             <artifactId>nexai-module-ai</artifactId>
             <version>${revision}</version>
-        </dependency>
-
-
-        <!-- NexAI 智能体平台：agentscope-java v2 运行时（库嵌入，ADR-0001；版本经 nexai-dependencies
-             的 agentscope-bom 管理，当前 2.0.3-SNAPSHOT，经用户确认由发布版切换、构件本地 install，
-             GA 后回落锁定发布版——见 ADR-0005 版本记录）。spike 引入面：core + harness + openai 兼容模型 +
-             PG/Redis 两个 AgentStateStore 扩展；工单 01 验证通过后随 M1 迁入 nexai-module-ai -->
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-harness</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-model-openai</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-postgresql</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-redis</artifactId>
         </dependency>
 
 

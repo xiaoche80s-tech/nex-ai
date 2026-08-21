@@ -23,6 +23,7 @@ import com.gkht.ai.nexai.module.ai.model.domain.valueobject.ChannelProvider;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.converter.ChannelConverterImpl;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.dataobject.ChannelDO;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.gateway.AgentscopeModelConnectivityGateway;
+import com.gkht.ai.nexai.module.ai.model.infrastructure.gateway.ChatModelFactory;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.mapper.ChannelMapper;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.repository.ChannelRepositoryImpl;
 import jakarta.annotation.Resource;
@@ -64,7 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Import({ChannelController.class, ChannelServiceImpl.class,
         ChannelRepositoryImpl.class, ChannelConverterImpl.class,
-        AgentscopeModelConnectivityGateway.class,
+        AgentscopeModelConnectivityGateway.class, ChatModelFactory.class,
         ChannelControllerTest.TenantDbTestConfiguration.class})
 public class ChannelControllerTest extends BaseDbAndRedisUnitTest {
 
