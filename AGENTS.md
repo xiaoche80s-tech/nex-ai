@@ -44,7 +44,63 @@ pnpm ts:check   # vue-tsc 类型检查
 pnpm lint       # eslint + stylelint + prettier 检查模式；lint:eslint / lint:format / lint:style 自动修复
 ```
 
-## 后端约定（芋道分层）
+## 后端开发约定
+
+### 架构总则：新代码基于 DDD（Clean Architecture + 六边形）
+
+**用户已确立：后端新功能一律按 DDD 开发**（参考 skill `clean-ddd-hexagonal`，采用其 Convention B「按聚合优先」布局）。存量 `system`/`infra` 模块保持芋道分层不动，仅维护不迁移；新业务模块（或新模块内的新聚合）必须使用下述结构。
+
+在 `nexai-module-<name>` 的 `com.gkht.ai.nexai.module.<name>.` 下：
+
+```
+{aggregate}/                     # 一个聚合一个目录，按业务命名（如 agent、knowledge）
+├── domain/                      # 领域层：零框架依赖（禁止 import MyBatis/Spring Web 等）
+│   ├── model/                   # 聚合根 + 实体（充血模型，业务行为写在实体上）
+│   ├── valueobject/             # 值对象（不可变，无 setter，按值判等）
+│   ├── event/                   # 领域事件（过去时命名，如 AgentPublishedEvent）
+│   ├── exception/               # 聚合内异常
+│   └── repository/              # Repository 接口（端口；一个聚合一个，按聚合不按表）
+├── application/                 # 应用层：用例编排，事务边界在此（@Transactional）
+│   ├── command/                 # 命令 DTO（写）
+│   ├── query/                   # 查询 DTO（读）
+│   ├── dto/                     # 出参 DTO
+│   └── service/                 # 应用服务（只编排，不写业务规则）
+└── infrastructure/              # 基础设施层：适配器
+    ├── dataobject/              # MyBatis Plus DO（贫血，继承 BaseDO/TenantBaseDO）
+    ├── mapper/                  # Mapper 接口（加 @Mapper 即可被发现，包名不限）
+    ├── converter/               # DO ↔ 领域模型转换（MapStruct）
+    └── repository/              # Repository 实现（实现 domain/repository 接口）
+
+interfaces/                      # 入口层
+├── controller/admin/            # REST 控制器 + vo/（URL 挂 /admin-api，机制见下）
+└── controller/app/              # 同理挂 /app-api
+shared/                          # 跨聚合共享：util/、constant/、enums/（仅限 2+ 聚合使用）
+framework/                       # 模块内 Spring 配置
+```
+
+依赖方向与关键规则：
+
+- 依赖只向内：`interfaces → application → domain`；`infrastructure → domain`（实现端口）。domain 层不依赖任何外层——能脱离 UI 和数据库单测领域逻辑即边界正确。
+- 充血模型：业务规则进实体/值对象；应用服务只做编排。出现"实体只有 getter/setter、逻辑全在服务"即为贫血反模式，需回移。
+- Controller 禁止直接调 Repository，必须经应用服务；简单列表查询可由应用服务经 Mapper 直查转 DTO，无需绕经领域模型（轻量读写分离即可，勿引入完整 CQRS/Event Sourcing，除非确有诉求）。
+- 聚合边界：同一事务内必须一致的属同一聚合；跨聚合只读可直接调对方 Repository 查询，**修改必须走领域事件**（最终一致），禁止跨聚合直接 save；外部只引用聚合根 ID。
+- DO 与领域模型严格分离，经 converter 转换，禁止 DO 出现在 domain/application 层。
+
+与芋道框架的衔接（已验证机制，保持使用）：
+
+- URL 前缀由包通配符决定：web starter 的 `WebProperties` 默认按 `**.controller.admin.**` 挂 `/admin-api`、`**.controller.app.**` 挂 `/app-api`——所以 DDD 模块的 REST 层包名必须包含 `controller/admin`（或 `controller/app`）段。
+- Mapper 扫描：mybatis starter 的 `@MapperScan` 按 `nexai.info.base-package` + `@Mapper` 注解扫描，包名不限，`infrastructure/mapper/` 可直接生效。
+- Controller 仍返回 `CommonResult<T>`、出入参 VO（`*SaveReqVO`、`*PageReqVO`、`*RespVO`）放控制器旁 `vo/`。
+- 错误码仍注册在模块 `enums/ErrorCodeConstants.java`。
+
+横切规则（新旧代码一致）：
+
+- SaaS 多租户已启用（`nexai.tenant.enable`）：新表默认租户过滤，除非加入 `nexai.tenant.ignore-tables`。
+- 逻辑删除通过 `deleted` 字段：1 = 已删除，0 = 存活。
+- Lombok + MapStruct 注解处理器在根 pom 的 `annotationProcessorPaths` 中装配（含 `lombok-mapstruct-binding`）；新增处理器需修改该列表。
+- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。domain 层用纯 JUnit 即可（无框架依赖，直接构造实体测试）。
+
+### 存量芋道分层（维护 system/infra 时遵循）
 
 每个 `nexai-module-*` 在 `module/<name>/` 下使用相同的包结构：
 
@@ -55,13 +111,6 @@ pnpm lint       # eslint + stylelint + prettier 检查模式；lint:eslint / lin
 - `api/**` —— 模块对外的公开接口；跨模块调用走 `api` 接口，实现位于 `service`。
 - `enums/ErrorCodeConstants.java` —— 模块错误码注册表；新增错误码写在这里。
 - `framework/**` —— 模块内配置；`job/**` —— Quartz 定时任务；`mq/**` —— 基于 Redis 的消息。
-
-横切规则：
-
-- SaaS 多租户已启用（`nexai.tenant.enable`）：新表默认租户过滤，除非加入 `nexai.tenant.ignore-tables`。
-- 逻辑删除通过 `deleted` 字段：1 = 已删除，0 = 存活。
-- Lombok + MapStruct 注解处理器在根 pom 的 `annotationProcessorPaths` 中装配（含 `lombok-mapstruct-binding`）；新增处理器需修改该列表。
-- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。
 
 ## 前端约定（nexai-ui/）
 
