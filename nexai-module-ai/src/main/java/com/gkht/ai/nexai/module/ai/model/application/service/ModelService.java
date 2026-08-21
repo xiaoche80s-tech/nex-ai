@@ -8,6 +8,8 @@ import com.gkht.ai.nexai.module.ai.model.application.dto.ConnectivityTestDTO;
 import com.gkht.ai.nexai.module.ai.model.application.dto.ModelDTO;
 import com.gkht.ai.nexai.module.ai.model.application.query.ModelPageQuery;
 
+import java.util.List;
+
 /**
  * 模型管理应用服务：渠道下登记模型元数据、启停与连通性测试。
  */
@@ -42,6 +44,11 @@ public interface ModelService {
      * 模型详情
      */
     ModelDTO getModel(Long id);
+
+    /**
+     * 启用模型精简列表（智能体规格编辑等下拉选择用）
+     */
+    List<ModelDTO> getEnabledModelList();
 
     /**
      * 连通性测试：取模型所属渠道的凭据做一次轻量真实调用，返回成败/耗时/说明。

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -115,6 +116,12 @@ public class ModelServiceImpl implements ModelService {
         ModelDTO dto = modelConverter.toDTOFromDomain(model);
         fillChannelInfo(dto);
         return dto;
+    }
+
+    @Override
+    public List<ModelDTO> getEnabledModelList() {
+        List<ModelDO> models = modelMapper.selectList(ModelDO::getEnabled, true);
+        return modelConverter.toDTOList(models);
     }
 
     @Override

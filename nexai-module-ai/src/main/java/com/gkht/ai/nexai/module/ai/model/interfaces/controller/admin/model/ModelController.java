@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import static com.gkht.ai.nexai.framework.common.pojo.CommonResult.success;
 
 /**
@@ -84,6 +86,13 @@ public class ModelController {
     @PreAuthorize("@ss.hasPermission('ai:model:query')")
     public CommonResult<ModelDTO> getModel(@RequestParam("id") Long id) {
         return success(modelService.getModel(id));
+    }
+
+    @GetMapping("/enabled-list")
+    @Operation(summary = "获得启用模型精简列表", description = "供智能体规格编辑下拉选择")
+    @PreAuthorize("@ss.hasPermission('ai:model:query')")
+    public CommonResult<List<ModelDTO>> getEnabledModelList() {
+        return success(modelService.getEnabledModelList());
     }
 
     @PostMapping("/test-connectivity")

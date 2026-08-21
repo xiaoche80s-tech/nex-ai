@@ -8,6 +8,9 @@ import com.gkht.ai.nexai.module.ai.model.infrastructure.mapper.ModelMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
+
 /**
  * 模型 Repository 实现：DO ↔ 领域模型适配，聚合重建经 Model.reconstitute。
  */
@@ -35,6 +38,14 @@ public class ModelRepositoryImpl implements ModelRepository {
     public Model findById(Long id) {
         ModelDO dataObject = modelMapper.selectById(id);
         return dataObject == null ? null : reconstitute(dataObject);
+    }
+
+    @Override
+    public List<Model> findByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return modelMapper.selectByIds(ids).stream().map(this::reconstitute).toList();
     }
 
     @Override

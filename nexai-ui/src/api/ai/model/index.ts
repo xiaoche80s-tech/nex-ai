@@ -169,3 +169,8 @@ export const getModel = (id: number) => {
 export const testModelConnectivity = (id: number) => {
   return request.post<ConnectivityTestResult>({ url: '/ai/model/test-connectivity?id=' + id })
 }
+
+// 查询启用模型精简列表（智能体规格编辑下拉用）
+export const getEnabledModelList = () => {
+  return request.get<ModelVO[]>({ url: '/ai/model/enabled-list' })
+}
