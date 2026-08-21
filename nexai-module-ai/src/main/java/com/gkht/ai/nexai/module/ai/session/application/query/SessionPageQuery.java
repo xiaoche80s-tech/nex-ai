@@ -16,4 +16,7 @@ public class SessionPageQuery extends PageParam {
     @Schema(description = "规格编号（精确匹配）", example = "1")
     private Long specId;
 
+    @Schema(description = "规格版本号（精确匹配，选填规格后可用）", example = "1")
+    private Integer versionNo;
+
 }

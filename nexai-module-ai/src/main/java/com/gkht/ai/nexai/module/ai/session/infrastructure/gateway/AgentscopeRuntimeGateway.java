@@ -10,9 +10,9 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ModelRegistry;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.util.JsonUtils;
-import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -40,15 +40,18 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     /** 事件流出错时降级输出的自定义事件类型（SSE 端点保证流以可读错误收尾而非中断连接） */
     static final String ERROR_EVENT_TYPE = "SESSION_ERROR";
 
-    @Resource
-    private ChatModelFactory chatModelFactory;
+    private final ChatModelFactory chatModelFactory;
+    private final AgentStateStoreProvider agentStateStoreProvider;
+    /** 无实现者时为空列表（ObjectProvider 惰性收集，避免空集合注入失败） */
+    private final List<RuntimeToolContributor> runtimeToolContributors;
 
-    @Resource
-    private AgentStateStoreProvider agentStateStoreProvider;
-
-    /** 无实现者时为空列表（Spring 注入保证非 null） */
-    @Resource
-    private List<RuntimeToolContributor> runtimeToolContributors;
+    public AgentscopeRuntimeGateway(ChatModelFactory chatModelFactory,
+                                    AgentStateStoreProvider agentStateStoreProvider,
+                                    ObjectProvider<RuntimeToolContributor> runtimeToolContributors) {
+        this.chatModelFactory = chatModelFactory;
+        this.agentStateStoreProvider = agentStateStoreProvider;
+        this.runtimeToolContributors = runtimeToolContributors.orderedStream().toList();
+    }
 
     @Override
     public Flux<String> chat(AgentRuntimeConfig config, String message) {

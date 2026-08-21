@@ -332,8 +332,8 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
     }
 
     @Test
-    @DisplayName("会话分页：按规格过滤")
-    void getSessionPage_filtersBySpec() {
+    @DisplayName("会话分页：按规格与版本过滤")
+    void getSessionPage_filtersBySpecAndVersion() {
         Long specA = createPublishedSpec();
         Long specB = createPublishedSpec();
         createDebugSession(specA, null);
@@ -342,6 +342,23 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
         PageResult<SessionDTO> page = sessionController.getSessionPage(pageOf(specA)).getData();
         assertEquals(1, page.getTotal());
         assertEquals(specA, page.getList().get(0).getSpecId());
+
+        // 版本过滤：specA 再发布 v2 后，按 v2 过滤只出绑 v2 的会话
+        Long modelId = createChannelAndModel();
+        AgentSpecUpdateCommand updateCommand = new AgentSpecUpdateCommand();
+        updateCommand.setId(specA);
+        updateCommand.setName("测试规格 v2");
+        updateCommand.setModelId(modelId);
+        updateCommand.setSystemPrompt(SYSTEM_PROMPT);
+        agentSpecController.updateSpec(updateCommand);
+        agentSpecController.publishSpec(publishCommand(specA));
+        createDebugSession(specA, 2);
+
+        SessionPageQuery byVersion = pageOf(specA);
+        byVersion.setVersionNo(2);
+        PageResult<SessionDTO> versionPage = sessionController.getSessionPage(byVersion).getData();
+        assertEquals(1, versionPage.getTotal());
+        assertEquals(2, versionPage.getList().get(0).getVersionNo());
     }
 
     // ==================== 测试链路构建与断言辅助 ====================

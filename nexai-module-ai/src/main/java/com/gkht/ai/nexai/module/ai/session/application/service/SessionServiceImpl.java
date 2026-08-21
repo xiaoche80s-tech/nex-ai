@@ -106,7 +106,8 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     public PageResult<SessionDTO> getSessionPage(SessionPageQuery query) {
-        PageResult<SessionDO> page = sessionMapper.selectPage(query, query.getType(), query.getSpecId());
+        PageResult<SessionDO> page = sessionMapper.selectPage(query, query.getType(),
+                query.getSpecId(), query.getVersionNo());
         return sessionConverter.toDTOPage(page);
     }
 

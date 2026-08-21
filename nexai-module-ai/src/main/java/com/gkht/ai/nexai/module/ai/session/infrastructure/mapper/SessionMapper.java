@@ -13,10 +13,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface SessionMapper extends BaseMapperX<SessionDO> {
 
-    default PageResult<SessionDO> selectPage(PageParam pageParam, Integer type, Long specId) {
+    default PageResult<SessionDO> selectPage(PageParam pageParam, Integer type, Long specId, Integer versionNo) {
         return selectPage(pageParam, new LambdaQueryWrapperX<SessionDO>()
                 .eqIfPresent(SessionDO::getType, type)
                 .eqIfPresent(SessionDO::getSpecId, specId)
+                .eqIfPresent(SessionDO::getVersionNo, versionNo)
                 .orderByDesc(SessionDO::getId));
     }
 
