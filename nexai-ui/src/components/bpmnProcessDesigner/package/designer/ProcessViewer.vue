@@ -150,7 +150,7 @@ import { BpmProcessInstanceStatus } from '@/utils/constants'
 const props = defineProps({
   xml: {
     default: '',
-    type: String,
+    type: String
   },
   view: {
     default: () => ({}),

@@ -41,7 +41,13 @@
   <ContentWrap>
     <el-table v-loading="loading" :data="list">
       <el-table-column label="编号" align="center" prop="id" width="80" />
-      <el-table-column label="反馈内容" align="center" prop="content" min-width="240" show-overflow-tooltip />
+      <el-table-column
+        label="反馈内容"
+        align="center"
+        prop="content"
+        min-width="240"
+        show-overflow-tooltip
+      />
       <el-table-column label="截图" align="center" width="80">
         <template #default="scope">
           <el-image
@@ -55,7 +61,13 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="关联会话" align="center" prop="sessionId" width="160" show-overflow-tooltip>
+      <el-table-column
+        label="关联会话"
+        align="center"
+        prop="sessionId"
+        width="160"
+        show-overflow-tooltip
+      >
         <template #default="scope">
           <span>{{ scope.row.sessionId || '-' }}</span>
         </template>
@@ -75,9 +87,7 @@
       />
       <el-table-column label="操作" align="center" width="140" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" @click="openDetail(scope.row.id)">
-            详情
-          </el-button>
+          <el-button link type="primary" @click="openDetail(scope.row.id)"> 详情 </el-button>
           <el-button
             link
             type="warning"
@@ -140,7 +150,11 @@
   <Dialog v-model="transitionVisible" title="流转处理状态" width="420">
     <el-form label-width="90px">
       <el-form-item label="当前状态">
-        <dict-tag v-if="transitionRow" :type="DICT_TYPE.AI_FEEDBACK_STATUS" :value="transitionRow.status" />
+        <dict-tag
+          v-if="transitionRow"
+          :type="DICT_TYPE.AI_FEEDBACK_STATUS"
+          :value="transitionRow.status"
+        />
       </el-form-item>
       <el-form-item label="目标状态" required>
         <el-select v-model="transitionTarget" placeholder="请选择目标状态" class="!w-220px">
@@ -154,7 +168,9 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button type="primary" :disabled="!transitionTarget" @click="submitTransition">确 定</el-button>
+      <el-button type="primary" :disabled="!transitionTarget" @click="submitTransition"
+        >确 定</el-button
+      >
       <el-button @click="transitionVisible = false">取 消</el-button>
     </template>
   </Dialog>
@@ -233,7 +249,9 @@ const transitionRow = ref<FeedbackApi.FeedbackVO>()
 const transitionTarget = ref<number>()
 const transitionTargetOptions = computed(() =>
   getIntDictOptions(DICT_TYPE.AI_FEEDBACK_STATUS).filter((dict) =>
-    transitionRow.value ? getTransitionTargets(transitionRow.value.status).includes(dict.value) : false
+    transitionRow.value
+      ? getTransitionTargets(transitionRow.value.status).includes(dict.value)
+      : false
   )
 )
 const openTransition = (row: FeedbackApi.FeedbackVO) => {
