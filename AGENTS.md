@@ -11,7 +11,7 @@
 
 NexAI —— 基于 ruoyi-vue-pro（芋道/yudao）fork 并重命名的企业级开发脚手架：groupId `com.gkht.ai`、基础包名 `com.gkht.ai.nexai`、配置前缀 `nexai.*`。本仓库为精简版：仅保留 `system` 与 `infra` 两个业务模块，其余 yudao 模块（bpm、pay、mall、crm 等）已在根 `pom.xml` 中注释。技术栈：Java 25、Spring Boot 4.1、PostgreSQL + MyBatis Plus、Redis + Redisson。管理后台前端位于 `nexai-ui/`（Vue 3 + Vite + TypeScript + Element Plus + UnoCSS，pnpm）。
 
-本工作区不是 git 仓库 —— 无历史记录、分支或 diff 可查。
+本工作区是 git 仓库，远程为 `origin` → https://github.com/xiaoche80s-tech/nex-ai （main 分支）。注意：`application-local.yaml`（含真实凭据）已被 `.gitignore` 排除，克隆者需从 `application-local-example.yaml` 复制并填写。
 
 ## 目录结构
 
