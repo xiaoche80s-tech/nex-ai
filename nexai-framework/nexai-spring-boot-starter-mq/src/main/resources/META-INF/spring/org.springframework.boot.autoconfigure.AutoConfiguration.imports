@@ -1,0 +1,3 @@
+com.gkht.ai.nexai.framework.mq.redis.config.NexaiRedisMQProducerAutoConfiguration
+com.gkht.ai.nexai.framework.mq.redis.config.NexaiRedisMQConsumerAutoConfiguration
+com.gkht.ai.nexai.framework.mq.rabbitmq.config.NexaiRabbitMQAutoConfiguration

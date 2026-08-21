@@ -1,0 +1,3 @@
+com.gkht.ai.nexai.framework.security.config.NexaiSecurityAutoConfiguration
+com.gkht.ai.nexai.framework.security.config.NexaiWebSecurityConfigurerAdapter
+com.gkht.ai.nexai.framework.operatelog.config.NexaiOperateLogConfiguration

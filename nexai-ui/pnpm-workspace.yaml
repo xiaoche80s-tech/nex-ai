@@ -1,0 +1,7 @@
+allowBuilds:
+  '@formily/vue': true
+  '@parcel/watcher': true
+  core-js-pure: true
+  es5-ext: true
+  esbuild: true
+  vue-demi: true

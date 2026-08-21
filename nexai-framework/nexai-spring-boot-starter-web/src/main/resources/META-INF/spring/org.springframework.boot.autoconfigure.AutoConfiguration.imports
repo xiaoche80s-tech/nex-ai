@@ -1,0 +1,7 @@
+com.gkht.ai.nexai.framework.apilog.config.NexaiApiLogAutoConfiguration
+com.gkht.ai.nexai.framework.jackson.config.NexaiJacksonAutoConfiguration
+com.gkht.ai.nexai.framework.swagger.config.NexaiSwaggerAutoConfiguration
+com.gkht.ai.nexai.framework.web.config.NexaiWebAutoConfiguration
+com.gkht.ai.nexai.framework.xss.config.NexaiXssAutoConfiguration
+com.gkht.ai.nexai.framework.banner.config.NexaiBannerAutoConfiguration
+com.gkht.ai.nexai.framework.encrypt.config.NexaiApiEncryptAutoConfiguration

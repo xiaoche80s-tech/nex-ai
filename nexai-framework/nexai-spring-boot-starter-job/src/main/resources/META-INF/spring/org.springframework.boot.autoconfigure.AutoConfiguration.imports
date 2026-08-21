@@ -1,0 +1,2 @@
+com.gkht.ai.nexai.framework.quartz.config.NexaiQuartzAutoConfiguration
+com.gkht.ai.nexai.framework.quartz.config.NexaiAsyncAutoConfiguration

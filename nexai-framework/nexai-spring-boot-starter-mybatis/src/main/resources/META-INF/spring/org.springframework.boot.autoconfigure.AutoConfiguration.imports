@@ -1,0 +1,3 @@
+com.gkht.ai.nexai.framework.datasource.config.NexaiDataSourceAutoConfiguration
+com.gkht.ai.nexai.framework.mybatis.config.NexaiMybatisAutoConfiguration
+com.gkht.ai.nexai.framework.translate.config.NexaiTranslateAutoConfiguration

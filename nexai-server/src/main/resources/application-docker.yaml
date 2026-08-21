@@ -1,0 +1,73 @@
+server:
+  port: 48080
+
+--- #################### 数据库相关配置 ####################
+spring:
+  autoconfigure:
+    # noinspection SpringBootApplicationYaml
+    exclude:
+      # Spring Boot 4 起 autoconfigure 类移包（quartz 在 org.springframework.boot.quartz.autoconfigure，
+      # 工单 02 时代写的 Boot 3 路径从未真正匹配——docker 单机不启 Quartz）
+      - org.springframework.boot.quartz.autoconfigure.QuartzAutoConfiguration
+      - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
+      - org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
+      - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
+      - org.dromara.trans.config.TransServiceConfig
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeImageAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeMultimodalEmbeddingAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAsyncToolCallingManagerAutoConfiguration
+  datasource:
+    dynamic:
+      druid:
+        validation-query: SELECT 1 # PG 无 DUAL 表语法（脚手架默认值是 MySQL 语法）
+      primary: master
+      datasource:
+        master:
+          url: jdbc:postgresql://postgres:5432/nexai_platform
+          username: nexai
+          password: nexai
+        slave:
+          lazy: true
+          url: jdbc:postgresql://postgres:5432/nexai_platform
+          username: nexai
+          password: nexai
+
+  # Redis（登录态/验证码/缓存必需）
+  data:
+    redis:
+      host: redis
+      port: 6379
+      database: 0
+
+--- #################### 微信公众号、小程序相关配置 ####################
+# 桩配置（与 local 同款脚手架测试号）：不配则 WxJava 自动装配走默认 in-memory +
+# HttpClient4 路径，classpath 无 httpclient4 直接 NoClassDefFoundError 起不来
+wx:
+  mp:
+    app-id: wxf56b1542b9e85f8a
+    secret: 496379dcef1ba869e9234de8d598cfd3
+    config-storage:
+      type: RedisTemplate
+      key-prefix: wx
+      http-client-type: HttpComponents
+  miniapp:
+    appid: wxc4598c446f8a9cb3
+    secret: 4a1a04e07f6a4a0751b39c3064a92c8b
+    config-storage:
+      type: RedisTemplate
+      key-prefix: wa
+      http-client-type: HttpComponents
+
+--- #################### NexAI 调整 ####################
+
+nexai:
+  captcha:
+    enable: false # docker 冒烟环境关闭滑块验证码，便于脚本登录
+  access-log:
+    enable: false

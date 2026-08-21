@@ -1,0 +1,2 @@
+com.gkht.ai.nexai.framework.tracer.config.NexaiTracerAutoConfiguration
+com.gkht.ai.nexai.framework.tracer.config.NexaiMetricsAutoConfiguration
