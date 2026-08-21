@@ -359,5 +359,6 @@ export enum DICT_TYPE {
   IM_CHANNEL_MATERIAL_TYPE = 'im_channel_material_type', // IM 频道素材内容类型：1=富文本 / 2=外链
 
   // ========== AI - 智能体平台模块  ==========
-  AI_FEEDBACK_STATUS = 'ai_feedback_status' // AI 问题反馈处理状态：10=待处理 / 20=处理中 / 30=已解决 / 40=已关闭（终态）
+  AI_FEEDBACK_STATUS = 'ai_feedback_status', // AI 问题反馈处理状态：10=待处理 / 20=处理中 / 30=已解决 / 40=已关闭（终态）
+  AI_CHANNEL_PROVIDER = 'ai_channel_provider' // AI 渠道提供商类型：openai / openai-compat / dashscope / anthropic / gemini / ollama
 }

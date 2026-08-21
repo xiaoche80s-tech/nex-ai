@@ -1663,12 +1663,19 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3450, 2, '处理中', '20', 'ai_feedback_status', 0, 'warning', '', '问题反馈处理状态：处理中', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3451, 3, '已解决', '30', 'ai_feedback_status', 0, 'success', '', '问题反馈处理状态：已解决', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3452, 4, '已关闭', '40', 'ai_feedback_status', 0, 'info', '', '问题反馈处理状态：已关闭（终态）', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+-- NexAI 智能体平台：渠道提供商类型（工单 03）
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3453, 1, 'OpenAI', 'openai', 'ai_channel_provider', 0, 'primary', '', '渠道提供商：OpenAI 官方', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3454, 2, 'OpenAI 兼容', 'openai-compat', 'ai_channel_provider', 0, 'success', '', '渠道提供商：OpenAI 兼容端点（中转/自建网关）', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3455, 3, '通义千问', 'dashscope', 'ai_channel_provider', 0, 'warning', '', '渠道提供商：阿里云 DashScope', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3456, 4, 'Anthropic', 'anthropic', 'ai_channel_provider', 0, 'danger', '', '渠道提供商：Anthropic Claude', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3457, 5, 'Gemini', 'gemini', 'ai_channel_provider', 0, 'info', '', '渠道提供商：Google Gemini', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3458, 6, 'Ollama', 'ollama', 'ai_channel_provider', 0, 'info', '', '渠道提供商：Ollama 本地服务（通常无需密钥）', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
 DROP SEQUENCE IF EXISTS system_dict_data_seq;
 CREATE SEQUENCE system_dict_data_seq
-    START 3449;
+    START 3459;
 
 -- ----------------------------
 -- Table structure for system_dict_type
@@ -1895,12 +1902,13 @@ INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_ti
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2135, 'MES 上下工状态类型', 'mes_pro_work_record_type', 0, 'MES 上下工状态类型', '1', '2026-04-05 14:07:27', '1', '2026-04-05 14:07:27', '0', NULL);
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2138, 'MES 生产入库单状态', 'mes_wm_product_produce_status', 0, 'MES 生产入库单状态', '1', '2026-04-05 15:53:46', '1', '2026-04-05 15:53:46', '0', '1970-01-01 00:00:00');
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2139, '问题反馈处理状态', 'ai_feedback_status', 0, 'NexAI 智能体平台问题反馈处理状态', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0', NULL);
+INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2140, '渠道提供商类型', 'ai_channel_provider', 0, 'NexAI 智能体平台渠道提供商类型', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0', NULL);
 COMMIT;
 -- @formatter:on
 
 DROP SEQUENCE IF EXISTS system_dict_type_seq;
 CREATE SEQUENCE system_dict_type_seq
-    START 2139;
+    START 2141;
 
 -- ----------------------------
 -- Table structure for system_login_log
@@ -3501,12 +3509,17 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6402, '问题反馈查询', 'ai:feedback:query', 3, 1, 6401, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6403, '问题反馈提交', 'ai:feedback:create', 3, 2, 6401, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6404, '问题反馈流转', 'ai:feedback:update', 3, 3, 6401, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6405, '模型管理', '', 2, 0, 6400, 'model', 'ep:box', 'ai/model/index', 'AiModel', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6406, '渠道查询', 'ai:channel:query', 3, 1, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6407, '渠道创建', 'ai:channel:create', 3, 2, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6408, '渠道更新', 'ai:channel:update', 3, 3, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6409, '渠道删除', 'ai:channel:delete', 3, 4, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
 DROP SEQUENCE IF EXISTS system_menu_seq;
 CREATE SEQUENCE system_menu_seq
-    START 6405;
+    START 6410;
 
 -- ----------------------------
 -- Table structure for system_notice
@@ -5994,4 +6007,44 @@ COMMENT ON TABLE ai_feedback IS 'AI 平台问题反馈表';
 
 DROP SEQUENCE IF EXISTS ai_feedback_seq;
 CREATE SEQUENCE ai_feedback_seq
+    START 1;
+-- ----------------------------
+-- Table structure for ai_channel（NexAI 智能体平台：模型渠道，工单 03）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_channel;
+CREATE TABLE ai_channel (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    provider varchar(32) NOT NULL,
+    base_url varchar(512) NOT NULL,
+    api_key varchar(1024) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    owner_type varchar(16) NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_channel ADD CONSTRAINT pk_ai_channel PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_channel.id IS '渠道编号';
+COMMENT ON COLUMN ai_channel.name IS '渠道名称（同一提供商多渠道时用于区分）';
+COMMENT ON COLUMN ai_channel.provider IS '提供商类型编码（openai/openai-compat/dashscope/anthropic/gemini/ollama）';
+COMMENT ON COLUMN ai_channel.base_url IS '端点地址';
+COMMENT ON COLUMN ai_channel.api_key IS 'API 密钥（AES 密文存储，EncryptTypeHandler）';
+COMMENT ON COLUMN ai_channel.enabled IS '是否启用';
+COMMENT ON COLUMN ai_channel.owner_type IS '归属维度（platform 平台共享 / tenant 租户自有，M1 仅租户侧）';
+COMMENT ON COLUMN ai_channel.creator IS '创建者';
+COMMENT ON COLUMN ai_channel.create_time IS '创建时间';
+COMMENT ON COLUMN ai_channel.updater IS '更新者';
+COMMENT ON COLUMN ai_channel.update_time IS '更新时间';
+COMMENT ON COLUMN ai_channel.deleted IS '是否删除';
+COMMENT ON COLUMN ai_channel.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_channel IS 'AI 平台模型渠道表';
+
+DROP SEQUENCE IF EXISTS ai_channel_seq;
+CREATE SEQUENCE ai_channel_seq
     START 1;

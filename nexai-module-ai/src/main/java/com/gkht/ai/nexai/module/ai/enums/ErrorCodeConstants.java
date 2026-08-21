@@ -13,4 +13,8 @@ public interface ErrorCodeConstants {
     ErrorCode FEEDBACK_NOT_EXISTS = new ErrorCode(1_022_001_000, "问题反馈不存在");
     ErrorCode FEEDBACK_STATUS_TRANSITION_ILLEGAL = new ErrorCode(1_022_001_001, "问题反馈状态流转不合法");
 
+    // ========== 模型渠道 CHANNEL 1-022-002-000 ==========
+    ErrorCode CHANNEL_NOT_EXISTS = new ErrorCode(1_022_002_000, "渠道不存在");
+    ErrorCode CHANNEL_PROVIDER_INVALID = new ErrorCode(1_022_002_001, "渠道提供商类型不支持");
+
 }
