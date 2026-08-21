@@ -274,6 +274,7 @@ nexai:
   security:
     permit-all_urls:
       - /admin-api/mp/open/** # 微信公众号开放平台，微信回调接口，不需要登录
+      - /admin-api/ai/spike/** # AI 平台集成 spike 临时端点（工单 01）；M1 建立正式运行时装配后随 spike 代码一并删除
   api-encrypt:
     enable: false # 是否开启 API 加密。默认关闭，避免低版本 JDK 8（8u120 以下）启动时 bcprov 的 JCE 认证报错
     algorithm: AES # 加密算法，支持 AES、RSA 等

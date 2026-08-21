@@ -104,7 +104,29 @@
         <!-- AI 大模型相关模块。默认注释，保证编译速度 -->
 
 
-        <!-- NexAI 智能体平台管理模块：大模型配置 / MCP 注册表 / Skill / AgentSpec -->
+        <!-- NexAI 智能体平台：agentscope-java v2 运行时（库嵌入，ADR-0001；版本经 nexai-dependencies
+             的 agentscope-bom 管理，禁 SNAPSHOT）。spike 引入面：core + harness + openai 兼容模型 +
+             PG/Redis 两个 AgentStateStore 扩展；工单 01 验证通过后随 M1 迁入 nexai-module-ai -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-redis</artifactId>
+        </dependency>
 
 
         <!-- IoT 物联网相关模块。默认注释，保证编译速度 -->
@@ -148,7 +170,7 @@
             <artifactId>nexai-spring-boot-starter-protection</artifactId>
         </dependency>
 
-        <!-- 数据库驱动：PostgreSQL（ADR-0005 全 PG；框架 starter 中为 optional，须由应用自带） -->
+        <!-- 数据库驱动：PostgreSQL（全 PG 栈）；框架 starter 中为 optional，须由应用自带 -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>

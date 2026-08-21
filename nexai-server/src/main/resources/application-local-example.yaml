@@ -64,7 +64,7 @@ spring:
       primary: master
       datasource:
         master:
-          # NexAI 使用 PostgreSQL（ADR-0005 全 PG）；表结构初始化脚本见 sql/postgresql/ruoyi-vue-pro.sql
+          # NexAI 使用 PostgreSQL（全 PG 栈）；表结构初始化脚本见 sql/postgresql/ruoyi-vue-pro.sql
           url: jdbc:postgresql://127.0.0.1:5432/nex-ai
           username: postgres # TODO 填入你的数据库账号
           password: YOUR_DB_PASSWORD # TODO 填入你的数据库密码
