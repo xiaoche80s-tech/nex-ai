@@ -11,7 +11,6 @@ import io.agentscope.core.state.AgentState;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.state.InMemoryAgentStateStore;
 import io.agentscope.core.state.VersionedState;
-import io.agentscope.core.util.JsonUtils;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.postgresql.state.PostgresAgentStateStore;
 import io.agentscope.extensions.redis.state.RedisAgentStateStore;
@@ -38,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.gkht.ai.nexai.framework.common.pojo.CommonResult;
+import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 
 /**
  * 集成 spike 临时端点（工单 01）：验证 agentscope-java 2.0.x 嵌入 nexai-server 的三大集成风险。
@@ -81,20 +81,19 @@ public class SpikeAgentScopeController {
             row.put("eventClass", event.getClass().getSimpleName());
             // 栈 A：agentscope 自带 codec（Jackson 2 databind，事件注解的原生目标栈）
             try {
-                row.put("jackson2", JsonUtils.getJsonCodec().toJson(event));
+                row.put("jackson2", io.agentscope.core.util.JsonUtils.getJsonCodec().toJson(event));
             } catch (Exception ex) {
                 row.put("jackson2Error", ex.toString());
             }
             // 栈 B：nexai-common JsonUtils（Jackson 3 / tools.jackson，与 Spring MVC HTTP 层同栈）
             try {
-                String json3 = com.gkht.ai.nexai.framework.common.util.json.JsonUtils.toJsonString(event);
+                String json3 = JsonUtils.toJsonString(event);
                 row.put("jackson3", json3);
                 // 判别字段：@JsonTypeInfo(property="type") 是多态反序列化的生命线，两栈都必须保留
                 row.put("typeInJackson3", json3 != null && json3.contains("\"type\""));
                 // 往返：Jackson 3 序列化的 JSON 能否经 Jackson 3 还原为正确的 AgentEvent 子类
                 try {
-                    AgentEvent back = com.gkht.ai.nexai.framework.common.util.json.JsonUtils
-                            .parseObject(json3, AgentEvent.class);
+                    AgentEvent back = JsonUtils.parseObject(json3, AgentEvent.class);
                     row.put("roundTripOk", back != null && back.getClass() == event.getClass()
                             && back.getType() == event.getType());
                     row.put("roundTripClass", back == null ? null : back.getClass().getSimpleName());
@@ -140,7 +139,7 @@ public class SpikeAgentScopeController {
         return agent.streamEvents(prompt)
                 .subscribeOn(Schedulers.boundedElastic())
                 // 保真优先：逐事件经 agentscope 原生 codec（Jackson 2）转 JSON 转发，不做协议改写
-                .map(event -> JsonUtils.getJsonCodec().toJson(event))
+                .map(event -> io.agentscope.core.util.JsonUtils.getJsonCodec().toJson(event))
                 .doFinally(signal -> {
                     agent.close();
                     // 注意：Redis 实现的 close() 会连带关闭传入的 RedissonClient（容器共享），故不关闭；

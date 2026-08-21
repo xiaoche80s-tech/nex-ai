@@ -105,7 +105,8 @@
 
 
         <!-- NexAI 智能体平台：agentscope-java v2 运行时（库嵌入，ADR-0001；版本经 nexai-dependencies
-             的 agentscope-bom 管理，禁 SNAPSHOT）。spike 引入面：core + harness + openai 兼容模型 +
+             的 agentscope-bom 管理，当前 2.0.3-SNAPSHOT，经用户确认由发布版切换、构件本地 install，
+             GA 后回落锁定发布版——见 ADR-0005 版本记录）。spike 引入面：core + harness + openai 兼容模型 +
              PG/Redis 两个 AgentStateStore 扩展；工单 01 验证通过后随 M1 迁入 nexai-module-ai -->
         <dependency>
             <groupId>io.agentscope</groupId>
