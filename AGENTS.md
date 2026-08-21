@@ -61,6 +61,7 @@ pnpm lint       # eslint + stylelint + prettier 检查模式；lint:eslint / lin
 │   ├── valueobject/             # 值对象（不可变，无 setter，按值判等）
 │   ├── event/                   # 领域事件（过去时命名，如 AgentPublishedEvent）
 │   ├── exception/               # 聚合内异常
+│   ├── gateway/                 # 外部系统端口接口（如 agentscope 连通性探测）；隔离第三方类型，出参入参用领域类型
 │   └── repository/              # Repository 接口（端口；一个聚合一个，按聚合不按表）
 ├── application/                 # 应用层：用例编排，事务边界在此（@Transactional）
 │   ├── command/                 # 命令 DTO（写）——即 HTTP 写接口的请求体
@@ -71,6 +72,7 @@ pnpm lint       # eslint + stylelint + prettier 检查模式；lint:eslint / lin
     ├── dataobject/              # MyBatis Plus DO（贫血，继承 BaseDO/TenantBaseDO）
     ├── mapper/                  # Mapper 接口（加 @Mapper 即可被发现，包名不限）
     ├── converter/               # DO ↔ 领域模型、领域模型 ↔ 出参 DTO 转换（MapStruct）
+    ├── gateway/                 # 外部系统端口实现（实现 domain/gateway 接口，如 agentscope 适配器）
     └── repository/              # Repository 实现（实现 domain/repository 接口）
 
 interfaces/                      # 入口层

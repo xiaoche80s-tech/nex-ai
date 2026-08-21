@@ -24,6 +24,34 @@
             <artifactId>nexai-spring-boot-starter-biz-tenant</artifactId>
         </dependency>
 
+        <!-- AI 智能体运行时：agentscope-java v2（库嵌入，ADR-0001；版本经 nexai-dependencies 的
+             agentscope-bom 管理）。本模块使用面：连通性测试按渠道提供商构造各 ChatModel 做轻量真实调用；
+             spike 遗留的 core/harness/pg/redis 依赖仍由 nexai-server 声明，工单 06 运行时装配时一并收拢 -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-dashscope</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-anthropic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-gemini</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-ollama</artifactId>
+        </dependency>
+
         <!-- Web 相关 -->
         <dependency>
             <groupId>com.gkht.ai</groupId>

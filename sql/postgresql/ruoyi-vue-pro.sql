@@ -3514,12 +3514,16 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6407, '渠道创建', 'ai:channel:create', 3, 2, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6408, '渠道更新', 'ai:channel:update', 3, 3, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6409, '渠道删除', 'ai:channel:delete', 3, 4, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6410, '模型查询', 'ai:model:query', 3, 5, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6411, '模型创建', 'ai:model:create', 3, 6, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6412, '模型更新', 'ai:model:update', 3, 7, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6413, '模型删除', 'ai:model:delete', 3, 8, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
 DROP SEQUENCE IF EXISTS system_menu_seq;
 CREATE SEQUENCE system_menu_seq
-    START 6410;
+    START 6414;
 
 -- ----------------------------
 -- Table structure for system_notice
@@ -6048,3 +6052,49 @@ COMMENT ON TABLE ai_channel IS 'AI 平台模型渠道表';
 DROP SEQUENCE IF EXISTS ai_channel_seq;
 CREATE SEQUENCE ai_channel_seq
     START 1;
+
+-- ----------------------------
+-- Table structure for ai_model（NexAI 智能体平台：模型元数据，工单 04）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_model;
+CREATE TABLE ai_model (
+    id int8 NOT NULL,
+    channel_id int8 NOT NULL,
+    model_id varchar(128) NOT NULL,
+    name varchar(64) NOT NULL,
+    context_window int4 NULL DEFAULT NULL,
+    input_price numeric(12, 6) NULL DEFAULT NULL,
+    output_price numeric(12, 6) NULL DEFAULT NULL,
+    capabilities varchar(1024) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_model ADD CONSTRAINT pk_ai_model PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_model.id IS '模型编号';
+COMMENT ON COLUMN ai_model.channel_id IS '所属渠道编号（ai_channel.id）';
+COMMENT ON COLUMN ai_model.model_id IS '模型标识（调用时传给提供商的 ID，如 gpt-4o / qwen-plus）';
+COMMENT ON COLUMN ai_model.name IS '显示名';
+COMMENT ON COLUMN ai_model.context_window IS '上下文窗口（tokens），NULL 表示未知';
+COMMENT ON COLUMN ai_model.input_price IS '输入单价（元 / 百万 tokens），NULL 表示未定价';
+COMMENT ON COLUMN ai_model.output_price IS '输出单价（元 / 百万 tokens），NULL 表示未定价';
+COMMENT ON COLUMN ai_model.capabilities IS '能力标签（JSON 数组字符串，如 ["chat","vision"]，域内规范化为小写去重）';
+COMMENT ON COLUMN ai_model.enabled IS '是否启用';
+COMMENT ON COLUMN ai_model.creator IS '创建者';
+COMMENT ON COLUMN ai_model.create_time IS '创建时间';
+COMMENT ON COLUMN ai_model.updater IS '更新者';
+COMMENT ON COLUMN ai_model.update_time IS '更新时间';
+COMMENT ON COLUMN ai_model.deleted IS '是否删除';
+COMMENT ON COLUMN ai_model.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_model IS 'AI 平台模型元数据表';
+
+DROP SEQUENCE IF EXISTS ai_model_seq;
+CREATE SEQUENCE ai_model_seq
+    START 1;
+

@@ -2,10 +2,12 @@ package com.gkht.ai.nexai.module.ai.model.interfaces.controller.admin.model;
 
 import com.gkht.ai.nexai.framework.common.pojo.CommonResult;
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
+import com.gkht.ai.nexai.module.ai.model.application.command.ChannelConnectivityTestCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelCreateCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelUpdateCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelUpdateStatusCommand;
 import com.gkht.ai.nexai.module.ai.model.application.dto.ChannelDTO;
+import com.gkht.ai.nexai.module.ai.model.application.dto.ConnectivityTestDTO;
 import com.gkht.ai.nexai.module.ai.model.application.query.ChannelPageQuery;
 import com.gkht.ai.nexai.module.ai.model.application.service.ChannelService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 import static com.gkht.ai.nexai.framework.common.pojo.CommonResult.success;
 
@@ -83,6 +87,21 @@ public class ChannelController {
     @PreAuthorize("@ss.hasPermission('ai:channel:query')")
     public CommonResult<ChannelDTO> getChannel(@RequestParam("id") Long id) {
         return success(channelService.getChannel(id));
+    }
+
+    @GetMapping("/simple-list")
+    @Operation(summary = "获得启用渠道精简列表", description = "供模型管理页签下拉选择")
+    @PreAuthorize("@ss.hasPermission('ai:channel:query')")
+    public CommonResult<List<ChannelDTO>> getEnabledChannelList() {
+        return success(channelService.getEnabledChannelList());
+    }
+
+    @PostMapping("/test-connectivity")
+    @Operation(summary = "渠道连通性测试", description = "用表单当前凭据（不落库）对指定模型标识做一次轻量真实调用，供保存前发现密钥或端点错误")
+    @PreAuthorize("@ss.hasPermission('ai:channel:update')")
+    public CommonResult<ConnectivityTestDTO> testConnectivity(
+            @Valid @RequestBody ChannelConnectivityTestCommand command) {
+        return success(channelService.testChannelConnectivity(command));
     }
 
 }

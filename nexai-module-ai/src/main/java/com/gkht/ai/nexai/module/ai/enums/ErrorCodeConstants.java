@@ -17,4 +17,8 @@ public interface ErrorCodeConstants {
     ErrorCode CHANNEL_NOT_EXISTS = new ErrorCode(1_022_002_000, "渠道不存在");
     ErrorCode CHANNEL_PROVIDER_INVALID = new ErrorCode(1_022_002_001, "渠道提供商类型不支持");
 
+    // ========== 模型元数据 MODEL 1-022-003-000 ==========
+    ErrorCode MODEL_NOT_EXISTS = new ErrorCode(1_022_003_000, "模型不存在");
+    ErrorCode MODEL_DUPLICATE_MODEL_ID = new ErrorCode(1_022_003_001, "同渠道下模型标识已存在");
+
 }

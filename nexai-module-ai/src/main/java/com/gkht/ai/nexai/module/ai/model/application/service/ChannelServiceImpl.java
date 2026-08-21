@@ -1,11 +1,14 @@
 package com.gkht.ai.nexai.module.ai.model.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
+import com.gkht.ai.nexai.module.ai.model.application.command.ChannelConnectivityTestCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelCreateCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelUpdateCommand;
 import com.gkht.ai.nexai.module.ai.model.application.command.ChannelUpdateStatusCommand;
 import com.gkht.ai.nexai.module.ai.model.application.dto.ChannelDTO;
+import com.gkht.ai.nexai.module.ai.model.application.dto.ConnectivityTestDTO;
 import com.gkht.ai.nexai.module.ai.model.application.query.ChannelPageQuery;
+import com.gkht.ai.nexai.module.ai.model.domain.gateway.ModelConnectivityGateway;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.model.domain.repository.ChannelRepository;
 import com.gkht.ai.nexai.module.ai.model.domain.valueobject.ChannelOwnerType;
@@ -17,6 +20,8 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.CHANNEL_NOT_EXISTS;
@@ -38,6 +43,9 @@ public class ChannelServiceImpl implements ChannelService {
 
     @Resource
     private ChannelConverter channelConverter;
+
+    @Resource
+    private ModelConnectivityGateway connectivityGateway;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -86,6 +94,28 @@ public class ChannelServiceImpl implements ChannelService {
     public ChannelDTO getChannel(Long id) {
         Channel channel = requireChannel(id);
         return channelConverter.toDTOFromDomain(channel);
+    }
+
+    @Override
+    public List<ChannelDTO> getEnabledChannelList() {
+        List<ChannelDO> channels = channelMapper.selectList(ChannelDO::getEnabled, true);
+        return channelConverter.toDTOList(channels);
+    }
+
+    @Override
+    public ConnectivityTestDTO testChannelConnectivity(ChannelConnectivityTestCommand command) {
+        ChannelProvider provider = parseProvider(command.getProvider());
+        // 编辑已存渠道且密钥留空时，回退已存密钥（探测凭据不落库）
+        String apiKey = command.getApiKey();
+        if ((apiKey == null || apiKey.isBlank()) && command.getChannelId() != null) {
+            Channel existing = channelRepository.findById(command.getChannelId());
+            if (existing != null) {
+                apiKey = existing.getApiKey();
+            }
+        }
+        Channel probeTarget = Channel.create("connectivity-probe", provider, command.getBaseUrl(),
+                apiKey, ChannelOwnerType.TENANT);
+        return ConnectivityTestDTO.from(connectivityGateway.probe(probeTarget, command.getModelId()));
     }
 
     private Channel requireChannel(Long id) {
