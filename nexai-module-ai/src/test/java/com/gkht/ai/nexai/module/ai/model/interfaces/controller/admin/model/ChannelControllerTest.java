@@ -114,6 +114,8 @@ public class ChannelControllerTest extends BaseDbAndRedisUnitTest {
     public void tearDown() {
         TenantContextHolder.clear();
         SecurityContextHolder.clearContext();
+        // 复位静态 AES，避免测试密钥泄漏到同 JVM 的其他测试类（复位后走未配置路径）
+        ReflectUtil.setFieldValue(EncryptTypeHandler.class, "aes", null);
     }
 
     private ChannelCreateCommand createCommand() {

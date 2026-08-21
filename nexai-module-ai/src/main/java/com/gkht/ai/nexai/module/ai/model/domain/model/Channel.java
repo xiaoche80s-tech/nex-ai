@@ -55,15 +55,7 @@ public class Channel {
      */
     public static Channel create(String name, ChannelProvider provider, String baseUrl,
                                  String apiKey, ChannelOwnerType ownerType) {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("渠道名称不能为空");
-        }
-        if (provider == null) {
-            throw new IllegalArgumentException("渠道提供商类型不能为空");
-        }
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalArgumentException("渠道端点地址不能为空");
-        }
+        validateBasics(name, provider, baseUrl);
         if (ownerType == null) {
             throw new IllegalArgumentException("渠道归属维度不能为空");
         }
@@ -84,6 +76,19 @@ public class Channel {
      * 更新渠道基础信息。apiKey 传 null 表示保留原密钥（编辑界面不回传明文，未修改则不覆盖）
      */
     public void update(String name, ChannelProvider provider, String baseUrl, String apiKey) {
+        validateBasics(name, provider, baseUrl);
+        this.name = name.strip();
+        this.provider = provider;
+        this.baseUrl = baseUrl.strip();
+        if (apiKey != null) {
+            this.apiKey = normalizeApiKey(apiKey);
+        }
+    }
+
+    /**
+     * 创建与更新共用的必填校验
+     */
+    private static void validateBasics(String name, ChannelProvider provider, String baseUrl) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("渠道名称不能为空");
         }
@@ -92,12 +97,6 @@ public class Channel {
         }
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new IllegalArgumentException("渠道端点地址不能为空");
-        }
-        this.name = name.strip();
-        this.provider = provider;
-        this.baseUrl = baseUrl.strip();
-        if (apiKey != null) {
-            this.apiKey = normalizeApiKey(apiKey);
         }
     }
 
