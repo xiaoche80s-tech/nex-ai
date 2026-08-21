@@ -105,6 +105,7 @@ framework/                       # 模块内 Spring 配置
 - SaaS 多租户已启用（`nexai.tenant.enable`）：新表默认租户过滤，除非加入 `nexai.tenant.ignore-tables`。
 - 逻辑删除通过 `deleted` 字段：1 = 已删除，0 = 存活。
 - Lombok + MapStruct 注解处理器在根 pom 的 `annotationProcessorPaths` 中装配（含 `lombok-mapstruct-binding`）；新增处理器需修改该列表。
+- 禁止使用 BeanUtils 做对象转换（Spring `BeanUtils`、Apache `BeanUtils`、hutool `BeanUtil`，以及 `nexai-common` 封装的 `BeanUtils.toBean()` 等运行时反射拷贝均含）：同名异义字段会静默错配且无法在编译期暴露。新写代码一律用 MapStruct 编译期生成——DDD 模块放 `{aggregate}/infrastructure/converter/`，存量模块放 `convert/`；存量代码不做专项迁移，仅当改动到某处转换时顺手替换为 MapStruct。
 - 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。唯一例外：DDD 的 domain 层用纯 JUnit 直接构造实体测试，不继承任何基类。
 
 ### 存量芋道分层（维护 system/infra 时遵循）
