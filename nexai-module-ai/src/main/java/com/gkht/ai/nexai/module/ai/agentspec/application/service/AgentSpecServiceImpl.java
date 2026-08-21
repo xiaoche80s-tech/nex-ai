@@ -126,23 +126,15 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Override
     public PageResult<AgentSpecDTO> getSpecPage(AgentSpecPageQuery query) {
         PageResult<AgentSpecDO> page = agentSpecMapper.selectPage(query, query.getName());
-        List<AgentSpecDTO> rows = agentSpecConverter.toDTOList(page.getList());
-        fillRowModelNames(page.getList(), rows);
-        return new PageResult<>(rows, page.getTotal());
+        PageResult<AgentSpecDTO> result = agentSpecConverter.toDTOPage(page);
+        fillRowModelNames(page.getList(), result.getList());
+        return result;
     }
 
     @Override
     public AgentSpecDetailDTO getSpec(Long id) {
         AgentSpec spec = requireSpec(id);
-        AgentSpecDetailDTO detail = new AgentSpecDetailDTO();
-        detail.setId(spec.getId());
-        detail.setName(spec.getName());
-        detail.setDescription(spec.getDescription());
-        detail.setIcon(spec.getIcon());
-        detail.setLatestVersionNo(spec.getLatestVersionNo());
-        detail.setCurrentVersionNo(spec.getCurrentVersionNo());
-        detail.setHasDraft(spec.hasDraft());
-        detail.setCreateTime(spec.getCreateTime());
+        AgentSpecDetailDTO detail = agentSpecConverter.toDetailDTO(spec);
         detail.setDraft(spec.hasDraft() ? agentSpecConverter.toConfigDTO(spec.getDraft()) : null);
         detail.setCurrentVersion(findCurrentVersion(spec.getId(), spec.getCurrentVersionNo()));
 

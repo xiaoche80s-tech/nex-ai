@@ -64,7 +64,7 @@ export interface AgentSpecSaveForm {
   name: string
   description?: string
   icon?: string
-  modelId: number
+  modelId: number | undefined
   systemPrompt?: string
   maxIters?: number
   temperature?: number

@@ -4,6 +4,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecConfigDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
@@ -41,6 +42,15 @@ public interface AgentSpecConverter {
         return new PageResult<>(toDTOList(page.getList()), page.getTotal());
     }
 
+    /**
+     * 聚合根 → 详情出参：草稿 / 当前版本快照 / 模型名由服务层补充
+     */
+    @Mapping(target = "hasDraft", source = "draft", qualifiedByName = "configToPresent")
+    @Mapping(target = "draft", ignore = true)
+    @Mapping(target = "currentVersion", ignore = true)
+    @Mapping(target = "modelName", ignore = true)
+    AgentSpecDetailDTO toDetailDTO(AgentSpec spec);
+
     // config → AgentSpecConfigDTO 自动复用 toConfigDTO（modelName 在服务层补充）
     AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
 
@@ -48,11 +58,19 @@ public interface AgentSpecConverter {
     AgentSpecConfigDTO toConfigDTO(AgentSpecConfig config);
 
     /**
-     * 草稿 JSON 是否存在 → hasDraft 布尔
+     * 草稿 JSON 字符串是否存在 → hasDraft 布尔（DO 侧）
      */
     @Named("draftToPresent")
     default Boolean draftToPresent(String draftJson) {
         return draftJson != null && !draftJson.isBlank();
+    }
+
+    /**
+     * 草稿值对象是否存在 → hasDraft 布尔（聚合根侧）
+     */
+    @Named("configToPresent")
+    default Boolean configToPresent(AgentSpecConfig draft) {
+        return draft != null;
     }
 
     /**

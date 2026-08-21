@@ -122,11 +122,11 @@ class AgentSpecTest {
         AgentSpecVersion latest = spec.publish(null);
 
         AgentSpecVersionImmutableException ex = assertThrows(AgentSpecVersionImmutableException.class,
-                () -> latest.modify(config("篡改快照")));
+                latest::modify);
         assertTrue(ex.getMessage().contains("v2"));
         // 早前版本同样拒绝（重建自持久化数据的 v1）
         AgentSpecVersion first = AgentSpecVersion.reconstitute(99L, 1L, 1, config("你是客服"), null, null);
-        assertThrows(AgentSpecVersionImmutableException.class, () -> first.modify(config("篡改 v1")));
+        assertThrows(AgentSpecVersionImmutableException.class, first::modify);
     }
 
     @Test

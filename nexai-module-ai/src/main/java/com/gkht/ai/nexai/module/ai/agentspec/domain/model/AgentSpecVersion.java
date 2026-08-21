@@ -68,9 +68,9 @@ public final class AgentSpecVersion {
 
     /**
      * 已发布版本不可变：任何修改尝试都被拒绝（发布语义的核心不变量）。
-     * 该方法的存在使「不可变」成为显式 API 契约而非隐式约定。
+     * 该方法的存在使「不可变」成为显式 API 契约而非隐式约定——测试据此断言拒绝行为。
      */
-    public AgentSpecVersion modify(AgentSpecConfig newConfig) {
+    public void modify() {
         throw new AgentSpecVersionImmutableException(specId, versionNo);
     }
 

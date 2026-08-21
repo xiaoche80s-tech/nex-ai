@@ -119,7 +119,7 @@ const formData = ref<SpecApi.AgentSpecSaveForm & { systemPrompt?: string }>({
   name: '',
   description: '',
   icon: '',
-  modelId: undefined as unknown as number,
+  modelId: undefined,
   systemPrompt: '',
   maxIters: undefined,
   temperature: undefined
@@ -147,7 +147,7 @@ const open = async (id?: number) => {
         name: detail.name,
         description: detail.description ?? '',
         icon: detail.icon ?? '',
-        modelId: config?.modelId ?? (undefined as unknown as number),
+        modelId: config?.modelId,
         systemPrompt: config?.systemPrompt ?? '',
         maxIters: config?.maxIters ?? undefined,
         temperature: config?.temperature ?? undefined
@@ -160,7 +160,7 @@ const open = async (id?: number) => {
         name: '',
         description: '',
         icon: '',
-        modelId: undefined as unknown as number,
+        modelId: undefined,
         systemPrompt: '',
         maxIters: undefined,
         temperature: undefined
