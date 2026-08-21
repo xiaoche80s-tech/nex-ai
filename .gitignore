@@ -51,6 +51,7 @@ rebel.xml
 application-my.yaml
 application-local.yaml
 .mimosa/
+.scratch/
 
 /nexai-ui-app/unpackage/
 .DS_Store

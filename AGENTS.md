@@ -127,6 +127,20 @@ framework/                       # 模块内 Spring 配置
 - 样式使用 UnoCSS 原子类（`uno.config.ts`）；SVG 图标放 `src/assets/svgs`，以 `icon-[dir]-[name]` 形式引用。
 - 界面文案接入 vue-i18n（`src/locales/`），新文案写入语言包。
 
+## Agent skills
+
+### Issue tracker
+
+工单以本地 markdown 文件跟踪于 `.scratch/<feature>/`（已 gitignore）。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用五个默认角色标签：needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文布局：根 `CONTEXT.md` + `docs/adr/`，由 `/domain-modeling` 惰性创建。见 `docs/agents/domain.md`。
+
 ## 注意事项
 
 - 上游芋道品牌信息在多处残留（pom `description`、Swagger 标题、`ruoyi-vue-pro.sql`）；未经要求不要迁移。
