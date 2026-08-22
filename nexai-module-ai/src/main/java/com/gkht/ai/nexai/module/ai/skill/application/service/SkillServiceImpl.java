@@ -88,9 +88,10 @@ public class SkillServiceImpl implements SkillService {
         } catch (SkillPublishWithoutDraftException ex) {
             throw exception(SKILL_PUBLISH_WITHOUT_DRAFT);
         }
-        // 聚合状态（指针前移、草稿清空）与版本快照同一事务落库
-        skillRepository.save(skill);
+        // 版本行先落库（引用转正：content_id 取主表现存草稿指针），随后 save 才清空指针；
+        // 聚合状态（指针前移、草稿清空）与版本行同一事务
         skillRepository.createVersion(version);
+        skillRepository.save(skill);
         return version.getVersionNo();
     }
 

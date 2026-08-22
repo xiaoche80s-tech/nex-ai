@@ -1,7 +1,6 @@
 package com.gkht.ai.nexai.module.ai.skill.infrastructure.converter;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
-import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillContentDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDetailDTO;
@@ -10,29 +9,33 @@ import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
 import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillVersion;
 import com.gkht.ai.nexai.module.ai.skill.domain.valueobject.SkillContent;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillDO;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillResourceDO;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillVersionDO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Named;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 技能转换器：领域模型 → DO、领域模型 → 出参 DTO。
- * DO → 领域模型（聚合重建）在 RepositoryImpl 经 reconstitute 完成。
- * 资源文件集在 DO 侧为 JSON 字符串、领域侧为 {@link SkillContent} 内的不可变 Map，互转集中于此。
+ * 技能转换器：领域模型 → 主表/版本表 DO、领域模型 → 出参 DTO。
+ * 内容与资源不在主表/版本表列中（ADR-0003 修订：内容独立成表 + 资源行级子表），
+ * 跨表装配在 RepositoryImpl / AgentscopeSkillRepository 完成，converter 只做同构字段映射。
  */
 @Mapper(componentModel = "spring")
 public interface SkillConverter {
 
-    @Mapping(target = "draftSkillMd", source = "draft", qualifiedByName = "draftToSkillMd")
-    @Mapping(target = "draftResources", source = "draft", qualifiedByName = "draftToResourcesJson")
+    /**
+     * 聚合根 → 主表 DO。draftContentId 忽略：内容行先落库拿编号、再回填指针，由 RepositoryImpl 编排
+     */
+    @Mapping(target = "draftContentId", ignore = true)
     SkillDO toDataObject(Skill skill);
 
-    @Mapping(target = "skillMd", source = "content", qualifiedByName = "contentToSkillMd")
-    @Mapping(target = "resources", source = "content", qualifiedByName = "contentToResourcesJson")
+    /**
+     * 版本实体 → 版本表 DO（纯指针行）。contentId 忽略：发布引用转正时由 RepositoryImpl 从主表草稿指针补
+     */
+    @Mapping(target = "contentId", ignore = true)
     SkillVersionDO toVersionDataObject(SkillVersion version);
 
     /**
@@ -47,7 +50,7 @@ public interface SkillConverter {
     default PageResult<SkillDTO> toDTOPage(PageResult<SkillDO> page) {
         List<SkillDTO> rows = toDTOList(page.getList());
         for (int i = 0; i < rows.size(); i++) {
-            rows.get(i).setHasDraft(draftMdToPresent(page.getList().get(i).getDraftSkillMd()));
+            rows.get(i).setHasDraft(page.getList().get(i).getDraftContentId() != null);
         }
         return new PageResult<>(rows, page.getTotal());
     }
@@ -66,62 +69,16 @@ public interface SkillConverter {
     SkillContentDTO toContentDTO(SkillContent content);
 
     /**
-     * 草稿值对象 → SKILL.md 原文列；null 草稿保持 null（表示无草稿）
+     * 资源行集合 → path → content 有序 Map（保持 path 升序的稳定装配形态）
      */
-    @Named("draftToSkillMd")
-    default String draftToSkillMd(SkillContent draft) {
-        return draft == null ? null : draft.getSkillMd();
-    }
-
-    /**
-     * 草稿值对象 → 资源 JSON 列；null 草稿保持 null（表示无草稿）
-     */
-    @Named("draftToResourcesJson")
-    default String draftToResourcesJson(SkillContent draft) {
-        return draft == null ? null : resourcesToJson(draft.getResources());
-    }
-
-    @Named("contentToSkillMd")
-    default String contentToSkillMd(SkillContent content) {
-        return content.getSkillMd();
-    }
-
-    @Named("contentToResourcesJson")
-    default String contentToResourcesJson(SkillContent content) {
-        return resourcesToJson(content.getResources());
-    }
-
-    /** 草稿 SKILL.md 列是否存在 → hasDraft 布尔（DO 侧） */
-    @Named("draftMdToPresent")
-    default Boolean draftMdToPresent(String draftSkillMd) {
-        return draftSkillMd != null && !draftSkillMd.isBlank();
-    }
-
-    /**
-     * DO 两列草稿 → 领域草稿值对象；两列均空返回 null（表示无草稿）
-     */
-    default SkillContent jsonToDraft(String draftSkillMd, String draftResources) {
-        if (draftSkillMd == null || draftSkillMd.isBlank()) {
-            return null;
+    default Map<String, String> resourcesToMap(List<SkillResourceDO> resources) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (resources != null) {
+            for (SkillResourceDO resource : resources) {
+                map.put(resource.getPath(), resource.getContent());
+            }
         }
-        return SkillContent.of(draftSkillMd, jsonToResources(draftResources));
-    }
-
-    /**
-     * 资源文件集 JSON → Map；null / 空白 / 非法 JSON 均按空集处理（缺列容忍）
-     */
-    default Map<String, String> jsonToResources(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
-        Map<String, String> parsed = JsonUtils.parseObjectQuietly(json,
-                new tools.jackson.core.type.TypeReference<LinkedHashMap<String, String>>() {
-                });
-        return parsed != null ? parsed : Map.of();
-    }
-
-    default String resourcesToJson(Map<String, String> resources) {
-        return JsonUtils.toJsonString(resources == null ? Map.of() : resources);
+        return map;
     }
 
 }

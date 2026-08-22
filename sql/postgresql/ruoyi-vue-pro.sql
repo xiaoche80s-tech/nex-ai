@@ -6246,7 +6246,8 @@ CREATE SEQUENCE ai_session_seq
     START 1;
 
 -- ----------------------------
--- Table structure for ai_skill（NexAI 智能体平台：技能，工单 10，ADR-0003）
+-- Table structure for ai_skill（NexAI 智能体平台：技能，工单 10，ADR-0003 修订：
+-- 内容独立成表 + 资源行级子表，主表零内容列）
 -- ----------------------------
 DROP TABLE IF EXISTS ai_skill;
 CREATE TABLE ai_skill (
@@ -6255,8 +6256,7 @@ CREATE TABLE ai_skill (
     description varchar(512) NOT NULL,
     latest_version_no int4 NOT NULL DEFAULT 0,
     current_version_no int4 NULL DEFAULT NULL,
-    draft_skill_md text NULL DEFAULT NULL,
-    draft_resources text NULL DEFAULT NULL,
+    draft_content_id int8 NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater varchar(64) NULL DEFAULT '',
@@ -6273,30 +6273,97 @@ COMMENT ON COLUMN ai_skill.name IS '技能名（SKILL.md front matter 的 name�
 COMMENT ON COLUMN ai_skill.description IS '技能描述（SKILL.md front matter 的 description，冗余列供列表展示）';
 COMMENT ON COLUMN ai_skill.latest_version_no IS '已发布的最新版本号，从未发布为 0';
 COMMENT ON COLUMN ai_skill.current_version_no IS '当前默认版本号（运行时仓储读取的版本），从未发布为 NULL';
-COMMENT ON COLUMN ai_skill.draft_skill_md IS '草稿 SKILL.md 原文（front matter 完整保留，运行时按原文重建 AgentSkill），NULL 表示无草稿';
-COMMENT ON COLUMN ai_skill.draft_resources IS '草稿资源文件集 JSON（相对路径 → 文件内容），NULL 表示无草稿';
+COMMENT ON COLUMN ai_skill.draft_content_id IS '草稿内容行编号（ai_skill_content.id），NULL 表示无草稿';
 COMMENT ON COLUMN ai_skill.creator IS '创建者';
 COMMENT ON COLUMN ai_skill.create_time IS '创建时间';
 COMMENT ON COLUMN ai_skill.updater IS '更新者';
 COMMENT ON COLUMN ai_skill.update_time IS '更新时间';
 COMMENT ON COLUMN ai_skill.deleted IS '是否删除';
 COMMENT ON COLUMN ai_skill.tenant_id IS '租户编号';
-COMMENT ON TABLE ai_skill IS 'AI 平台技能表（自建表实现官方 AgentSkillRepository 接口，ADR-0003；草稿 → 发布锁定 → 再编辑生成新草稿）';
+COMMENT ON TABLE ai_skill IS 'AI 平台技能表（自建表族实现官方 AgentSkillRepository 接口，ADR-0003；草稿 → 发布锁定 → 再编辑生成新草稿）';
 
 DROP SEQUENCE IF EXISTS ai_skill_seq;
 CREATE SEQUENCE ai_skill_seq
     START 1;
 
 -- ----------------------------
--- Table structure for ai_skill_version（NexAI 智能体平台：技能版本，工单 10）
+-- Table structure for ai_skill_content（NexAI 智能体平台：技能内容，工单 10，ADR-0003 修订）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_skill_content;
+CREATE TABLE ai_skill_content (
+    id int8 NOT NULL,
+    skill_id int8 NOT NULL,
+    skill_md text NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill_content ADD CONSTRAINT pk_ai_skill_content PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_skill_content.id IS '内容行编号';
+COMMENT ON COLUMN ai_skill_content.skill_id IS '归属技能编号（ai_skill.id，冗余归属列，聚合删除时级联清理含历史草稿行）';
+COMMENT ON COLUMN ai_skill_content.skill_md IS 'SKILL.md 全文（YAML front matter 的 name/description 必填 + 正文，front matter 完整保真存储，运行时按原文重建 AgentSkill）';
+COMMENT ON COLUMN ai_skill_content.creator IS '创建者';
+COMMENT ON COLUMN ai_skill_content.create_time IS '创建时间';
+COMMENT ON COLUMN ai_skill_content.updater IS '更新者';
+COMMENT ON COLUMN ai_skill_content.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill_content.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill_content.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill_content IS 'AI 平台技能内容表（一行 = 一份完整 SKILL.md，内容行不可变：编辑草稿写新行，发布引用转正零复制）';
+
+DROP SEQUENCE IF EXISTS ai_skill_content_seq;
+CREATE SEQUENCE ai_skill_content_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_skill_resource（NexAI 智能体平台：技能资源文件，工单 10，ADR-0003 修订）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_skill_resource;
+CREATE TABLE ai_skill_resource (
+    id int8 NOT NULL,
+    content_id int8 NOT NULL,
+    path varchar(500) NOT NULL,
+    content text NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill_resource ADD CONSTRAINT pk_ai_skill_resource PRIMARY KEY (id);
+CREATE UNIQUE INDEX uk_ai_skill_resource ON ai_skill_resource (content_id, path) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_skill_resource.id IS '资源行编号';
+COMMENT ON COLUMN ai_skill_resource.content_id IS '所属内容行编号（ai_skill_content.id）';
+COMMENT ON COLUMN ai_skill_resource.path IS '资源文件相对路径（如 scripts/run.py，禁 .. 段与反斜杠）';
+COMMENT ON COLUMN ai_skill_resource.content IS '资源文件内容';
+COMMENT ON COLUMN ai_skill_resource.creator IS '创建者';
+COMMENT ON COLUMN ai_skill_resource.create_time IS '创建时间';
+COMMENT ON COLUMN ai_skill_resource.updater IS '更新者';
+COMMENT ON COLUMN ai_skill_resource.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill_resource.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill_resource.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill_resource IS 'AI 平台技能资源文件表（一行 = 一个附属资源文件，行级化对齐官方 agentscope_skill_resources 惯例）';
+
+DROP SEQUENCE IF EXISTS ai_skill_resource_seq;
+CREATE SEQUENCE ai_skill_resource_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_skill_version（NexAI 智能体平台：技能版本，工单 10，ADR-0003 修订）
 -- ----------------------------
 DROP TABLE IF EXISTS ai_skill_version;
 CREATE TABLE ai_skill_version (
     id int8 NOT NULL,
     skill_id int8 NOT NULL,
     version_no int4 NOT NULL,
-    skill_md text NOT NULL,
-    resources text NOT NULL,
+    content_id int8 NOT NULL,
     remark varchar(255) NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -6312,8 +6379,7 @@ CREATE UNIQUE INDEX uk_ai_skill_version ON ai_skill_version (skill_id, version_n
 COMMENT ON COLUMN ai_skill_version.id IS '版本记录编号';
 COMMENT ON COLUMN ai_skill_version.skill_id IS '所属技能编号（ai_skill.id）';
 COMMENT ON COLUMN ai_skill_version.version_no IS '版本号，技能内从 1 递增';
-COMMENT ON COLUMN ai_skill_version.skill_md IS '发布时固化的 SKILL.md 原文快照（不可变，只插入不更新）';
-COMMENT ON COLUMN ai_skill_version.resources IS '发布时固化的资源文件集 JSON（相对路径 → 文件内容，不可变）';
+COMMENT ON COLUMN ai_skill_version.content_id IS '内容行编号（ai_skill_content.id，发布时从主表草稿指针引用转正，零复制）';
 COMMENT ON COLUMN ai_skill_version.remark IS '发布说明';
 COMMENT ON COLUMN ai_skill_version.creator IS '创建者';
 COMMENT ON COLUMN ai_skill_version.create_time IS '发布时间';
@@ -6321,7 +6387,7 @@ COMMENT ON COLUMN ai_skill_version.updater IS '更新者';
 COMMENT ON COLUMN ai_skill_version.update_time IS '更新时间';
 COMMENT ON COLUMN ai_skill_version.deleted IS '是否删除';
 COMMENT ON COLUMN ai_skill_version.tenant_id IS '租户编号';
-COMMENT ON TABLE ai_skill_version IS 'AI 平台技能版本表（不可变快照，发布语义：草稿 → 发布锁定 → 再编辑生成新草稿）';
+COMMENT ON TABLE ai_skill_version IS 'AI 平台技能版本表（不可变指针行，发布语义：草稿 → 发布锁定（引用转正） → 再编辑生成新草稿）';
 
 DROP SEQUENCE IF EXISTS ai_skill_version_seq;
 CREATE SEQUENCE ai_skill_version_seq

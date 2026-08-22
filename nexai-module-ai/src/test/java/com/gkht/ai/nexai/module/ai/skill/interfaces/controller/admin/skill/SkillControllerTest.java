@@ -21,8 +21,11 @@ import com.gkht.ai.nexai.module.ai.skill.domain.gateway.SkillMdParserGateway;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.converter.SkillConverterImpl;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.gateway.AgentscopeSkillMdParserGateway;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.gateway.AgentscopeSkillRepository;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillContentMapper;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillMapper;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillResourceMapper;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillVersionMapper;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.repository.SkillContentAssembler;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.repository.SkillRepositoryImpl;
 import io.agentscope.core.skill.AgentSkill;
 import jakarta.annotation.Resource;
@@ -47,6 +50,7 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_PUBLISH
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_VERSION_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -58,7 +62,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 官方 AgentSkillRepository 实现（AgentscopeSkillRepository）的行为与租户隔离同链路验证。
  */
 @Import({SkillController.class, SkillServiceImpl.class, SkillRepositoryImpl.class,
-        SkillConverterImpl.class, AgentscopeSkillMdParserGateway.class, AgentscopeSkillRepository.class,
+        SkillConverterImpl.class, SkillContentAssembler.class,
+        AgentscopeSkillMdParserGateway.class, AgentscopeSkillRepository.class,
         SkillControllerTest.TenantDbTestConfiguration.class})
 public class SkillControllerTest extends BaseDbAndRedisUnitTest {
 
@@ -73,6 +78,15 @@ public class SkillControllerTest extends BaseDbAndRedisUnitTest {
 
     @Resource
     private SkillMapper skillMapper;
+
+    @Resource
+    private SkillContentMapper skillContentMapper;
+
+    @Resource
+    private SkillResourceMapper skillResourceMapper;
+
+    @Resource
+    private SkillVersionMapper skillVersionMapper;
 
     /** 注入以强制初始化租户拦截器 bean（向 MybatisPlusInterceptor 注册 inner） */
     @Resource
@@ -133,19 +147,26 @@ public class SkillControllerTest extends BaseDbAndRedisUnitTest {
     // ==================== 管理面行为 ====================
 
     @Test
-    @DisplayName("创建技能：SKILL.md 原文与资源落草稿、name/description 从 front matter 解析冗余、租户自动归属")
+    @DisplayName("创建技能：主表零内容列、草稿指针指向内容行、资源文件行级落库、租户自动归属")
     public void createSkillPersistsDraft() {
         Long skillId = skillController.createSkill(createCommand(VALID_MD)).getData();
 
         assertNotNull(skillId);
-        var dataObject = skillMapper.selectById(skillId);
-        assertEquals(VALID_MD, dataObject.getDraftSkillMd());
-        assertTrue(dataObject.getDraftResources().contains("scripts/run.py"));
-        assertEquals("pdf-report", dataObject.getName());
-        assertEquals("生成 PDF 汇报文档", dataObject.getDescription());
-        assertEquals(0, dataObject.getLatestVersionNo());
-        assertNull(dataObject.getCurrentVersionNo());
-        assertEquals(1L, dataObject.getTenantId());
+        var main = skillMapper.selectById(skillId);
+        assertEquals("pdf-report", main.getName());
+        assertEquals("生成 PDF 汇报文档", main.getDescription());
+        assertEquals(0, main.getLatestVersionNo());
+        assertNull(main.getCurrentVersionNo());
+        assertEquals(1L, main.getTenantId());
+        // 内容独立成表：SKILL.md 在内容行，资源文件行级
+        assertNotNull(main.getDraftContentId());
+        var content = skillContentMapper.selectById(main.getDraftContentId());
+        assertEquals(skillId, content.getSkillId());
+        assertEquals(VALID_MD, content.getSkillMd());
+        var resources = skillResourceMapper.selectListByContentIds(List.of(main.getDraftContentId()));
+        assertEquals(1, resources.size());
+        assertEquals("scripts/run.py", resources.get(0).getPath());
+        assertEquals("print('hi')", resources.get(0).getContent());
     }
 
     @Test
@@ -211,25 +232,35 @@ public class SkillControllerTest extends BaseDbAndRedisUnitTest {
     }
 
     @Test
-    @DisplayName("发布：草稿固化为 v1 快照、指针前移、草稿清空；无草稿再发布报错；v2 后 v1 快照原样")
+    @DisplayName("发布：版本行引用转正（content_id = 草稿内容行，零复制）、指针前移、草稿指针清空；无草稿再发布报错；v2 后 v1 内容原样")
     public void publishLocksImmutableSnapshot() {
         Long skillId = skillController.createSkill(createCommand(VALID_MD)).getData();
+        Long draftContentId = skillMapper.selectById(skillId).getDraftContentId();
 
         assertEquals(1, skillController.publishSkill(publishCommand(skillId, "首个版本")).getData());
 
+        // 引用转正：版本行指向原草稿内容行（同一行，零复制）；主表草稿指针清空、默认版本前移
+        var version = skillVersionMapper.selectBySkillIdAndVersionNo(skillId, 1);
+        assertEquals(draftContentId, version.getContentId());
+        assertEquals(VALID_MD, skillContentMapper.selectById(draftContentId).getSkillMd());
+        var main = skillMapper.selectById(skillId);
+        assertEquals(1, main.getCurrentVersionNo());
+        assertNull(main.getDraftContentId());
+
         SkillDetailDTO detail = skillController.getSkill(skillId).getData();
-        assertEquals(1, detail.getCurrentVersionNo());
         assertFalse(detail.getHasDraft());
         assertEquals(VALID_MD, detail.getCurrentVersion().getContent().getSkillMd());
         assertTrue(detail.getCurrentVersion().getContent().getResources().containsKey("scripts/run.py"));
         assertEquals("首个版本", detail.getCurrentVersion().getRemark());
 
-        // 再编辑 → 发布 v2；v1 快照保持发布时内容
+        // 再编辑 → 旧内容行被版本引用而保留、新草稿写新行 → 发布 v2；v1 内容行原样
         String v2Md = "---\nname: pdf-report\ndescription: 生成 PDF 汇报文档\n---\n按新版模板生成。";
         SkillUpdateCommand command = new SkillUpdateCommand();
         command.setId(skillId);
         command.setSkillMd(v2Md);
         skillController.updateSkill(command);
+        Long v2DraftContentId = skillMapper.selectById(skillId).getDraftContentId();
+        assertNotEquals(draftContentId, v2DraftContentId);
         assertEquals(2, skillController.publishSkill(publishCommand(skillId, "v2")).getData());
 
         List<SkillVersionDTO> versions = skillController.getVersionList(skillId).getData();
@@ -239,6 +270,30 @@ public class SkillControllerTest extends BaseDbAndRedisUnitTest {
 
         assertServiceException(() -> skillController.publishSkill(publishCommand(skillId, null)),
                 SKILL_PUBLISH_WITHOUT_DRAFT);
+    }
+
+    @Test
+    @DisplayName("编辑草稿：写新内容行，无版本引用的旧内容行连同资源行清理；内容未变则复用原行（幂等保存）")
+    public void updateSkillCleansStaleContentRow() {
+        Long skillId = skillController.createSkill(createCommand(VALID_MD)).getData();
+        Long staleContentId = skillMapper.selectById(skillId).getDraftContentId();
+
+        SkillUpdateCommand command = new SkillUpdateCommand();
+        command.setId(skillId);
+        command.setSkillMd(VALID_MD);
+        command.setResources(Map.of());
+        skillController.updateSkill(command);
+
+        // 旧内容行被清理（无版本引用），草稿指向新行
+        Long newContentId = skillMapper.selectById(skillId).getDraftContentId();
+        assertNotEquals(staleContentId, newContentId);
+        assertNull(skillContentMapper.selectById(staleContentId));
+        assertTrue(skillResourceMapper.selectListByContentIds(List.of(staleContentId)).isEmpty());
+        assertEquals(VALID_MD, skillContentMapper.selectById(newContentId).getSkillMd());
+
+        // 再次保存相同内容：复用原行，不产生内容行 churn
+        skillController.updateSkill(command);
+        assertEquals(newContentId, skillMapper.selectById(skillId).getDraftContentId());
     }
 
     @Test

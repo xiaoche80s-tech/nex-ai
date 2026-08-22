@@ -4,11 +4,11 @@ import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
 import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
 import com.gkht.ai.nexai.module.ai.skill.domain.repository.SkillRepository;
 import com.gkht.ai.nexai.module.ai.skill.domain.valueobject.SkillContent;
-import com.gkht.ai.nexai.module.ai.skill.infrastructure.converter.SkillConverter;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillDO;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillVersionDO;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillMapper;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillVersionMapper;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.repository.SkillContentAssembler;
 import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.AgentSkillRepositoryInfo;
@@ -22,21 +22,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 官方 {@link AgentSkillRepository} 的平台实现（ADR-0003）：自建 {@code ai_skill} 表
- * 承载多租户与版本化，不使用官方 {@code agentscope_skills} 表与自动建表。
- * 供运行时装配链注入（如 DynamicSkillMiddleware 的仓储列表），实现工单 11 挂载生效的读侧。
+ * 官方 {@link AgentSkillRepository} 的平台实现（ADR-0003，2026-08-22 修订：内容独立成表 +
+ * 资源行级子表）：自建 {@code ai_skill} 表族承载多租户与版本化，不使用官方
+ * {@code agentscope_skills} 表与自动建表。供运行时装配链注入（如 DynamicSkillMiddleware
+ * 的仓储列表），实现工单 11 挂载生效的读侧。
  *
- * <p><b>可见性语义</b>：只读「已发布」技能（默认版本指针指向的版本快照）——与智能体规格
- * 「运行时只见已发布版本」的纪律一致，草稿不进运行时。读侧经 MyBatis 租户拦截器按
- * {@link TenantContextHolder} 当前租户过滤，调用方（运行时链路）必须先建立租户上下文。</p>
+ * <p><b>可见性语义</b>：只读「已发布」技能（默认版本指针指向的版本 → 内容行 → 资源行
+ * 三段组配）——与智能体规格「运行时只见已发布版本」的纪律一致，草稿不进运行时。读侧经
+ * MyBatis 租户拦截器按 {@link TenantContextHolder} 当前租户过滤，调用方（运行时链路）
+ * 必须先建立租户上下文。</p>
  *
  * <p><b>写侧语义</b>（运行时写回技能，如自学习闭环）：{@link #save} 把传入 AgentSkill
- * 固化为该技能的<b>草稿</b>（不存在则创建技能），不绕过「发布才进读侧」的不变量；
- * {@link #setWriteable} 只读化运行时写通道，不影响管理面应用服务。</p>
+ * 固化为该技能的<b>草稿</b>（不存在则创建技能），经聚合 Repository 落新内容行——
+ * 不绕过「发布才进读侧」的不变量；{@link #setWriteable} 只读化运行时写通道，
+ * 不影响管理面应用服务。</p>
  */
 @Component
 public class AgentscopeSkillRepository implements AgentSkillRepository {
@@ -50,18 +53,18 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
 
     private final SkillMapper skillMapper;
     private final SkillVersionMapper skillVersionMapper;
-    private final SkillConverter skillConverter;
+    private final SkillContentAssembler contentAssembler;
     private final SkillRepository skillRepository;
     /** 运行时写通道旗标（读侧不受限），volatile 供 setWriteable 并发切换 */
     private volatile boolean writeable = true;
 
     public AgentscopeSkillRepository(SkillMapper skillMapper,
                                      SkillVersionMapper skillVersionMapper,
-                                     SkillConverter skillConverter,
+                                     SkillContentAssembler contentAssembler,
                                      SkillRepository skillRepository) {
         this.skillMapper = skillMapper;
         this.skillVersionMapper = skillVersionMapper;
-        this.skillConverter = skillConverter;
+        this.contentAssembler = contentAssembler;
         this.skillRepository = skillRepository;
     }
 
@@ -74,7 +77,12 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
             // 对齐官方语义：不存在（含未发布）按名抛出，调用方以此感知缺技能
             throw new IllegalArgumentException("Skill not found: " + name);
         }
-        return rebuild(version);
+        SkillContent content = contentAssembler.assembleOne(version.getContentId());
+        if (content == null) {
+            throw new IllegalStateException(
+                    "Skill content row missing: " + name + " (content " + version.getContentId() + ")");
+        }
+        return rebuild(content);
     }
 
     /**
@@ -98,21 +106,30 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
         if (published.isEmpty()) {
             return List.of();
         }
+        // 三段组配：版本行（按 skill_id + version_no 定位默认版本）→ 内容行 → 资源行
         Map<String, SkillVersionDO> versionBySkillId = skillVersionMapper
                 .selectListBySkillIds(published.stream().map(SkillDO::getId).toList()).stream()
                 .collect(Collectors.toMap(
-                        version -> versionKey(version.getSkillId(), version.getVersionNo()),
-                        Function.identity(),
+                        version -> version.getSkillId() + ":" + version.getVersionNo(),
+                        version -> version,
                         (a, b) -> a));
+        Map<Long, SkillContent> contentById = contentAssembler.assemble(versionBySkillId.values().stream()
+                .map(SkillVersionDO::getContentId).filter(Objects::nonNull).toList());
         List<AgentSkill> skills = new ArrayList<>(published.size());
         for (SkillDO skill : published) {
-            SkillVersionDO version = versionBySkillId.get(versionKey(skill.getId(), skill.getCurrentVersionNo()));
+            SkillVersionDO version = versionBySkillId.get(skill.getId() + ":" + skill.getCurrentVersionNo());
             if (version == null) {
                 log.warn("[getAllSkills][技能 {} 指向的默认版本 {} 缺失，跳过]", skill.getId(), skill.getCurrentVersionNo());
                 continue;
             }
+            SkillContent content = contentById.get(version.getContentId());
+            if (content == null) {
+                log.warn("[getAllSkills][技能 {} 默认版本 {} 的内容行 {} 缺失，跳过]",
+                        skill.getId(), skill.getCurrentVersionNo(), version.getContentId());
+                continue;
+            }
             try {
-                skills.add(rebuild(version));
+                skills.add(rebuild(content));
             } catch (IllegalArgumentException ex) {
                 // 对齐官方容忍语义：单个技能构建失败不拖垮整批（warn 后跳过）
                 log.warn("[getAllSkills][技能 {} 重建失败：{}]", skill.getId(), ex.getMessage());
@@ -139,7 +156,8 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
                 throw new IllegalStateException("Cannot save skill: '" + agentSkill.getName()
                         + "' already exists and force=false. Use force=true to overwrite.");
             }
-            // AgentSkill → SKILL.md 原文（front matter 由 metadata 重新生成，正文原样）
+            // AgentSkill → SKILL.md 原文（front matter 由 metadata 重新生成，正文原样）；
+            // 经聚合 Repository 落新内容行 + 主表指针，内容行生命周期封装在其内
             String skillMd = MarkdownSkillParser.generate(agentSkill.getMetadata(), agentSkill.getSkillContent());
             SkillContent content = SkillContent.of(skillMd, agentSkill.getResources());
             if (existing == null) {
@@ -200,12 +218,11 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
      * 版本快照 → AgentSkill：经官方解析器从 SKILL.md 原文重建（与解析网关同源），
      * source 取本仓储标识（getSkillId = name_source）
      */
-    private AgentSkill rebuild(SkillVersionDO version) {
-        return SkillUtil.createFrom(version.getSkillMd(),
-                skillConverter.jsonToResources(version.getResources()), REPOSITORY_TYPE);
+    private AgentSkill rebuild(SkillContent content) {
+        return SkillUtil.createFrom(content.getSkillMd(), content.getResources(), REPOSITORY_TYPE);
     }
 
-    /** 技能的当前默认版本快照；技能不存在或未发布返回 null */
+    /** 技能的当前默认版本行；技能不存在或未发布返回 null */
     private SkillVersionDO currentVersionOf(SkillDO skill) {
         if (skill == null || skill.getCurrentVersionNo() == null) {
             return null;
@@ -216,10 +233,6 @@ public class AgentscopeSkillRepository implements AgentSkillRepository {
     /** 强断言租户上下文存在：读侧按当前租户过滤，无租户即无确定的技能集 */
     private void requireTenant() {
         TenantContextHolder.getRequiredTenantId();
-    }
-
-    private String versionKey(Long skillId, Integer versionNo) {
-        return skillId + ":" + versionNo;
     }
 
 }

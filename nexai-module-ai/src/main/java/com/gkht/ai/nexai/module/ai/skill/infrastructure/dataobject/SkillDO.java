@@ -8,9 +8,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * 技能 DO（贫血模型）。草稿拆两列保真存储：draft_skill_md 存 SKILL.md 原文
- * （front matter 完整保留，运行时按原文重建 AgentSkill），draft_resources 存资源
- * JSON 字符串，两列均 NULL 表示无草稿；默认版本以版本号表达，发布在聚合内即可完成指针前移。
+ * 技能 DO（贫血模型）：主体与指针，零内容列（ADR-0003 修订）。
+ * 草稿经 draft_content_id 指向内容表行（NULL 表示无草稿）；
+ * 默认版本以版本号表达，发布在聚合内即可完成指针前移。
  */
 @TableName("ai_skill")
 @KeySequence("ai_skill_seq") // 用于 Oracle、PostgreSQL、Kingbase、DB2、H2 数据库的主键自增。如果是 MySQL 等数据库，可不写。
@@ -40,12 +40,8 @@ public class SkillDO extends TenantBaseDO {
      */
     private Integer currentVersionNo;
     /**
-     * 草稿 SKILL.md 原文，NULL 表示无草稿
+     * 草稿内容行编号（ai_skill_content.id），NULL 表示无草稿
      */
-    private String draftSkillMd;
-    /**
-     * 草稿资源文件集 JSON 字符串（path → content），NULL 表示无草稿
-     */
-    private String draftResources;
+    private Long draftContentId;
 
 }

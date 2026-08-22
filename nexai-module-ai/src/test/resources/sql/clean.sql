@@ -4,4 +4,6 @@ DELETE FROM "ai_model";
 DELETE FROM "ai_agent_spec";
 DELETE FROM "ai_agent_spec_version";
 DELETE FROM "ai_skill";
+DELETE FROM "ai_skill_content";
+DELETE FROM "ai_skill_resource";
 DELETE FROM "ai_skill_version";
