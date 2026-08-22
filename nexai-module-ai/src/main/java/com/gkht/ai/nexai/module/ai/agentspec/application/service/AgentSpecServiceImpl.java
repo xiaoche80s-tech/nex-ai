@@ -135,7 +135,7 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     public PageResult<AgentSpecDTO> getSpecPage(AgentSpecPageQuery query) {
         PageResult<AgentSpecDO> page = agentSpecMapper.selectPage(query, query.getName());
         PageResult<AgentSpecDTO> result = agentSpecConverter.toDTOPage(page);
-        fillRowModelNames(page.getList(), result.getList());
+        fillRowConfigInfo(page.getList(), result.getList());
         return result;
     }
 
@@ -192,7 +192,7 @@ public class AgentSpecServiceImpl implements AgentSpecService {
      * 列表行补充模型名与自描述：优先取草稿（正在编辑的内容），无草稿取默认版本快照
      * ——草稿 JSON 直接从 DO 解析，默认版本一次批量查询后内存匹配
      */
-    private void fillRowModelNames(List<AgentSpecDO> dataObjects, List<AgentSpecDTO> rows) {
+    private void fillRowConfigInfo(List<AgentSpecDO> dataObjects, List<AgentSpecDTO> rows) {
         if (dataObjects.isEmpty()) {
             return;
         }

@@ -98,7 +98,10 @@ class AgentSpecConfigTest {
         assertEquals(base, AgentSpecConfig.of(1L, "描述", "提示", 10,
                 GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
                 List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null))));
-        assertEquals(base.hashCode(), base.hashCode());
+        AgentSpecConfig same = AgentSpecConfig.of(1L, "描述", "提示", 10,
+                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)));
+        assertEquals(base.hashCode(), same.hashCode());
 
         assertNotEquals(base, AgentSpecConfig.of(1L, "别的描述", "提示", 10,
                 GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
