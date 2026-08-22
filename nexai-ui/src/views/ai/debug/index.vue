@@ -441,7 +441,10 @@ const effectiveMaxIters = computed(
   () => activeSession.value?.overrideMaxIters ?? detailConfig.value?.maxIters ?? '默认'
 )
 const effectiveTemperature = computed(
-  () => activeSession.value?.overrideTemperature ?? detailConfig.value?.temperature ?? '默认'
+  () =>
+    activeSession.value?.overrideTemperature ??
+    detailConfig.value?.generateOptions?.temperature ??
+    '默认'
 )
 
 /** 打开（或切换）会话：恢复继续对话能力并加载绑定版本快照填充右栏 */

@@ -4,6 +4,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Model;
@@ -174,7 +175,8 @@ public class SessionServiceImpl implements SessionService {
 
     /**
      * 发起事件流前的共用装配链：会话绑定的版本快照 + 渠道模型解析 + 会话级推理参数覆盖。
-     * 覆盖优先于快照（克隆重跑微调参数的生效点）。运行中重复发起由网关抛
+     * 覆盖优先于快照（克隆重跑微调参数的生效点；调试台目前仅支持温度覆盖，
+     * topP/maxTokens 恒取快照值）。运行中重复发起由网关抛
      * {@link SessionRunningException}，此处统一转业务错误。
      */
     private AgentRuntimeConfig assembleRuntime(Session session, Long userId) {
@@ -183,11 +185,15 @@ public class SessionServiceImpl implements SessionService {
         AgentSpecConfig snapshot = version.getConfig();
         Integer maxIters = session.getOverrideMaxIters() != null
                 ? session.getOverrideMaxIters() : snapshot.getMaxIters();
-        Double temperature = session.getOverrideTemperature() != null
-                ? session.getOverrideTemperature() : snapshot.getTemperature();
+        GenerateOptions snapshotOptions = snapshot.getGenerateOptions();
+        GenerateOptions effectiveOptions = GenerateOptions.of(
+                session.getOverrideTemperature() != null ? session.getOverrideTemperature()
+                        : (snapshotOptions == null ? null : snapshotOptions.getTemperature()),
+                snapshotOptions == null ? null : snapshotOptions.getTopP(),
+                snapshotOptions == null ? null : snapshotOptions.getMaxTokens());
         return AgentRuntimeConfig.of(session.getSessionKey(),
                 runtimeUserId(userId), agentName(session), snapshot.getSystemPrompt(),
-                maxIters, temperature,
+                maxIters, effectiveOptions,
                 parts.channel(), parts.model());
     }
 

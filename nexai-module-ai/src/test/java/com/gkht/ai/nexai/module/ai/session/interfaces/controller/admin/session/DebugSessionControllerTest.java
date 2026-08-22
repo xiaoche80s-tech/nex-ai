@@ -310,6 +310,7 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
         AgentSpecUpdateCommand updateCommand = new AgentSpecUpdateCommand();
         updateCommand.setId(specId);
         updateCommand.setName("测试规格 v2");
+        updateCommand.setDescription("调试台测试规格，验证事件流与装配链");
         updateCommand.setModelId(modelId);
         updateCommand.setSystemPrompt(SYSTEM_PROMPT);
         agentSpecController.updateSpec(updateCommand);
@@ -364,6 +365,7 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
         AgentSpecUpdateCommand updateCommand = new AgentSpecUpdateCommand();
         updateCommand.setId(specA);
         updateCommand.setName("测试规格 v2");
+        updateCommand.setDescription("调试台测试规格，验证事件流与装配链");
         updateCommand.setModelId(modelId);
         updateCommand.setSystemPrompt(SYSTEM_PROMPT);
         agentSpecController.updateSpec(updateCommand);
@@ -592,6 +594,7 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
     private AgentSpecCreateCommand specCreateCommand(Long modelId) {
         AgentSpecCreateCommand command = new AgentSpecCreateCommand();
         command.setName("测试规格");
+        command.setDescription("调试台测试规格，验证事件流与装配链");
         command.setSystemPrompt(SYSTEM_PROMPT);
         command.setModelId(modelId);
         return command;

@@ -1,20 +1,44 @@
 import request from '@/config/axios'
 
-/** 智能体规格配置（草稿与版本快照共用结构，对应后端 AgentSpecConfigDTO） */
+/** 模型调用参数（与 agentscope GenerateOptions 同名同义） */
+export interface GenerateOptions {
+  temperature: number | null
+  topP: number | null
+  maxTokens: number | null
+}
+
+/** MCP 服务挂载（服务 + 工具白名单，M2 预留） */
+export interface McpServerMount {
+  serverId: number
+  /** 空 = 该服务全部工具 */
+  allowedTools?: string[]
+}
+
+/** 子智能体挂载（规格 + 工具白名单，M2 预留） */
+export interface SubagentMount {
+  specId: number
+  /** 空 = 继承父智能体全部工具 */
+  tools?: string[]
+}
+
+/** 智能体规格配置（草稿与版本快照共用，按 agentscope 三层分组） */
 export interface AgentSpecConfig {
+  // —— agent 层 ——
   modelId: number
   /** 服务端补充的模型显示名 */
   modelName?: string
+  /** 给 LLM 的自描述（用于展示与子智能体路由），必填 */
+  description: string
   systemPrompt: string | null
   /** 推理参数：最大迭代轮数，null 表示运行时取默认 */
   maxIters: number | null
-  /** 推理参数：温度，null 表示运行时取默认 */
-  temperature: number | null
-  /** M2 预留引用列表 */
+  // —— 模型调用层 ——
+  generateOptions: GenerateOptions | null
+  // —— 挂载层（M2 预留）——
   skillIds?: number[]
   knowledgeBaseIds?: number[]
-  mcpServerIds?: number[]
-  subagentSpecIds?: number[]
+  mcpServers?: McpServerMount[]
+  subagents?: SubagentMount[]
 }
 
 /** 智能体规格版本（不可变快照，对应后端 AgentSpecVersionDTO） */
@@ -31,6 +55,7 @@ export interface AgentSpecVersionVO {
 export interface AgentSpecVO {
   id: number | undefined
   name: string
+  /** 自描述（服务端从草稿/默认版本快照解析填充） */
   description: string | null
   icon: string | null
   /** 已发布的最新版本号，从未发布为 0 */
@@ -58,16 +83,18 @@ export interface AgentSpecPageParams extends PageParam {
   name?: string
 }
 
-/** 规格创建/编辑表单（编辑即覆盖草稿；无草稿时生成新草稿） */
+/** 规格创建/编辑表单（编辑即覆盖草稿；无草稿时生成新草稿）。调用参数平铺、提交时由服务端组装三层结构 */
 export interface AgentSpecSaveForm {
   id?: number
   name: string
-  description?: string
   icon?: string
   modelId: number | undefined
+  description: string
   systemPrompt?: string
   maxIters?: number
   temperature?: number
+  topP?: number
+  maxTokens?: number
 }
 
 // 创建规格（携带首个草稿）

@@ -197,9 +197,20 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         if (config.getMaxIters() != null) {
             builder.maxIters(config.getMaxIters());
         }
-        if (config.getTemperature() != null) {
-            builder.generateOptions(new GenerateOptions.Builder()
-                    .temperature(config.getTemperature()).build());
+        // 调用参数整组透传（temperature/topP/maxTokens 非空项生效）
+        com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions options = config.getGenerateOptions();
+        if (options != null) {
+            GenerateOptions.Builder optionsBuilder = new GenerateOptions.Builder();
+            if (options.getTemperature() != null) {
+                optionsBuilder.temperature(options.getTemperature());
+            }
+            if (options.getTopP() != null) {
+                optionsBuilder.topP(options.getTopP());
+            }
+            if (options.getMaxTokens() != null) {
+                optionsBuilder.maxTokens(options.getMaxTokens());
+            }
+            builder.generateOptions(optionsBuilder.build());
         }
         Toolkit toolkit = new Toolkit();
         for (RuntimeToolContributor contributor : runtimeToolContributors) {

@@ -228,7 +228,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         AgentSpecDetailDTO detail = agentSpecController.getSpec(specId).getData();
         assertEquals("你是企业的资深客服", detail.getDraft().getSystemPrompt());
         assertEquals(15, detail.getDraft().getMaxIters());
-        assertEquals(0.3d, detail.getDraft().getTemperature());
+        assertEquals(0.3d, detail.getDraft().getGenerateOptions().getTemperature());
         // 发布后再编辑 → 新草稿
         publish(specId, "v1");
         agentSpecController.updateSpec(updateCommand(specId, modelId));
@@ -262,6 +262,8 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         // 无草稿再发布被拒绝
         assertServiceException(() -> agentSpecController.publishSpec(publishCommand(specId, null)),
                 AGENT_SPEC_PUBLISH_WITHOUT_DRAFT);
+        // 发布后详情：hasDraft 必须是显式 false 而非 null（MapStruct 可空 source 条件包裹回归断言）
+        assertFalse(agentSpecController.getSpec(specId).getData().getHasDraft());
     }
 
     @Test
@@ -360,7 +362,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         assertTrue(detail.getHasDraft());
         assertNull(detail.getCurrentVersion());
         assertEquals("GPT-4o 主力", detail.getDraft().getModelName());
-        assertEquals(0.7d, detail.getDraft().getTemperature());
+        assertEquals(0.7d, detail.getDraft().getGenerateOptions().getTemperature());
     }
 
     @Test

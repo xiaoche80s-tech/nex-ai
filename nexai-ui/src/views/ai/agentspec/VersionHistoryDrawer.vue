@@ -66,7 +66,7 @@
           snapshotConfig.modelName || `#${snapshotConfig.modelId}`
         }}</el-descriptions-item>
         <el-descriptions-item label="温度">{{
-          snapshotConfig.temperature ?? '默认'
+          snapshotConfig.generateOptions?.temperature ?? '默认'
         }}</el-descriptions-item>
         <el-descriptions-item label="最大迭代轮数">{{
           snapshotConfig.maxIters ?? '默认'

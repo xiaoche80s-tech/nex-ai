@@ -12,10 +12,14 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecPublishWithoutDraftException;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecSelfMountingException;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecVersionNotExistsException;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.SubagentMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverter;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
@@ -40,6 +44,7 @@ import java.util.stream.Collectors;
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PUBLISH_WITHOUT_DRAFT;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_SELF_MOUNTING_REJECTED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
 
@@ -72,8 +77,7 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Transactional(rollbackFor = Exception.class)
     public Long createSpec(AgentSpecCreateCommand command) {
         requireModel(command.getModelId());
-        AgentSpec spec = AgentSpec.create(command.getName(), command.getDescription(), command.getIcon(),
-                toConfig(command));
+        AgentSpec spec = AgentSpec.create(command.getName(), command.getIcon(), toConfig(command));
         return agentSpecRepository.save(spec);
     }
 
@@ -82,7 +86,11 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     public void updateSpec(AgentSpecUpdateCommand command) {
         AgentSpec spec = requireSpec(command.getId());
         requireModel(command.getModelId());
-        spec.editDraft(command.getName(), command.getDescription(), command.getIcon(), toConfig(command));
+        try {
+            spec.editDraft(command.getName(), command.getIcon(), toConfig(command));
+        } catch (AgentSpecSelfMountingException ex) {
+            throw exception(AGENT_SPEC_SELF_MOUNTING_REJECTED);
+        }
         agentSpecRepository.save(spec);
     }
 
@@ -135,8 +143,15 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     public AgentSpecDetailDTO getSpec(Long id) {
         AgentSpec spec = requireSpec(id);
         AgentSpecDetailDTO detail = agentSpecConverter.toDetailDTO(spec);
+        detail.setHasDraft(spec.hasDraft());
         detail.setDraft(spec.hasDraft() ? agentSpecConverter.toConfigDTO(spec.getDraft()) : null);
         detail.setCurrentVersion(findCurrentVersion(spec.getId(), spec.getCurrentVersionNo()));
+        // 自描述跟随「草稿优先、无草稿取默认版本」——与列表行口径一致
+        if (detail.getDraft() != null) {
+            detail.setDescription(detail.getDraft().getDescription());
+        } else if (detail.getCurrentVersion() != null) {
+            detail.setDescription(detail.getCurrentVersion().getConfig().getDescription());
+        }
 
         List<AgentSpecConfigDTO> configs = new ArrayList<>();
         if (detail.getDraft() != null) {
@@ -174,8 +189,8 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     /**
-     * 列表行模型名批量填充：行模型引用优先取草稿（正在编辑的内容），
-     * 无草稿取默认版本快照——草稿 JSON 直接从 DO 解析，默认版本一次批量查询后内存匹配
+     * 列表行补充模型名与自描述：优先取草稿（正在编辑的内容），无草稿取默认版本快照
+     * ——草稿 JSON 直接从 DO 解析，默认版本一次批量查询后内存匹配
      */
     private void fillRowModelNames(List<AgentSpecDO> dataObjects, List<AgentSpecDTO> rows) {
         if (dataObjects.isEmpty()) {
@@ -186,12 +201,12 @@ public class AgentSpecServiceImpl implements AgentSpecService {
         List<Long> defaultVersionSpecIds = dataObjects.stream()
                 .filter(spec -> spec.getDraft() == null && spec.getCurrentVersionNo() != null)
                 .map(AgentSpecDO::getId).toList();
-        Map<Long, Long> modelIdBySpecId = new HashMap<>();
+        Map<Long, AgentSpecConfig> rowConfigBySpecId = new HashMap<>();
         for (AgentSpecDO dataObject : dataObjects) {
             if (dataObject.getDraft() != null) {
                 AgentSpecConfig draft = agentSpecConverter.jsonToConfig(dataObject.getDraft());
                 if (draft != null) {
-                    modelIdBySpecId.put(dataObject.getId(), draft.getModelId());
+                    rowConfigBySpecId.put(dataObject.getId(), draft);
                 }
             }
         }
@@ -202,12 +217,17 @@ public class AgentSpecServiceImpl implements AgentSpecService {
             }
             AgentSpecConfig snapshot = agentSpecConverter.jsonToConfig(version.getSnapshot());
             if (snapshot != null) {
-                modelIdBySpecId.putIfAbsent(version.getSpecId(), snapshot.getModelId());
+                rowConfigBySpecId.putIfAbsent(version.getSpecId(), snapshot);
             }
         }
-        Map<Long, String> modelNames = modelNameMap(modelIdBySpecId.values());
+        Map<Long, String> modelNames = modelNameMap(
+                rowConfigBySpecId.values().stream().map(AgentSpecConfig::getModelId).toList());
         for (AgentSpecDTO row : rows) {
-            row.setModelName(modelNames.get(modelIdBySpecId.get(row.getId())));
+            AgentSpecConfig config = rowConfigBySpecId.get(row.getId());
+            if (config != null) {
+                row.setModelName(modelNames.get(config.getModelId()));
+                row.setDescription(config.getDescription());
+            }
         }
     }
 
@@ -228,12 +248,19 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     /**
-     * command → 领域配置值对象（创建/编辑命令共用）
+     * command → 领域配置值对象（创建/编辑命令共用）：平铺字段组装为三层结构——
+     * agent 层直取，调用参数合成 GenerateOptions（全空则整组省略），挂载转结构化值对象
      */
     private AgentSpecConfig toConfig(AgentSpecDraftCommand command) {
-        return AgentSpecConfig.of(command.getModelId(), command.getSystemPrompt(), command.getMaxIters(),
-                command.getTemperature(), command.getSkillIds(), command.getKnowledgeBaseIds(),
-                command.getMcpServerIds(), command.getSubagentSpecIds());
+        GenerateOptions generateOptions = command.getTemperature() == null && command.getTopP() == null
+                && command.getMaxTokens() == null ? null
+                : GenerateOptions.of(command.getTemperature(), command.getTopP(), command.getMaxTokens());
+        return AgentSpecConfig.of(command.getModelId(), command.getDescription(), command.getSystemPrompt(),
+                command.getMaxIters(), generateOptions, command.getSkillIds(), command.getKnowledgeBaseIds(),
+                command.getMcpServers() == null ? null : command.getMcpServers().stream()
+                        .map(mount -> McpServerMount.of(mount.getServerId(), mount.getAllowedTools())).toList(),
+                command.getSubagents() == null ? null : command.getSubagents().stream()
+                        .map(mount -> SubagentMount.of(mount.getSpecId(), mount.getTools())).toList());
     }
 
     private AgentSpec requireSpec(Long id) {

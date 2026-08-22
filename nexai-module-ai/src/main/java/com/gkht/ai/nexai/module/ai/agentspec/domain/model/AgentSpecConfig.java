@@ -4,65 +4,85 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 智能体规格配置值对象（不可变，按值判等）：草稿与已发布版本快照共用同一结构。
+ * 智能体规格配置值对象（不可变，按值判等）：草稿与已发布版本快照共用同一结构，
+ * 按 agentscope 的分层组织为三层——agent 层（模型引用 / 自描述 / 系统提示 / 迭代上限）、
+ * 模型调用层（{@link GenerateOptions}）、挂载层（技能 / 知识库 / MCP / 子智能体，M2 预留）。
  *
- * <p>核心字段为模型引用（按元数据引用而非硬编码）与系统提示、推理参数（maxIters / 温度）；
- * 技能 / 知识库 / MCP / 子智能体引用列表为 M2 预留，M1 全程可空。</p>
+ * <p>分层判据：影响智能体行为的配置进快照（本值对象全部字段），纯管理元数据
+ * （名称 / 图标）留规格主体。挂载层的统一模式是「引用 + 可选工具白名单过滤」
+ * （McpServerMount / SubagentMount），对齐 agentscope 的 Toolkit 白名单语义。</p>
  */
 public final class AgentSpecConfig {
 
+    /** 自描述长度上限（字符）：给 LLM 的路由决策依据（agentscope 语义），须精炼 */
+    static final int DESCRIPTION_MAX_LENGTH = 1024;
     /** 系统提示长度上限（字符） */
     static final int SYSTEM_PROMPT_MAX_LENGTH = 16_384;
-    /** 温度上限（业界提供商普遍接受 0 ~ 2） */
-    static final double TEMPERATURE_MAX = 2.0d;
 
+    // —— agent 层 ——
     /** 模型引用（ai_model.id，外部聚合引用） */
     private final Long modelId;
+    /** 给 LLM 的自描述：M2 子智能体挂载时作为 spawn 路由决策依据，亦用于列表展示（必填） */
+    private final String description;
     /** 系统提示，可空 */
     private final String systemPrompt;
-    /** 推理参数：最大迭代轮数，可空表示运行时取默认 */
+    /** 推理参数：最大迭代轮数（reasoning-acting 循环上限），可空表示运行时取默认 */
     private final Integer maxIters;
-    /** 推理参数：温度（0 ~ 2），可空表示运行时取默认 */
-    private final Double temperature;
-    /** 技能引用列表（M2 预留，可空） */
-    private final List<Long> skillIds;
-    /** 知识库引用列表（M2 预留，可空） */
-    private final List<Long> knowledgeBaseIds;
-    /** MCP 服务引用列表（M2 预留，可空） */
-    private final List<Long> mcpServerIds;
-    /** 子智能体规格引用列表（M2 预留，可空） */
-    private final List<Long> subagentSpecIds;
 
-    private AgentSpecConfig(Long modelId, String systemPrompt, Integer maxIters, Double temperature,
-                            List<Long> skillIds, List<Long> knowledgeBaseIds,
-                            List<Long> mcpServerIds, List<Long> subagentSpecIds) {
+    // —— 模型调用层 ——
+    /** 调用参数（temperature / topP / maxTokens），可空 = 全默认 */
+    private final GenerateOptions generateOptions;
+
+    // —— 挂载层（M2 预留）——
+    /** 技能引用列表 */
+    private final List<Long> skillIds;
+    /** 知识库引用列表 */
+    private final List<Long> knowledgeBaseIds;
+    /** MCP 服务挂载列表（服务 + 工具白名单） */
+    private final List<McpServerMount> mcpServers;
+    /** 子智能体挂载列表（规格 + 工具白名单，运行时经 agent_spawn 动态实例化） */
+    private final List<SubagentMount> subagents;
+
+    private AgentSpecConfig(Long modelId, String description, String systemPrompt, Integer maxIters,
+                            GenerateOptions generateOptions, List<Long> skillIds, List<Long> knowledgeBaseIds,
+                            List<McpServerMount> mcpServers, List<SubagentMount> subagents) {
         this.modelId = modelId;
+        this.description = description;
         this.systemPrompt = systemPrompt;
         this.maxIters = maxIters;
-        this.temperature = temperature;
+        this.generateOptions = generateOptions;
         this.skillIds = skillIds;
         this.knowledgeBaseIds = knowledgeBaseIds;
-        this.mcpServerIds = mcpServerIds;
-        this.subagentSpecIds = subagentSpecIds;
+        this.mcpServers = mcpServers;
+        this.subagents = subagents;
     }
 
     /**
      * 构建规格配置
      *
-     * @param modelId      模型引用，不能为 null
-     * @param systemPrompt 系统提示，可空，去除首尾空白
-     * @param maxIters     最大迭代轮数，可空，须 >= 1
-     * @param temperature  温度，可空，须在 [0, 2] 内
-     * @param skillIds             技能引用列表，可空
-     * @param knowledgeBaseIds     知识库引用列表，可空
-     * @param mcpServerIds         MCP 服务引用列表，可空
-     * @param subagentSpecIds      子智能体规格引用列表，可空
+     * @param modelId         模型引用，不能为 null
+     * @param description     给 LLM 的自描述，不能为空白
+     * @param systemPrompt    系统提示，可空，去除首尾空白
+     * @param maxIters        最大迭代轮数，可空，须 >= 1
+     * @param generateOptions 调用参数组，可空 = 全默认
+     * @param skillIds        技能引用列表，可空
+     * @param knowledgeBaseIds 知识库引用列表，可空
+     * @param mcpServers      MCP 服务挂载列表，可空
+     * @param subagents       子智能体挂载列表，可空
      */
-    public static AgentSpecConfig of(Long modelId, String systemPrompt, Integer maxIters,
-                                     Double temperature, List<Long> skillIds, List<Long> knowledgeBaseIds,
-                                     List<Long> mcpServerIds, List<Long> subagentSpecIds) {
+    public static AgentSpecConfig of(Long modelId, String description, String systemPrompt, Integer maxIters,
+                                     GenerateOptions generateOptions, List<Long> skillIds,
+                                     List<Long> knowledgeBaseIds, List<McpServerMount> mcpServers,
+                                     List<SubagentMount> subagents) {
         if (modelId == null) {
             throw new IllegalArgumentException("规格必须引用一个模型");
+        }
+        if (description == null || description.isBlank()) {
+            throw new IllegalArgumentException("规格自描述不能为空");
+        }
+        String strippedDescription = description.strip();
+        if (strippedDescription.length() > DESCRIPTION_MAX_LENGTH) {
+            throw new IllegalArgumentException("规格自描述不能超过 " + DESCRIPTION_MAX_LENGTH + " 个字符");
         }
         String prompt = systemPrompt == null || systemPrompt.isBlank() ? null : systemPrompt.strip();
         if (prompt != null && prompt.length() > SYSTEM_PROMPT_MAX_LENGTH) {
@@ -71,12 +91,10 @@ public final class AgentSpecConfig {
         if (maxIters != null && maxIters < 1) {
             throw new IllegalArgumentException("最大迭代轮数不能小于 1");
         }
-        if (temperature != null && (temperature < 0d || temperature > TEMPERATURE_MAX)) {
-            throw new IllegalArgumentException("温度必须在 0 ~ " + TEMPERATURE_MAX + " 之间");
-        }
-        return new AgentSpecConfig(modelId, prompt, maxIters, temperature,
+        return new AgentSpecConfig(modelId, strippedDescription, prompt, maxIters, generateOptions,
                 snapshotIds(skillIds), snapshotIds(knowledgeBaseIds),
-                snapshotIds(mcpServerIds), snapshotIds(subagentSpecIds));
+                mcpServers == null ? List.of() : List.copyOf(mcpServers),
+                subagents == null ? List.of() : List.copyOf(subagents));
     }
 
     /** 引用列表规范化为不可变快照（null 视为空列表） */
@@ -88,6 +106,10 @@ public final class AgentSpecConfig {
         return modelId;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
     public String getSystemPrompt() {
         return systemPrompt;
     }
@@ -96,8 +118,8 @@ public final class AgentSpecConfig {
         return maxIters;
     }
 
-    public Double getTemperature() {
-        return temperature;
+    public GenerateOptions getGenerateOptions() {
+        return generateOptions;
     }
 
     public List<Long> getSkillIds() {
@@ -108,12 +130,12 @@ public final class AgentSpecConfig {
         return knowledgeBaseIds;
     }
 
-    public List<Long> getMcpServerIds() {
-        return mcpServerIds;
+    public List<McpServerMount> getMcpServers() {
+        return mcpServers;
     }
 
-    public List<Long> getSubagentSpecIds() {
-        return subagentSpecIds;
+    public List<SubagentMount> getSubagents() {
+        return subagents;
     }
 
     @Override
@@ -125,19 +147,20 @@ public final class AgentSpecConfig {
             return false;
         }
         return Objects.equals(modelId, other.modelId)
+                && Objects.equals(description, other.description)
                 && Objects.equals(systemPrompt, other.systemPrompt)
                 && Objects.equals(maxIters, other.maxIters)
-                && Objects.equals(temperature, other.temperature)
+                && Objects.equals(generateOptions, other.generateOptions)
                 && Objects.equals(skillIds, other.skillIds)
                 && Objects.equals(knowledgeBaseIds, other.knowledgeBaseIds)
-                && Objects.equals(mcpServerIds, other.mcpServerIds)
-                && Objects.equals(subagentSpecIds, other.subagentSpecIds);
+                && Objects.equals(mcpServers, other.mcpServers)
+                && Objects.equals(subagents, other.subagents);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(modelId, systemPrompt, maxIters, temperature,
-                skillIds, knowledgeBaseIds, mcpServerIds, subagentSpecIds);
+        return Objects.hash(modelId, description, systemPrompt, maxIters, generateOptions,
+                skillIds, knowledgeBaseIds, mcpServers, subagents);
     }
 
 }

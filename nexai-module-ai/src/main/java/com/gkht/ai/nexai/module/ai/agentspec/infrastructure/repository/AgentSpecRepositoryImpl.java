@@ -42,7 +42,6 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
             agentSpecMapper.update(new AgentSpecDO(), new LambdaUpdateWrapper<AgentSpecDO>()
                     .eq(AgentSpecDO::getId, dataObject.getId())
                     .set(AgentSpecDO::getName, dataObject.getName())
-                    .set(AgentSpecDO::getDescription, dataObject.getDescription())
                     .set(AgentSpecDO::getIcon, dataObject.getIcon())
                     .set(AgentSpecDO::getLatestVersionNo, dataObject.getLatestVersionNo())
                     .set(AgentSpecDO::getCurrentVersionNo, dataObject.getCurrentVersionNo())
@@ -87,7 +86,7 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
 
     private AgentSpec reconstitute(AgentSpecDO dataObject) {
         return AgentSpec.reconstitute(dataObject.getId(), dataObject.getName(),
-                dataObject.getDescription(), dataObject.getIcon(), dataObject.getLatestVersionNo(),
+                dataObject.getIcon(), dataObject.getLatestVersionNo(),
                 dataObject.getCurrentVersionNo(), agentSpecConverter.jsonToConfig(dataObject.getDraft()),
                 dataObject.getCreateTime());
     }

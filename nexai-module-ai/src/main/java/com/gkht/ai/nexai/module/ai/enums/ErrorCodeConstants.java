@@ -25,6 +25,7 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_NOT_EXISTS = new ErrorCode(1_022_004_000, "智能体规格不存在");
     ErrorCode AGENT_SPEC_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_004_001, "规格当前没有可发布的草稿，请先编辑生成新草稿");
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_002, "规格版本不存在");
+    ErrorCode AGENT_SPEC_SELF_MOUNTING_REJECTED = new ErrorCode(1_022_004_003, "规格不能把自己挂载为子智能体");
 
     // ========== 会话 SESSION 1-022-005-000 ==========
     ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");

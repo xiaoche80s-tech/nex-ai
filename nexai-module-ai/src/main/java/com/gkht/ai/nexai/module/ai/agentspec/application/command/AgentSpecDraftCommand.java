@@ -3,18 +3,19 @@ package com.gkht.ai.nexai.module.ai.agentspec.application.command;
 import java.util.List;
 
 /**
- * 规格草稿命令公共契约：创建与编辑命令共有的主体信息 + 草稿配置字段。
- * 供应用服务统一转换为领域配置值对象，避免两套 command 重复转换逻辑。
+ * 规格草稿命令公共契约：创建与编辑命令共有的主体信息 + 配置字段。
+ * 配置字段按 agentscope 分层平铺（与表单字段一一对应），由应用服务组装为三层
+ * AgentSpecConfig（agent 层 / 模型调用层 / 挂载层）；MCP 与子智能体挂载为结构化列表。
  */
 public interface AgentSpecDraftCommand {
 
     String getName();
 
-    String getDescription();
-
     String getIcon();
 
     Long getModelId();
+
+    String getDescription();
 
     String getSystemPrompt();
 
@@ -22,12 +23,16 @@ public interface AgentSpecDraftCommand {
 
     Double getTemperature();
 
+    Double getTopP();
+
+    Integer getMaxTokens();
+
     List<Long> getSkillIds();
 
     List<Long> getKnowledgeBaseIds();
 
-    List<Long> getMcpServerIds();
+    List<McpServerMountCommand> getMcpServers();
 
-    List<Long> getSubagentSpecIds();
+    List<SubagentMountCommand> getSubagents();
 
 }

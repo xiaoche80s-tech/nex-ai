@@ -9,6 +9,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.SubagentMount;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecVersionDO;
 import lombok.Data;
@@ -33,6 +36,7 @@ public interface AgentSpecConverter {
     AgentSpecVersionDO toVersionDataObject(AgentSpecVersion version);
 
     @Mapping(target = "hasDraft", source = "draft", qualifiedByName = "draftToPresent")
+    @Mapping(target = "description", ignore = true)
     @Mapping(target = "modelName", ignore = true)
     AgentSpecDTO toDTO(AgentSpecDO specDO);
 
@@ -43,11 +47,14 @@ public interface AgentSpecConverter {
     }
 
     /**
-     * 聚合根 → 详情出参：草稿 / 当前版本快照 / 模型名由服务层补充
+     * 聚合根 → 详情出参：草稿 / 当前版本快照 / 模型名由服务层补充。
+     * hasDraft 亦由服务层显式置位——MapStruct 对可空对象 source 的 qualifiedByName
+     * 映射会做条件包裹（draft 为 null 时跳过 set，出参残留 null 而非 false）。
      */
-    @Mapping(target = "hasDraft", source = "draft", qualifiedByName = "configToPresent")
+    @Mapping(target = "hasDraft", ignore = true)
     @Mapping(target = "draft", ignore = true)
     @Mapping(target = "currentVersion", ignore = true)
+    @Mapping(target = "description", ignore = true)
     @Mapping(target = "modelName", ignore = true)
     AgentSpecDetailDTO toDetailDTO(AgentSpec spec);
 
@@ -56,22 +63,6 @@ public interface AgentSpecConverter {
 
     @Mapping(target = "modelName", ignore = true)
     AgentSpecConfigDTO toConfigDTO(AgentSpecConfig config);
-
-    /**
-     * 草稿 JSON 字符串是否存在 → hasDraft 布尔（DO 侧）
-     */
-    @Named("draftToPresent")
-    default Boolean draftToPresent(String draftJson) {
-        return draftJson != null && !draftJson.isBlank();
-    }
-
-    /**
-     * 草稿值对象是否存在 → hasDraft 布尔（聚合根侧）
-     */
-    @Named("configToPresent")
-    default Boolean configToPresent(AgentSpecConfig draft) {
-        return draft != null;
-    }
 
     /**
      * 配置值对象 → JSON 字符串；null 草稿保持 null（表示无草稿）
@@ -94,37 +85,112 @@ public interface AgentSpecConverter {
     }
 
     /**
+     * 草稿 JSON 字符串是否存在 → hasDraft 布尔（DO 侧，String source 无条件调用）
+     */
+    @Named("draftToPresent")
+    default Boolean draftToPresent(String draftJson) {
+        return draftJson != null && !draftJson.isBlank();
+    }
+
+    /**
      * JSON 编解码桥接 POJO：domain 值对象零框架依赖（无 Jackson 注解与默认构造器），
-     * 经此同构 POJO 完成序列化，字段与 {@link AgentSpecConfig} 一一对应。
+     * 经此同构 POJO 完成序列化，字段与 {@link AgentSpecConfig} 三层结构一一对应。
      */
     @Data
     class ConfigJSON {
 
         private Long modelId;
+        private String description;
         private String systemPrompt;
         private Integer maxIters;
-        private Double temperature;
+        private GenerateOptionsJSON generateOptions;
         private List<Long> skillIds;
         private List<Long> knowledgeBaseIds;
-        private List<Long> mcpServerIds;
-        private List<Long> subagentSpecIds;
+        private List<McpServerMountJSON> mcpServers;
+        private List<SubagentMountJSON> subagents;
 
         static ConfigJSON from(AgentSpecConfig config) {
             ConfigJSON json = new ConfigJSON();
             json.setModelId(config.getModelId());
+            json.setDescription(config.getDescription());
             json.setSystemPrompt(config.getSystemPrompt());
             json.setMaxIters(config.getMaxIters());
-            json.setTemperature(config.getTemperature());
+            json.setGenerateOptions(config.getGenerateOptions() == null ? null
+                    : GenerateOptionsJSON.from(config.getGenerateOptions()));
             json.setSkillIds(config.getSkillIds());
             json.setKnowledgeBaseIds(config.getKnowledgeBaseIds());
-            json.setMcpServerIds(config.getMcpServerIds());
-            json.setSubagentSpecIds(config.getSubagentSpecIds());
+            json.setMcpServers(config.getMcpServers() == null ? null
+                    : config.getMcpServers().stream().map(McpServerMountJSON::from).toList());
+            json.setSubagents(config.getSubagents() == null ? null
+                    : config.getSubagents().stream().map(SubagentMountJSON::from).toList());
             return json;
         }
 
         AgentSpecConfig toDomain() {
-            return AgentSpecConfig.of(modelId, systemPrompt, maxIters, temperature,
-                    skillIds, knowledgeBaseIds, mcpServerIds, subagentSpecIds);
+            return AgentSpecConfig.of(modelId, description, systemPrompt, maxIters,
+                    generateOptions == null ? null : generateOptions.toDomain(),
+                    skillIds, knowledgeBaseIds,
+                    mcpServers == null ? null : mcpServers.stream().map(McpServerMountJSON::toDomain).toList(),
+                    subagents == null ? null : subagents.stream().map(SubagentMountJSON::toDomain).toList());
+        }
+
+    }
+
+    @Data
+    class GenerateOptionsJSON {
+
+        private Double temperature;
+        private Double topP;
+        private Integer maxTokens;
+
+        static GenerateOptionsJSON from(GenerateOptions options) {
+            GenerateOptionsJSON json = new GenerateOptionsJSON();
+            json.setTemperature(options.getTemperature());
+            json.setTopP(options.getTopP());
+            json.setMaxTokens(options.getMaxTokens());
+            return json;
+        }
+
+        GenerateOptions toDomain() {
+            return GenerateOptions.of(temperature, topP, maxTokens);
+        }
+
+    }
+
+    @Data
+    class McpServerMountJSON {
+
+        private Long serverId;
+        private List<String> allowedTools;
+
+        static McpServerMountJSON from(McpServerMount mount) {
+            McpServerMountJSON json = new McpServerMountJSON();
+            json.setServerId(mount.getServerId());
+            json.setAllowedTools(mount.getAllowedTools());
+            return json;
+        }
+
+        McpServerMount toDomain() {
+            return McpServerMount.of(serverId, allowedTools);
+        }
+
+    }
+
+    @Data
+    class SubagentMountJSON {
+
+        private Long specId;
+        private List<String> tools;
+
+        static SubagentMountJSON from(SubagentMount mount) {
+            SubagentMountJSON json = new SubagentMountJSON();
+            json.setSpecId(mount.getSpecId());
+            json.setTools(mount.getTools());
+            return json;
+        }
+
+        SubagentMount toDomain() {
+            return SubagentMount.of(specId, tools);
         }
 
     }

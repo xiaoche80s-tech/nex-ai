@@ -6117,13 +6117,12 @@ CREATE SEQUENCE ai_model_seq
     START 1;
 
 -- ----------------------------
--- Table structure for ai_agent_spec（NexAI 智能体平台：智能体规格，工单 05）
+-- Table structure for ai_agent_spec（NexAI 智能体平台：智能体规格，工单 05；结构重设见 ADR-0006）
 -- ----------------------------
 DROP TABLE IF EXISTS ai_agent_spec;
 CREATE TABLE ai_agent_spec (
     id int8 NOT NULL,
     name varchar(64) NOT NULL,
-    description varchar(512) NULL DEFAULT NULL,
     icon varchar(128) NULL DEFAULT NULL,
     latest_version_no int4 NOT NULL DEFAULT 0,
     current_version_no int4 NULL DEFAULT NULL,
@@ -6139,19 +6138,18 @@ CREATE TABLE ai_agent_spec (
 ALTER TABLE ai_agent_spec ADD CONSTRAINT pk_ai_agent_spec PRIMARY KEY (id);
 
 COMMENT ON COLUMN ai_agent_spec.id IS '规格编号';
-COMMENT ON COLUMN ai_agent_spec.name IS '规格名称';
-COMMENT ON COLUMN ai_agent_spec.description IS '描述';
-COMMENT ON COLUMN ai_agent_spec.icon IS '图标标识';
+COMMENT ON COLUMN ai_agent_spec.name IS '规格名称（管理元数据，不参与版本化）';
+COMMENT ON COLUMN ai_agent_spec.icon IS '图标标识（管理元数据，不参与版本化）';
 COMMENT ON COLUMN ai_agent_spec.latest_version_no IS '已发布的最新版本号，从未发布为 0';
 COMMENT ON COLUMN ai_agent_spec.current_version_no IS '当前默认版本号（会话默认绑定），从未发布为 NULL';
-COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON（模型引用/系统提示/推理参数/M2 预留引用列表），NULL 表示无草稿';
+COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON，按 agentscope 三层分组：agent 层（模型引用/给 LLM 的自描述/系统提示/maxIters）+ 模型调用层（generateOptions: temperature/topP/maxTokens）+ 挂载层（skills/knowledgeBases/mcpServers/subagents，M2 预留），NULL 表示无草稿';
 COMMENT ON COLUMN ai_agent_spec.creator IS '创建者';
 COMMENT ON COLUMN ai_agent_spec.create_time IS '创建时间';
 COMMENT ON COLUMN ai_agent_spec.updater IS '更新者';
 COMMENT ON COLUMN ai_agent_spec.update_time IS '更新时间';
 COMMENT ON COLUMN ai_agent_spec.deleted IS '是否删除';
 COMMENT ON COLUMN ai_agent_spec.tenant_id IS '租户编号';
-COMMENT ON TABLE ai_agent_spec IS 'AI 平台智能体规格表';
+COMMENT ON TABLE ai_agent_spec IS 'AI 平台智能体规格表（影响行为的配置——含给 LLM 的自描述——全在 draft/snapshot JSON 内随版本快照固化）';
 
 DROP SEQUENCE IF EXISTS ai_agent_spec_seq;
 CREATE SEQUENCE ai_agent_spec_seq

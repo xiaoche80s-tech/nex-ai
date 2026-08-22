@@ -2,7 +2,7 @@
   <Dialog
     v-model="dialogVisible"
     :title="formType === 'create' ? '创建智能体规格' : '编辑智能体规格'"
-    width="640"
+    width="680"
   >
     <el-form
       ref="formRef"
@@ -11,16 +11,18 @@
       label-width="110px"
       v-loading="formLoading"
     >
+      <el-divider content-position="left">基本信息</el-divider>
       <el-form-item label="规格名称" prop="name">
         <el-input v-model="formData.name" :maxlength="64" placeholder="请输入规格名称" />
       </el-form-item>
-      <el-form-item label="描述" prop="description">
+      <el-form-item label="自描述" prop="description">
         <el-input
           v-model="formData.description"
-          :maxlength="512"
+          :maxlength="1024"
           type="textarea"
           :rows="2"
-          placeholder="这个智能体做什么（可选）"
+          show-word-limit
+          placeholder="给智能体的自描述（用于展示与子智能体路由）"
         />
       </el-form-item>
       <el-form-item label="图标" prop="icon">
@@ -30,6 +32,8 @@
           placeholder="图标标识，如 ep:service（可选）"
         />
       </el-form-item>
+
+      <el-divider content-position="left">模型与推理</el-divider>
       <el-form-item label="引用模型" prop="modelId">
         <el-select
           v-model="formData.modelId"
@@ -67,24 +71,56 @@
           controls-position="right"
         />
       </el-form-item>
-      <el-form-item label="温度" prop="temperature">
-        <el-input-number
-          v-model="formData.temperature"
-          :min="0"
-          :max="2"
-          :step="0.1"
-          :precision="2"
-          placeholder="0 ~ 2，不填运行时取默认"
-          class="!w-full"
-          controls-position="right"
-        />
-      </el-form-item>
+
+      <el-collapse class="border-none">
+        <el-collapse-item name="generateOptions">
+          <template #title>
+            <span class="text-14px">调用参数（进阶，可选）</span>
+          </template>
+          <el-form-item label="温度" prop="temperature">
+            <el-input-number
+              v-model="formData.temperature"
+              :min="0"
+              :max="2"
+              :step="0.1"
+              :precision="2"
+              placeholder="0 ~ 2，不填运行时取默认"
+              class="!w-full"
+              controls-position="right"
+            />
+          </el-form-item>
+          <el-form-item label="topP" prop="topP">
+            <el-input-number
+              v-model="formData.topP"
+              :min="0"
+              :max="1"
+              :step="0.05"
+              :precision="2"
+              placeholder="0 ~ 1，不填运行时取默认"
+              class="!w-full"
+              controls-position="right"
+            />
+          </el-form-item>
+          <el-form-item label="最大 tokens" prop="maxTokens">
+            <el-input-number
+              v-model="formData.maxTokens"
+              :min="1"
+              :step="256"
+              :precision="0"
+              placeholder="单次生成上限，不填运行时取默认"
+              class="!w-full"
+              controls-position="right"
+            />
+          </el-form-item>
+        </el-collapse-item>
+      </el-collapse>
+
       <el-alert
         v-if="formType === 'update' && hasPublished"
         type="info"
         :closable="false"
         show-icon
-        class="mb-10px"
+        class="mt-10px"
         title="已发布的版本不可修改；本次保存将写入草稿，确认后再发布为新版本。"
       />
     </el-form>
@@ -114,7 +150,7 @@ const hasPublished = ref(false) // 编辑对象是否已发布过（提示草稿
 const dialogVisible = ref(false) // 弹窗的是否展示
 const formLoading = ref(false) // 表单的加载中
 const formRef = ref() // 表单 Ref
-const formData = ref<SpecApi.AgentSpecSaveForm & { systemPrompt?: string }>({
+const formData = ref<SpecApi.AgentSpecSaveForm>({
   id: undefined,
   name: '',
   description: '',
@@ -122,11 +158,17 @@ const formData = ref<SpecApi.AgentSpecSaveForm & { systemPrompt?: string }>({
   modelId: undefined,
   systemPrompt: '',
   maxIters: undefined,
-  temperature: undefined
+  temperature: undefined,
+  topP: undefined,
+  maxTokens: undefined
 })
 const modelOptions = ref<ModelApi.ModelVO[]>([]) // 启用模型下拉选项
 const formRules = reactive({
   name: [{ required: true, message: '规格名称不能为空', trigger: 'blur' }],
+  description: [
+    { required: true, message: '规格自描述不能为空', trigger: 'blur' },
+    { max: 1024, message: '自描述不能超过 1024 个字符', trigger: 'blur' }
+  ],
   modelId: [{ required: true, message: '规格必须引用一个模型', trigger: 'change' }]
 })
 
@@ -140,17 +182,20 @@ const open = async (id?: number) => {
       formType.value = 'update'
       const detail = await SpecApi.getSpec(id)
       hasPublished.value = detail.latestVersionNo > 0
-      // 预填优先级：草稿 > 当前默认版本快照 > 空表单
+      // 预填优先级：草稿 > 当前默认版本快照 > 空表单；调用参数从 generateOptions 展平
       const config = detail.draft ?? detail.currentVersion?.config
+      const options = config?.generateOptions
       formData.value = {
         id: detail.id,
         name: detail.name,
-        description: detail.description ?? '',
+        description: config?.description ?? '',
         icon: detail.icon ?? '',
         modelId: config?.modelId,
         systemPrompt: config?.systemPrompt ?? '',
         maxIters: config?.maxIters ?? undefined,
-        temperature: config?.temperature ?? undefined
+        temperature: options?.temperature ?? undefined,
+        topP: options?.topP ?? undefined,
+        maxTokens: options?.maxTokens ?? undefined
       }
     } else {
       formType.value = 'create'
@@ -163,7 +208,9 @@ const open = async (id?: number) => {
         modelId: undefined,
         systemPrompt: '',
         maxIters: undefined,
-        temperature: undefined
+        temperature: undefined,
+        topP: undefined,
+        maxTokens: undefined
       }
     }
   } finally {
