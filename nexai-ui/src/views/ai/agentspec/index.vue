@@ -31,6 +31,14 @@
     <!-- 规格列表 -->
     <el-table v-loading="loading" :data="list">
       <el-table-column label="编号" align="center" prop="id" width="80" />
+      <el-table-column label="业务编码" align="center" prop="specCode" width="160" show-overflow-tooltip />
+      <el-table-column label="归属" align="center" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="row.ownerLevel === 'USER'" type="warning">用户级</el-tag>
+          <el-tag v-else-if="row.ownerLevel === 'PLATFORM'" type="danger">平台级</el-tag>
+          <el-tag v-else>租户级</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column
         label="规格名称"
         align="center"

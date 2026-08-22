@@ -21,7 +21,17 @@ export interface SubagentMount {
   tools?: string[]
 }
 
-/** 智能体规格配置（草稿与版本快照共用，按 agentscope 三层分组） */
+/** 执行能力（仅沙箱模式可选） */
+export type ExecutionCapability = 'SHELL' | 'PYTHON' | 'NODE'
+
+/** 执行环境配置（workspace / 沙箱 / 执行能力，随版本快照固化） */
+export interface ExecutionEnv {
+  workspaceEnabled: boolean
+  sandboxEnabled: boolean
+  capabilities: ExecutionCapability[]
+}
+
+/** 智能体规格配置（草稿与版本快照共用，按 agentscope「三层 + 执行环境层」分组） */
 export interface AgentSpecConfig {
   // —— agent 层 ——
   modelId: number
@@ -36,9 +46,11 @@ export interface AgentSpecConfig {
   generateOptions: GenerateOptions | null
   // —— 挂载层（M2 预留）——
   skillIds?: number[]
-  knowledgeBaseIds?: number[]
   mcpServers?: McpServerMount[]
   subagents?: SubagentMount[]
+  // —— 执行环境层 ——
+  /** null 表示全关（纯对话智能体） */
+  executionEnv?: ExecutionEnv | null
 }
 
 /** 智能体规格版本（不可变快照，对应后端 AgentSpecVersionDTO） */
@@ -51,10 +63,19 @@ export interface AgentSpecVersionVO {
   createTime: Date
 }
 
+/** 归属层级（M1 开放 TENANT/USER，平台级 M2+） */
+export type OwnerLevel = 'TENANT' | 'USER'
+
 /** 智能体规格列表项（对应后端 AgentSpecDTO） */
 export interface AgentSpecVO {
   id: number | undefined
   name: string
+  /** 业务编码（创建后不可变） */
+  specCode: string
+  /** 归属层级 */
+  ownerLevel: string
+  /** 归属用户编号（用户级 = 创建者） */
+  ownerUserId: number | null
   /** 自描述（服务端从草稿/默认版本快照解析填充） */
   description: string | null
   icon: string | null
@@ -83,10 +104,14 @@ export interface AgentSpecPageParams extends PageParam {
   name?: string
 }
 
-/** 规格创建/编辑表单（编辑即覆盖草稿；无草稿时生成新草稿）。调用参数平铺、提交时由服务端组装三层结构 */
+/** 规格创建/编辑表单（编辑即覆盖草稿；无草稿时生成新草稿）。调用参数平铺、提交时由服务端组装分层结构 */
 export interface AgentSpecSaveForm {
   id?: number
   name: string
+  /** 仅创建时可填（创建后不可变，编辑态只读展示） */
+  specCode?: string
+  /** 仅创建时可选（默认租户级；创建后不可变） */
+  ownerLevel?: OwnerLevel
   icon?: string
   modelId: number | undefined
   description: string
@@ -95,6 +120,9 @@ export interface AgentSpecSaveForm {
   temperature?: number
   topP?: number
   maxTokens?: number
+  workspaceEnabled?: boolean
+  sandboxEnabled?: boolean
+  capabilities?: ExecutionCapability[]
 }
 
 // 创建规格（携带首个草稿）

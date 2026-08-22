@@ -15,6 +15,23 @@
       <el-form-item label="规格名称" prop="name">
         <el-input v-model="formData.name" :maxlength="64" placeholder="请输入规格名称" />
       </el-form-item>
+      <el-form-item label="业务编码" prop="specCode">
+        <el-input
+          v-model="formData.specCode"
+          :disabled="formType === 'update'"
+          :maxlength="64"
+          placeholder="如 customer-service（小写字母/数字/连字符，创建后不可变）"
+        />
+        <div v-if="formType === 'update'" class="text-12px text-gray-400 leading-20px mt-2px">
+          业务编码创建后不可变（workspace 目录与运行时标识使用它）
+        </div>
+      </el-form-item>
+      <el-form-item v-if="formType === 'create'" label="归属层级" prop="ownerLevel">
+        <el-radio-group v-model="formData.ownerLevel">
+          <el-radio value="TENANT">租户级（租户内可见）</el-radio>
+          <el-radio value="USER">用户级（仅自己可见）</el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item label="自描述" prop="description">
         <el-input
           v-model="formData.description"
@@ -115,6 +132,29 @@
         </el-collapse-item>
       </el-collapse>
 
+      <el-divider content-position="left">执行环境</el-divider>
+      <el-form-item label="启用工作区">
+        <el-switch v-model="formData.workspaceEnabled" @change="onWorkspaceToggle" />
+        <div class="text-12px text-gray-400 leading-20px mt-2px">
+          开启后智能体获得文件工具与常驻工作区（对话与文件产物落盘、可被检索）
+        </div>
+      </el-form-item>
+      <template v-if="formData.workspaceEnabled">
+        <el-form-item label="沙箱隔离">
+          <el-switch v-model="formData.sandboxEnabled" @change="onSandboxToggle" />
+          <div class="text-12px text-gray-400 leading-20px mt-2px">
+            文件与命令在 Docker 容器内执行（需部署环境提供 Docker）
+          </div>
+        </el-form-item>
+        <el-form-item v-if="formData.sandboxEnabled" label="执行能力">
+          <el-checkbox-group v-model="formData.capabilities">
+            <el-checkbox value="SHELL">Shell 命令</el-checkbox>
+            <el-checkbox value="PYTHON">Python</el-checkbox>
+            <el-checkbox value="NODE">Node.js</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+      </template>
+
       <el-alert
         v-if="formType === 'update' && hasPublished"
         type="info"
@@ -153,6 +193,8 @@ const formRef = ref() // 表单 Ref
 const formData = ref<SpecApi.AgentSpecSaveForm>({
   id: undefined,
   name: '',
+  specCode: '',
+  ownerLevel: 'TENANT',
   description: '',
   icon: '',
   modelId: undefined,
@@ -160,17 +202,41 @@ const formData = ref<SpecApi.AgentSpecSaveForm>({
   maxIters: undefined,
   temperature: undefined,
   topP: undefined,
-  maxTokens: undefined
+  maxTokens: undefined,
+  workspaceEnabled: false,
+  sandboxEnabled: false,
+  capabilities: []
 })
 const modelOptions = ref<ModelApi.ModelVO[]>([]) // 启用模型下拉选项
 const formRules = reactive({
   name: [{ required: true, message: '规格名称不能为空', trigger: 'blur' }],
+  specCode: [
+    { required: true, message: '业务编码不能为空', trigger: 'blur' },
+    {
+      pattern: /^[a-z][a-z0-9-]{1,63}$/,
+      message: '须为小写字母开头的小写字母/数字/连字符组合（2~64 位）',
+      trigger: 'blur'
+    }
+  ],
   description: [
     { required: true, message: '规格自描述不能为空', trigger: 'blur' },
     { max: 1024, message: '自描述不能超过 1024 个字符', trigger: 'blur' }
   ],
   modelId: [{ required: true, message: '规格必须引用一个模型', trigger: 'change' }]
 })
+
+/** 执行环境联动：关工作区 → 沙箱与能力一并清空；关沙箱 → 能力清空（非沙箱禁执行能力） */
+const onWorkspaceToggle = (enabled: boolean | string | number) => {
+  if (!enabled) {
+    formData.value.sandboxEnabled = false
+    formData.value.capabilities = []
+  }
+}
+const onSandboxToggle = (enabled: boolean | string | number) => {
+  if (!enabled) {
+    formData.value.capabilities = []
+  }
+}
 
 /** 打开弹窗：传 id 为编辑（优先草稿、无草稿预填当前默认版本），否则为创建 */
 const open = async (id?: number) => {
@@ -182,12 +248,16 @@ const open = async (id?: number) => {
       formType.value = 'update'
       const detail = await SpecApi.getSpec(id)
       hasPublished.value = detail.latestVersionNo > 0
-      // 预填优先级：草稿 > 当前默认版本快照 > 空表单；调用参数从 generateOptions 展平
+      // 预填优先级：草稿 > 当前默认版本快照 > 空表单；调用参数与执行环境从分层结构展平
       const config = detail.draft ?? detail.currentVersion?.config
       const options = config?.generateOptions
+      const env = config?.executionEnv
       formData.value = {
         id: detail.id,
         name: detail.name,
+        // 编辑态只读展示（创建后不可变）
+        specCode: detail.specCode,
+        ownerLevel: (detail.ownerLevel as SpecApi.OwnerLevel) ?? 'TENANT',
         description: config?.description ?? '',
         icon: detail.icon ?? '',
         modelId: config?.modelId,
@@ -195,7 +265,10 @@ const open = async (id?: number) => {
         maxIters: config?.maxIters ?? undefined,
         temperature: options?.temperature ?? undefined,
         topP: options?.topP ?? undefined,
-        maxTokens: options?.maxTokens ?? undefined
+        maxTokens: options?.maxTokens ?? undefined,
+        workspaceEnabled: env?.workspaceEnabled ?? false,
+        sandboxEnabled: env?.sandboxEnabled ?? false,
+        capabilities: env?.capabilities ?? []
       }
     } else {
       formType.value = 'create'
@@ -203,6 +276,8 @@ const open = async (id?: number) => {
       formData.value = {
         id: undefined,
         name: '',
+        specCode: '',
+        ownerLevel: 'TENANT',
         description: '',
         icon: '',
         modelId: undefined,
@@ -210,7 +285,10 @@ const open = async (id?: number) => {
         maxIters: undefined,
         temperature: undefined,
         topP: undefined,
-        maxTokens: undefined
+        maxTokens: undefined,
+        workspaceEnabled: false,
+        sandboxEnabled: false,
+        capabilities: []
       }
     }
   } finally {
