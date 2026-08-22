@@ -23,6 +23,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 NAME_RE = re.compile(r"我叫([\u4e00-\u9fa5A-Za-z0-9]{1,10})")
+# 长回复触发词：命中则慢速分片输出（供中断演示）。build_reply 与 do_POST 的
+# slow 判定共用，改触发词只动这一处。
+SLOW_TRIGGER = "长回复"
 
 
 def _text_of(message):
@@ -40,7 +43,7 @@ def build_reply(messages):
     if last_user is None:
         return "（fake-openai-server：未收到用户消息）"
     content = _text_of(last_user)
-    if "长回复" in content:
+    if SLOW_TRIGGER in content:
         return "长回复演示：" + "这是一段用于演示中断功能的较长回复文本。" * 12
     if "我叫什么" in content:
         for m in messages:
@@ -100,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
         reply = build_reply(messages)
         prompt_tokens = sum(len(_text_of(m)) for m in messages)
 
-        slow = "长回复" in (_text_of(messages[-1]) if messages else "")
+        slow = SLOW_TRIGGER in (_text_of(messages[-1]) if messages else "")
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")

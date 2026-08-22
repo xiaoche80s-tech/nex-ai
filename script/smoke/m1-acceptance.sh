@@ -52,12 +52,12 @@ api() { # method path [json_body] -> 响应原文（curl -sf，非 2xx 直接失
 
 # 消费调试会话 SSE 流并断言（python 内完成）：
 #   $1=会话ID $2=消息内容 $3=期望回复包含的子串（空串则只断言流健康）
-consume_sse() { # $1=会话ID $2=消息内容 $3=期望回复子串（空则只断言流健康）
-    local sid="$1" content="$2" expect="${3:-}"
+consume_sse() { # $1=会话ID $2=消息内容 $3=期望回复子串（空则只断言流健康） $4=附加断言参数（如 --min-input-tokens N）
+    local sid="$1" content="$2" expect="${3:-}" extra="${4:-}"
     curl -sN --max-time 120 -X POST "$BASE/admin-api/ai/session/$sid/message" \
         -H "tenant-id: $TENANT" -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" -d "{\"content\":$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "$content")}" \
-        | python3 "$SCRIPT_DIR/sse-consumer.py" "$expect"
+        | python3 "$SCRIPT_DIR/sse-consumer.py" "$expect" $extra
 }
 
 echo "M1 集成验收冒烟（模式：${MODE}，目标：${BASE}）"
@@ -65,13 +65,14 @@ echo "M1 集成验收冒烟（模式：${MODE}，目标：${BASE}）"
 # ---------- 0. 凭据来源 ----------
 if [ "$MODE" = "mock" ]; then
     step "0/9 自起 OpenAI 兼容 mock 模型服务（127.0.0.1:${MOCK_PORT}）"
-    python3 "$SCRIPT_DIR/fake-openai-server.py" "$MOCK_PORT" >/tmp/m1-fake-openai.log 2>&1 &
+    MOCK_LOG="$(mktemp /tmp/m1-fake-openai.XXXXXX)"
+    python3 "$SCRIPT_DIR/fake-openai-server.py" "$MOCK_PORT" >"$MOCK_LOG" 2>&1 &
     MOCK_PID=$!
     for _ in $(seq 1 20); do
         nc -z 127.0.0.1 "$MOCK_PORT" 2>/dev/null && break
         sleep 0.3
     done
-    nc -z 127.0.0.1 "$MOCK_PORT" 2>/dev/null || die "mock 模型服务启动失败（见 /tmp/m1-fake-openai.log）"
+    nc -z 127.0.0.1 "$MOCK_PORT" 2>/dev/null || die "mock 模型服务启动失败（见 ${MOCK_LOG}）"
     AI_BASE_URL="http://127.0.0.1:$MOCK_PORT"
     AI_API_KEY="${M1_MOCK_KEY:-local-smoke-no-auth}"   # mock 服务不校验密钥，占位值可经环境变量覆盖
     AI_MODEL="fake-model"
@@ -108,11 +109,11 @@ CHANNEL_ID=$(api POST /admin-api/ai/channel/create \
 echo "  渠道编号: $CHANNEL_ID"
 
 # ---------- 3. 模型：创建 ----------
-step "3/9 登记模型"
+step "3/9 登记模型（modelId 即调用端点的真实模型标识）"
 MODEL_ID=$(api POST /admin-api/ai/model/create \
-    "{\"channelId\":$CHANNEL_ID,\"modelId\":\"m1smoke-$TS\",\"name\":\"M1验收模型-$TS\",\"contextWindow\":128000,\"inputPrice\":0.5,\"outputPrice\":2.0,\"capabilities\":[\"chat\"]}" \
+    "{\"channelId\":$CHANNEL_ID,\"modelId\":\"$AI_MODEL\",\"name\":\"M1验收模型-$TS\",\"contextWindow\":128000,\"inputPrice\":0.5,\"outputPrice\":2.0,\"capabilities\":[\"chat\"]}" \
     | jget "['data']") || die "创建模型失败"
-echo "  模型编号: ${MODEL_ID}（登记标识 m1smoke-${TS}；探测与调用使用端点真实标识 ${AI_MODEL}）"
+echo "  模型编号: ${MODEL_ID}（标识 ${AI_MODEL}——运行时以 ai_model.modelId 作 modelName 直发端点，须登记端点真实标识；可重跑性靠每轮新建渠道规避同渠道 modelId 唯一约束）"
 
 # ---------- 4. 规格：创建 + 发布（不可变版本） ----------
 step "4/9 创建智能体规格并发布版本"
@@ -133,38 +134,42 @@ echo "-- 第 1 轮"
 consume_sse "$SESSION_ID" "我叫小明，请记住我。" "记住了"
 
 echo "-- 第 2 轮（新 HTTP 请求；历史恢复依赖 PostgresAgentStateStore）"
+# 记忆恢复断言分模式：mock 断言复述名字（回复脚本可控）；real 断言第 2 轮输入 token ≥ 60
+# （第 1 轮约 30，历史被重传则必然翻倍增长——模型无关的硬指标，真实模型不保证按稿复述）
 if [ "$MODE" = "mock" ]; then
     consume_sse "$SESSION_ID" "我叫什么名字？" "你叫小明"
 else
-    consume_sse "$SESSION_ID" "我叫什么名字？" ""
+    consume_sse "$SESSION_ID" "我叫什么名字？" "" --min-input-tokens 60
 fi
 
 # ---------- 6. 中断正在运行的流 ----------
 step "6/9 中断正在运行的事件流"
+INTERRUPT_STREAM="$(mktemp /tmp/m1-interrupt-stream.XXXXXX)"
 curl -sN --max-time 120 -X POST "$BASE/admin-api/ai/session/$SESSION_ID/message" \
     -H "tenant-id: $TENANT" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-    -d '{"content":"请给我一段长回复"}' >/tmp/m1-interrupt-stream.txt &
+    -d '{"content":"请给我一段长回复"}' >"$INTERRUPT_STREAM" &
 STREAM_PID=$!
 sleep 1.5
 INTR=$(api POST "/admin-api/ai/session/$SESSION_ID/interrupt" "") || die "中断请求失败"
-[ "$(echo "$INTR" | jget "['data']")" = "True" ] || echo "  ⚠️ 中断返回 false（流可能已结束，时序敏感，非硬失败）"
+INTR_FLAG=$(echo "$INTR" | jget "['data']")
 wait "$STREAM_PID" || true
-python3 - <<'PYEOF' || die "中断后事件流未正常收尾"
-import json
-types = []
-for line in open("/tmp/m1-interrupt-stream.txt"):
-    line = line.strip()
-    if line.startswith("data:"):
-        payload = line[5:].strip()
-        if payload and payload != "[DONE]":
-            t = json.loads(payload).get("type")
-            if t not in types:
-                types.append(t)
-print("  中断后事件序列:", " -> ".join(types))
-assert "AGENT_END" in types, "中断后缺少 AGENT_END"
-PYEOF
+if [ "$INTR_FLAG" = "True" ]; then
+    # 中断生效路径：流以正常序列收尾（AGENT_END），但文本块被截断——不应出现 TEXT_BLOCK_END
+    if grep -q '"type":"TEXT_BLOCK_END"' "$INTERRUPT_STREAM"; then
+        python3 "$SCRIPT_DIR/sse-consumer.py" "" <"$INTERRUPT_STREAM" || true
+        die "长回复流完整闭合（出现 TEXT_BLOCK_END），中断未真正生效"
+    fi
+    python3 "$SCRIPT_DIR/sse-consumer.py" "" <"$INTERRUPT_STREAM" \
+        || die "中断后事件流未正常收尾（缺 AGENT_END）"
+    echo "  中断生效：文本块中途截断且以正常事件序列收尾 ✓"
+else
+    echo "  ⚠️ 中断返回 false（流可能在 1.5s 内已结束，时序敏感，降级为收尾断言）"
+    python3 "$SCRIPT_DIR/sse-consumer.py" "" <"$INTERRUPT_STREAM" \
+        || die "事件流未正常收尾"
+fi
 INTR2=$(api POST "/admin-api/ai/session/$SESSION_ID/interrupt" "") || true
 echo "  幂等重发中断返回: ${INTR2}（无运行中流时应为 false）"
+rm -f "$INTERRUPT_STREAM"
 
 # ---------- 7. 克隆重跑（历史复制 + 参数微调） ----------
 step "7/9 克隆会话并微调参数重跑（历史应被复制）"
@@ -178,7 +183,7 @@ echo "-- 克隆会话追问（历史已复制，应仍知道名字）"
 if [ "$MODE" = "mock" ]; then
     consume_sse "$CLONE_ID" "我叫什么名字？" "你叫小明"
 else
-    consume_sse "$CLONE_ID" "我叫什么名字？" ""
+    consume_sse "$CLONE_ID" "我叫什么名字？" "" --min-input-tokens 60
 fi
 
 # ---------- 8. 问题反馈：提交（关联会话） ----------
