@@ -32,4 +32,11 @@ public interface ErrorCodeConstants {
     ErrorCode SESSION_MODEL_UNAVAILABLE = new ErrorCode(1_022_005_002, "会话绑定的模型或渠道已停用或不存在，无法装配运行时");
     ErrorCode SESSION_RUNNING = new ErrorCode(1_022_005_003, "该会话已有运行中的事件流，请先停止或等待其结束");
 
+    // ========== 技能 SKILL 1-022-006-000 ==========
+    ErrorCode SKILL_NOT_EXISTS = new ErrorCode(1_022_006_000, "技能不存在");
+    ErrorCode SKILL_MD_INVALID = new ErrorCode(1_022_006_001, "SKILL.md 校验失败：{0}");
+    ErrorCode SKILL_NAME_DUPLICATE = new ErrorCode(1_022_006_002, "同名技能已存在：{0}");
+    ErrorCode SKILL_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_006_003, "技能当前没有可发布的草稿，请先编辑生成新草稿");
+    ErrorCode SKILL_VERSION_NOT_EXISTS = new ErrorCode(1_022_006_004, "技能版本不存在");
+
 }

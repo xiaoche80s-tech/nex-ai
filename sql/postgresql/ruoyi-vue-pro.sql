@@ -3530,12 +3530,18 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6424, '会话发消息', 'ai:session:message', 3, 3, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6425, '会话中断', 'ai:session:interrupt', 3, 4, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6426, '会话克隆', 'ai:session:clone', 3, 5, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6427, '技能管理', '', 2, 2, 6400, 'skill', 'ep:collection', 'ai/skill/index', 'AiSkill', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6428, '技能查询', 'ai:skill:query', 3, 1, 6427, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6429, '技能创建', 'ai:skill:create', 3, 2, 6427, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6430, '技能更新', 'ai:skill:update', 3, 3, 6427, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6431, '技能删除', 'ai:skill:delete', 3, 4, 6427, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6432, '技能发布', 'ai:skill:publish', 3, 5, 6427, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
 DROP SEQUENCE IF EXISTS system_menu_seq;
 CREATE SEQUENCE system_menu_seq
-    START 6421;
+    START 6433;
 
 -- ----------------------------
 -- Table structure for system_notice
@@ -6237,5 +6243,87 @@ CREATE UNIQUE INDEX uk_ai_session_key ON ai_session (session_key);
 
 DROP SEQUENCE IF EXISTS ai_session_seq;
 CREATE SEQUENCE ai_session_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_skill（NexAI 智能体平台：技能，工单 10，ADR-0003）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_skill;
+CREATE TABLE ai_skill (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    description varchar(512) NOT NULL,
+    latest_version_no int4 NOT NULL DEFAULT 0,
+    current_version_no int4 NULL DEFAULT NULL,
+    draft_skill_md text NULL DEFAULT NULL,
+    draft_resources text NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill ADD CONSTRAINT pk_ai_skill PRIMARY KEY (id);
+CREATE UNIQUE INDEX uk_ai_skill_name ON ai_skill (tenant_id, name) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_skill.id IS '技能编号';
+COMMENT ON COLUMN ai_skill.name IS '技能名（SKILL.md front matter 的 name，运行时挂载寻址键，租户内唯一：应用层校验 + 存活行部分唯一索引兜底并发）';
+COMMENT ON COLUMN ai_skill.description IS '技能描述（SKILL.md front matter 的 description，冗余列供列表展示）';
+COMMENT ON COLUMN ai_skill.latest_version_no IS '已发布的最新版本号，从未发布为 0';
+COMMENT ON COLUMN ai_skill.current_version_no IS '当前默认版本号（运行时仓储读取的版本），从未发布为 NULL';
+COMMENT ON COLUMN ai_skill.draft_skill_md IS '草稿 SKILL.md 原文（front matter 完整保留，运行时按原文重建 AgentSkill），NULL 表示无草稿';
+COMMENT ON COLUMN ai_skill.draft_resources IS '草稿资源文件集 JSON（相对路径 → 文件内容），NULL 表示无草稿';
+COMMENT ON COLUMN ai_skill.creator IS '创建者';
+COMMENT ON COLUMN ai_skill.create_time IS '创建时间';
+COMMENT ON COLUMN ai_skill.updater IS '更新者';
+COMMENT ON COLUMN ai_skill.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill IS 'AI 平台技能表（自建表实现官方 AgentSkillRepository 接口，ADR-0003；草稿 → 发布锁定 → 再编辑生成新草稿）';
+
+DROP SEQUENCE IF EXISTS ai_skill_seq;
+CREATE SEQUENCE ai_skill_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_skill_version（NexAI 智能体平台：技能版本，工单 10）
+-- ----------------------------
+DROP TABLE IF EXISTS ai_skill_version;
+CREATE TABLE ai_skill_version (
+    id int8 NOT NULL,
+    skill_id int8 NOT NULL,
+    version_no int4 NOT NULL,
+    skill_md text NOT NULL,
+    resources text NOT NULL,
+    remark varchar(255) NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill_version ADD CONSTRAINT pk_ai_skill_version PRIMARY KEY (id);
+CREATE UNIQUE INDEX uk_ai_skill_version ON ai_skill_version (skill_id, version_no);
+
+COMMENT ON COLUMN ai_skill_version.id IS '版本记录编号';
+COMMENT ON COLUMN ai_skill_version.skill_id IS '所属技能编号（ai_skill.id）';
+COMMENT ON COLUMN ai_skill_version.version_no IS '版本号，技能内从 1 递增';
+COMMENT ON COLUMN ai_skill_version.skill_md IS '发布时固化的 SKILL.md 原文快照（不可变，只插入不更新）';
+COMMENT ON COLUMN ai_skill_version.resources IS '发布时固化的资源文件集 JSON（相对路径 → 文件内容，不可变）';
+COMMENT ON COLUMN ai_skill_version.remark IS '发布说明';
+COMMENT ON COLUMN ai_skill_version.creator IS '创建者';
+COMMENT ON COLUMN ai_skill_version.create_time IS '发布时间';
+COMMENT ON COLUMN ai_skill_version.updater IS '更新者';
+COMMENT ON COLUMN ai_skill_version.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill_version.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill_version.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill_version IS 'AI 平台技能版本表（不可变快照，发布语义：草稿 → 发布锁定 → 再编辑生成新草稿）';
+
+DROP SEQUENCE IF EXISTS ai_skill_version_seq;
+CREATE SEQUENCE ai_skill_version_seq
     START 1;
 
