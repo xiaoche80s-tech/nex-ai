@@ -9,22 +9,30 @@ import com.gkht.ai.nexai.module.ai.model.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Model;
 import com.gkht.ai.nexai.module.ai.model.domain.repository.ChannelRepository;
 import com.gkht.ai.nexai.module.ai.model.domain.repository.ModelRepository;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCloneCommand;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionConfirmCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand;
 import com.gkht.ai.nexai.module.ai.session.application.dto.SessionDTO;
 import com.gkht.ai.nexai.module.ai.session.application.query.SessionPageQuery;
+import com.gkht.ai.nexai.module.ai.session.domain.exception.SessionRunningException;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.model.Session;
 import com.gkht.ai.nexai.module.ai.session.domain.repository.SessionRepository;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
+import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.converter.SessionConverter;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.dataobject.SessionDO;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.mapper.SessionMapper;
 import jakarta.annotation.Resource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
@@ -33,15 +41,18 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.CHANNEL_NOT_E
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_MODEL_UNAVAILABLE;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_RUNNING;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_SPEC_NOT_PUBLISHED;
 
 /**
  * 会话应用服务实现。创建与装配读取走跨聚合只读查询（直接查对方 Repository）；
- * 发消息的同步段完成全部阻塞 DB 访问后，把冷的事件流交还调用方。
+ * 发消息/确认回应的同步段完成全部阻塞 DB 访问后，把冷的事件流交还调用方。
  */
 @Service
 @Validated
 public class SessionServiceImpl implements SessionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionServiceImpl.class);
 
     /** 无登录上下文时的运行时用户槽位（测试直连服务层场景；生产恒有登录态） */
     public static final String ANONYMOUS_USER_ID = "anonymous";
@@ -91,17 +102,59 @@ public class SessionServiceImpl implements SessionService {
     @Transactional(rollbackFor = Exception.class)
     public Flux<String> sendDebugMessage(Long sessionId, DebugSessionMessageCommand command, Long userId) {
         Session session = requireSession(sessionId);
-        // 装配链的四次只读查询全部在调用线程完成，事件流回调中不再触碰 DB
-        AgentSpecVersion version = requireVersion(session);
-        AgentSpecConfigParts parts = resolveRuntimeModel(version);
-        AgentSpecConfig snapshot = version.getConfig();
-        AgentRuntimeConfig config = AgentRuntimeConfig.of(session.getSessionKey(),
-                runtimeUserId(userId), agentName(session), snapshot.getSystemPrompt(),
-                snapshot.getMaxIters(), snapshot.getTemperature(),
-                parts.channel(), parts.model());
+        AgentRuntimeConfig config = assembleRuntime(session, userId);
         session.recordMessageRound();
         sessionRepository.save(session);
-        return agentRuntimeGateway.chat(config, command.getContent());
+        return startStream(() -> agentRuntimeGateway.chat(config, command.getContent()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Flux<String> confirmToolCalls(Long sessionId, DebugSessionConfirmCommand command, Long userId) {
+        Session session = requireSession(sessionId);
+        AgentRuntimeConfig config = assembleRuntime(session, userId);
+        List<ToolCallDecision> decisions = command.getDecisions().stream()
+                .map(item -> new ToolCallDecision(item.getToolCallId(), item.getToolName(),
+                        item.getArguments(), item.isApproved()))
+                .toList();
+        // 确认回应是挂起轮的延续而非新用户消息，不计入消息轮数
+        return startStream(() -> agentRuntimeGateway.confirmToolCalls(config, decisions));
+    }
+
+    /**
+     * 发起事件流的共用入口：网关在同步段发现同一会话已有运行中的流时抛
+     * {@link SessionRunningException}，转业务错误（此时轮次等变更随事务一并回滚）
+     */
+    private Flux<String> startStream(java.util.function.Supplier<Flux<String>> stream) {
+        try {
+            return stream.get();
+        } catch (SessionRunningException ex) {
+            throw exception(SESSION_RUNNING);
+        }
+    }
+
+    @Override
+    public boolean interruptSession(Long sessionId) {
+        Session session = requireSession(sessionId);
+        return agentRuntimeGateway.interrupt(session.getSessionKey());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long cloneDebugSession(Long sourceId, DebugSessionCloneCommand command, Long userId) {
+        Session source = requireSession(sourceId);
+        Session cloned = source.cloneAsDebug(command.getTitle(),
+                command.getMaxIters(), command.getTemperature());
+        Long clonedId = sessionRepository.save(cloned);
+        // 对话历史随克隆复制（同一状态存储内搬移）；源无状态或复制失败降级为空白新会话，不阻断克隆
+        try {
+            agentRuntimeGateway.copySessionState(stateUserId(source), source.getSessionKey(),
+                    runtimeUserId(userId), cloned.getSessionKey());
+        } catch (Exception ex) {
+            log.warn("[cloneDebugSession][源会话 {} 状态复制到 {} 失败，降级为空白克隆：{}]",
+                    source.getId(), cloned.getSessionKey(), ex.getMessage());
+        }
+        return clonedId;
     }
 
     @Override
@@ -117,6 +170,25 @@ public class SessionServiceImpl implements SessionService {
             throw exception(SESSION_NOT_EXISTS);
         }
         return session;
+    }
+
+    /**
+     * 发起事件流前的共用装配链：会话绑定的版本快照 + 渠道模型解析 + 会话级推理参数覆盖。
+     * 覆盖优先于快照（克隆重跑微调参数的生效点）。运行中重复发起由网关抛
+     * {@link SessionRunningException}，此处统一转业务错误。
+     */
+    private AgentRuntimeConfig assembleRuntime(Session session, Long userId) {
+        AgentSpecVersion version = requireVersion(session);
+        AgentSpecConfigParts parts = resolveRuntimeModel(version);
+        AgentSpecConfig snapshot = version.getConfig();
+        Integer maxIters = session.getOverrideMaxIters() != null
+                ? session.getOverrideMaxIters() : snapshot.getMaxIters();
+        Double temperature = session.getOverrideTemperature() != null
+                ? session.getOverrideTemperature() : snapshot.getTemperature();
+        return AgentRuntimeConfig.of(session.getSessionKey(),
+                runtimeUserId(userId), agentName(session), snapshot.getSystemPrompt(),
+                maxIters, temperature,
+                parts.channel(), parts.model());
     }
 
     /**
@@ -163,6 +235,15 @@ public class SessionServiceImpl implements SessionService {
      */
     private String runtimeUserId(Long userId) {
         return userId != null ? String.valueOf(userId) : ANONYMOUS_USER_ID;
+    }
+
+    /**
+     * 源会话状态所在的 userId 槽位：会话创建者的持久化痕迹（creator 列），
+     * 无记录时（测试直连、历史数据）退化为匿名槽位
+     */
+    private String stateUserId(Session session) {
+        String creator = session.getCreatorUserId();
+        return creator == null || creator.isBlank() ? ANONYMOUS_USER_ID : creator;
     }
 
     /** 装配链解析结果（channel + model 一起传递） */

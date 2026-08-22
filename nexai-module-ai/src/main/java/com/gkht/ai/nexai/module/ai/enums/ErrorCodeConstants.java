@@ -30,5 +30,6 @@ public interface ErrorCodeConstants {
     ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");
     ErrorCode SESSION_SPEC_NOT_PUBLISHED = new ErrorCode(1_022_005_001, "规格尚未发布任何版本，无法发起会话");
     ErrorCode SESSION_MODEL_UNAVAILABLE = new ErrorCode(1_022_005_002, "会话绑定的模型或渠道已停用或不存在，无法装配运行时");
+    ErrorCode SESSION_RUNNING = new ErrorCode(1_022_005_003, "该会话已有运行中的事件流，请先停止或等待其结束");
 
 }

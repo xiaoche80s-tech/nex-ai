@@ -9,6 +9,22 @@ export interface ToolCallCard {
   state: 'running' | 'done' | 'error'
 }
 
+/** 待人工确认的工具调用（REQUIRE_USER_CONFIRM 事件展开） */
+export interface PendingConfirmTool {
+  toolCallId: string
+  name: string
+  /** 参数 JSON（可编辑后批准） */
+  arguments: string
+}
+
+/** 挂起等待三态回应的确认请求 */
+export interface PendingConfirm {
+  replyId: string
+  toolCalls: PendingConfirmTool[]
+  /** 已回应（UI 停止展示操作按钮，等待后续事件流） */
+  responded: boolean
+}
+
 /** 助手回合：一次 AGENT_START → AGENT_END 的事件折叠结果 */
 export interface AssistantTurn {
   /** 回答正文（TEXT_BLOCK_DELTA 增量拼接） */
@@ -16,6 +32,8 @@ export interface AssistantTurn {
   /** 思考过程（THINKING_BLOCK_DELTA 增量拼接），空则不渲染思考块 */
   thinking: string
   tools: ToolCallCard[]
+  /** 挂起的人工确认请求（REQUIRE_USER_CONFIRM），回应后保留作历史展示 */
+  pendingConfirm: PendingConfirm | null
   /** 本回合是否已终结（AGENT_RESULT/AGENT_END/出错） */
   finished: boolean
   /** 运行中出错的提示（SESSION_ERROR 或流异常） */
@@ -40,7 +58,7 @@ export interface ChatUsage {
 /**
  * 原生 AgentEvent 流 → 对话渲染模型的折叠器。
  *
- * 只消费调试台关心的九类事件，其余（MODEL_CALL_START、块 START/END、AGENT_START 等
+ * 只消费调试台关心的事件，其余（MODEL_CALL_START、块 START/END、AGENT_START 等
  * 纯生命周期标记）不产生独立 UI——块边界由渲染层按内容有无处理，
  * 保证「事件流可序列化还原为对话」这一外部行为可断言。
  */
@@ -52,7 +70,14 @@ export const useEventStream = () => {
 
   /** 开始一个用户回合：登记用户消息并预置助手回合（等待事件流填充） */
   const newTurn = (): AssistantTurn =>
-    reactive({ text: '', thinking: '', tools: [], finished: false, error: null }) as AssistantTurn
+    reactive({
+      text: '',
+      thinking: '',
+      tools: [],
+      pendingConfirm: null,
+      finished: false,
+      error: null
+    }) as AssistantTurn
 
   const beginTurn = (text: string) => {
     entries.push({ kind: 'user', text })
@@ -116,6 +141,21 @@ export const useEventStream = () => {
         if (event.usage) {
           usage.inputTokens += event.usage.inputTokens ?? 0
           usage.outputTokens += event.usage.outputTokens ?? 0
+        }
+        break
+      }
+      case 'REQUIRE_USER_CONFIRM': {
+        // HITL 挂起：登记待确认清单，渲染三态回应卡片（回应动作由视图层调确认 API）
+        if (currentTurn && event.toolCalls?.length) {
+          currentTurn.pendingConfirm = reactive({
+            replyId: event.replyId ?? '',
+            toolCalls: event.toolCalls.map((call) => ({
+              toolCallId: call.id,
+              name: call.name,
+              arguments: call.content ?? '{}'
+            })),
+            responded: false
+          })
         }
         break
       }

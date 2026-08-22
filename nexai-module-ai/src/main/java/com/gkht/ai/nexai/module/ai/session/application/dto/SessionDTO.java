@@ -30,6 +30,12 @@ public class SessionDTO {
     @Schema(description = "已发送的消息轮数", example = "3")
     private Integer messageRounds;
 
+    @Schema(description = "推理参数覆盖：最大迭代轮数（null 表示沿用版本快照）", example = "5")
+    private Integer overrideMaxIters;
+
+    @Schema(description = "推理参数覆盖：温度（null 表示沿用版本快照）", example = "0.9")
+    private Double overrideTemperature;
+
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 

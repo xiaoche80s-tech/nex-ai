@@ -41,8 +41,9 @@ public class SessionRepositoryImpl implements SessionRepository {
     private Session reconstitute(SessionDO dataObject) {
         return Session.reconstitute(dataObject.getId(), dataObject.getSessionKey(),
                 SessionType.of(dataObject.getType()), dataObject.getSpecId(),
-                dataObject.getVersionNo(), dataObject.getTitle(), dataObject.getMessageRounds(),
-                dataObject.getCreateTime());
+                dataObject.getVersionNo(), dataObject.getTitle(),
+                dataObject.getOverrideMaxIters(), dataObject.getOverrideTemperature(),
+                dataObject.getMessageRounds(), dataObject.getCreator(), dataObject.getCreateTime());
     }
 
 }

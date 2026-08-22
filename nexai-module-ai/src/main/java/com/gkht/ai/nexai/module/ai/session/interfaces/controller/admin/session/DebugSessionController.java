@@ -3,6 +3,8 @@ package com.gkht.ai.nexai.module.ai.session.interfaces.controller.admin.session;
 import com.gkht.ai.nexai.framework.common.pojo.CommonResult;
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.security.core.util.SecurityFrameworkUtils;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCloneCommand;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionConfirmCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand;
 import com.gkht.ai.nexai.module.ai.session.application.dto.SessionDTO;
@@ -59,6 +61,41 @@ public class DebugSessionController {
     public Flux<String> sendMessage(@PathVariable("id") Long id,
                                     @Valid @RequestBody DebugSessionMessageCommand command) {
         return sessionService.sendDebugMessage(id, command, SecurityFrameworkUtils.getLoginUserId());
+    }
+
+    @PostMapping(value = "/{id}/confirm", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "回应工具确认请求（SSE 事件流，HITL 三态）",
+            description = "对事件流中 REQUIRE_USER_CONFIRM 事件的工具调用逐条回应：批准 / 改参数后批准"
+                    + "（decisions[].arguments 携带改后完整参数 JSON）/ 拒绝（approved=false，工具不执行、"
+                    + "向上下文写入拒绝结果）。返回 USER_CONFIRM_RESULT → 工具执行或拒绝 → 后续推理 → AGENT_END 的事件流；"
+                    + "无待确认调用时流以 SESSION_ERROR 收尾")
+    @Parameter(name = "id", description = "会话编号", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('ai:session:message')")
+    public Flux<String> confirmToolCalls(@PathVariable("id") Long id,
+                                         @Valid @RequestBody DebugSessionConfirmCommand command) {
+        return sessionService.confirmToolCalls(id, command, SecurityFrameworkUtils.getLoginUserId());
+    }
+
+    @PostMapping("/{id}/interrupt")
+    @Operation(summary = "中断正在运行的事件流",
+            description = "对运行中的会话触发中断旗标：流在当前检查点停止推理并以正常事件序列收尾"
+                    + "（写入中断恢复消息后 AGENT_END）。幂等：会话当前无运行中的流时返回 false")
+    @Parameter(name = "id", description = "会话编号", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('ai:session:interrupt')")
+    public CommonResult<Boolean> interruptSession(@PathVariable("id") Long id) {
+        return success(sessionService.interruptSession(id));
+    }
+
+    @PostMapping("/{id}/clone")
+    @Operation(summary = "克隆会话为新调试会话",
+            description = "复制源会话的对话历史状态（agentscope 状态存储整体搬移）为新调试会话，"
+                    + "可微调推理参数（maxIters/temperature，null 沿用源会话当前值）实现对照重跑；"
+                    + "克隆产物恒为调试会话（type=debug），消息轮数归零")
+    @Parameter(name = "id", description = "源会话编号", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('ai:session:clone')")
+    public CommonResult<Long> cloneSession(@PathVariable("id") Long id,
+                                           @Valid @RequestBody DebugSessionCloneCommand command) {
+        return success(sessionService.cloneDebugSession(id, command, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/page")

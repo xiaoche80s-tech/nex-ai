@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS ai_session (
     spec_id int8 NOT NULL,
     version_no int4 NOT NULL,
     title varchar(128) NULL DEFAULT NULL,
+    override_max_iters int4 NULL DEFAULT NULL,
+    override_temperature numeric(3,2) NULL DEFAULT NULL,
     message_rounds int4 NOT NULL DEFAULT 0,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -108,4 +110,7 @@ CREATE TABLE IF NOT EXISTS ai_session (
     tenant_id int8 NOT NULL DEFAULT 0,
     CONSTRAINT pk_ai_session PRIMARY KEY (id)
 );
+-- 工单 08 会话级推理参数覆盖：共享库已建表时幂等补列
+ALTER TABLE ai_session ADD COLUMN IF NOT EXISTS override_max_iters int4 NULL DEFAULT NULL;
+ALTER TABLE ai_session ADD COLUMN IF NOT EXISTS override_temperature numeric(3,2) NULL DEFAULT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_session_key ON ai_session (session_key);

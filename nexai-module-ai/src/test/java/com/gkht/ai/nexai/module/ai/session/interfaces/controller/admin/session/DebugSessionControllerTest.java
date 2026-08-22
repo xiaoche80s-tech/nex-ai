@@ -8,6 +8,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.mybatis.core.type.EncryptTypeHandler;
 import com.gkht.ai.nexai.framework.mybatis.core.util.MyBatisUtils;
 import com.gkht.ai.nexai.framework.security.core.LoginUser;
+import com.gkht.ai.nexai.framework.security.core.util.SecurityFrameworkUtils;
 import com.gkht.ai.nexai.framework.tenant.config.TenantProperties;
 import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
 import com.gkht.ai.nexai.framework.tenant.core.db.TenantDatabaseInterceptor;
@@ -33,6 +34,8 @@ import com.gkht.ai.nexai.module.ai.model.infrastructure.repository.ChannelReposi
 import com.gkht.ai.nexai.module.ai.model.infrastructure.repository.ModelRepositoryImpl;
 import com.gkht.ai.nexai.module.ai.model.interfaces.controller.admin.model.ChannelController;
 import com.gkht.ai.nexai.module.ai.model.interfaces.controller.admin.model.ModelController;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCloneCommand;
+import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionConfirmCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand;
 import com.gkht.ai.nexai.module.ai.session.application.dto.SessionDTO;
@@ -43,6 +46,7 @@ import com.gkht.ai.nexai.module.ai.session.infrastructure.gateway.AgentStateStor
 import com.gkht.ai.nexai.module.ai.session.infrastructure.gateway.RuntimeToolContributor;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.repository.SessionRepositoryImpl;
 import com.gkht.ai.nexai.module.ai.support.BasePgDbAndRedisUnitTest;
+import com.gkht.ai.nexai.module.ai.support.ConfirmableEchoTool;
 import com.gkht.ai.nexai.module.ai.support.EchoTool;
 import com.gkht.ai.nexai.module.ai.support.FakeChatModel;
 import io.agentscope.core.tool.Toolkit;
@@ -62,13 +66,19 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServiceException;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_RUNNING;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_SPEC_NOT_PUBLISHED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -166,13 +176,16 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
 
     }
 
-    /** 调试工具注入：验证工具调用事件流（M2 的技能/MCP 挂载走同一扩展点） */
+    /** 调试工具注入：验证工具调用事件流（M2 的技能/MCP 挂载走同一扩展点）；confirmable 工具驱动 HITL 三态 */
     @TestConfiguration
     static class ToolContributorConfiguration {
 
         @Bean
         public RuntimeToolContributor echoToolContributor() {
-            return toolkit -> toolkit.registerTool(new EchoTool());
+            return toolkit -> {
+                toolkit.registerTool(new EchoTool());
+                toolkit.registerAgentTool(new ConfirmableEchoTool());
+            };
         }
 
     }
@@ -191,10 +204,13 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
 
     @AfterEach
     public void tearDown() {
-        // 先清理 agentscope 状态存储中的会话状态（无租户概念，按运行时 userId 槽位逐一删除），
-        // 再释放租户上下文——其后由 clean.sql 清理业务表
+        // 先清理 agentscope 状态存储中的会话状态（无租户概念，按运行时 userId 槽位逐一删除——
+        // 槽位与发消息时一致：有登录态取登录用户编号，否则匿名），再释放租户上下文——其后由 clean.sql 清理业务表
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        String slotUserId = loginUserId != null ? String.valueOf(loginUserId)
+                : SessionServiceImpl.ANONYMOUS_USER_ID;
         for (SessionDTO session : sessionController.getSessionPage(pageOf(null)).getData().getList()) {
-            agentStateStoreProvider.get().delete(SessionServiceImpl.ANONYMOUS_USER_ID, session.getSessionKey());
+            agentStateStoreProvider.get().delete(slotUserId, session.getSessionKey());
         }
         TenantContextHolder.clear();
         SecurityContextHolder.clearContext();
@@ -361,6 +377,192 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
         assertEquals(2, versionPage.getList().get(0).getVersionNo());
     }
 
+    // ==================== 工单 08：HITL 三态 / 中断 / 克隆重跑 ====================
+
+    @Test
+    @DisplayName("HITL：确认工具调用触发挂起（REQUIRE_USER_CONFIRM + REQUEST_STOP，工具不执行，流正常收尾）")
+    void hitl_pausesStreamOnConfirmRequest() {
+        CURRENT_FAKE.set(FakeChatModel.script()
+                .callTool("confirmable_echo", Map.of("text", "敲黑板"))
+                .reply("工具执行完毕")
+                .build());
+        Long sessionId = createDebugSession(createPublishedSpec(), null);
+
+        List<String> events = collectEvents(sessionId, "请回显：敲黑板");
+        List<String> types = events.stream().map(this::eventType).toList();
+
+        assertTrue(types.contains("REQUIRE_USER_CONFIRM"), "应发出确认请求事件，实际序列：" + types);
+        assertTrue(types.contains("REQUEST_STOP"), "确认请求后应以 REQUEST_STOP 信号挂起本轮");
+        assertEquals("AGENT_END", eventType(events.get(events.size() - 1)), "挂起轮事件流应正常收尾");
+        // TOOL_CALL_* 生命周期事件表示调用被发起；闸门拦截的表现是永不出现工具执行结果
+        assertFalse(types.stream().anyMatch(type -> type.startsWith("TOOL_RESULT")),
+                "确认前工具不得真实执行，实际序列：" + types);
+        String confirmEvent = lastOf(events, "REQUIRE_USER_CONFIRM");
+        assertTrue(confirmEvent.contains("confirmable_echo") && confirmEvent.contains("fake-call-0"),
+                "确认请求应携带待确认工具调用的名称与标识，实际：" + confirmEvent);
+    }
+
+    @Test
+    @DisplayName("HITL：批准（原参数）→ 确认结果事件 + 工具真实执行 + 后续推理完成")
+    void hitl_approveExecutesTool() {
+        Long sessionId = preparedAskingSession();
+
+        List<String> events = confirmAndCollect(sessionId, "fake-call-0", "confirmable_echo",
+                "{\"text\":\"敲黑板\"}", true);
+        List<String> types = events.stream().map(this::eventType).toList();
+
+        assertTrue(types.contains("USER_CONFIRM_RESULT"), "回应后应发出确认结果事件，实际序列：" + types);
+        String toolResult = lastOf(events, "TOOL_RESULT_TEXT_DELTA");
+        assertTrue(toolResult != null && toolResult.contains("confirmed-echo:敲黑板"),
+                "批准后工具应以原参数真实执行，实际：" + toolResult);
+        assertTrue(lastOf(events, "AGENT_RESULT").contains("工具执行完毕"), "工具结果应驱动后续推理完成");
+        assertEquals("AGENT_END", eventType(events.get(events.size() - 1)));
+    }
+
+    @Test
+    @DisplayName("HITL：修改参数后批准 → 工具收到改后参数执行，原参数不出现")
+    void hitl_approveWithModifiedArguments() {
+        Long sessionId = preparedAskingSession();
+
+        List<String> events = confirmAndCollect(sessionId, "fake-call-0", "confirmable_echo",
+                "{\"text\":\"改后的文本\"}", true);
+
+        String toolResult = lastOf(events, "TOOL_RESULT_TEXT_DELTA");
+        assertTrue(toolResult != null && toolResult.contains("confirmed-echo:改后的文本"),
+                "改参数后批准应以修改后的参数执行，实际：" + toolResult);
+        assertFalse(toolResult.contains("敲黑板"), "原始参数不应被执行");
+    }
+
+    @Test
+    @DisplayName("HITL：拒绝 → 工具不执行，拒绝结果进入上下文驱动下一轮推理")
+    void hitl_denySkipsTool() {
+        Long sessionId = preparedAskingSession();
+
+        List<String> events = confirmAndCollect(sessionId, "fake-call-0", "confirmable_echo",
+                "{\"text\":\"敲黑板\"}", false);
+        List<String> types = events.stream().map(this::eventType).toList();
+
+        assertTrue(types.contains("USER_CONFIRM_RESULT"), "拒绝同样以确认结果事件开始");
+        assertFalse(String.join("\n", events).contains("confirmed-echo"), "拒绝后工具函数体不得执行");
+        assertTrue(fake().getReceivedMessages().size() >= 2, "拒绝后应发起下一轮推理消化拒绝结果");
+        String nextRoundContext = io.agentscope.core.util.JsonUtils.getJsonCodec()
+                .toJson(fake().getReceivedMessages().get(1));
+        assertTrue(nextRoundContext.contains("Permission denied by user"),
+                "下一轮推理请求应携带用户拒绝结果");
+        assertTrue(lastOf(events, "AGENT_RESULT").contains("工具执行完毕"), "拒绝后推理照常完成");
+    }
+
+    @Test
+    @DisplayName("HITL：无待确认调用时回应 → 流以 SESSION_ERROR 收尾而非中断连接")
+    void hitl_confirmWithoutPendingFails() {
+        Long sessionId = createDebugSession(createPublishedSpec(), null);
+        collectEvents(sessionId, "普通一轮"); // 正常完成，无挂起
+
+        List<String> events = confirmAndCollect(sessionId, "fake-call-0", "confirmable_echo", "{}", true);
+
+        assertTrue(events.stream().anyMatch(event -> eventType(event).equals("SESSION_ERROR")),
+                "无待确认调用时流应以 SESSION_ERROR 收尾，实际："
+                        + events.stream().map(this::eventType).toList());
+    }
+
+    @Test
+    @DisplayName("中断：运行中的流及时收尾（AGENT_END），未跑完脚本，且会话可立即继续")
+    void interrupt_stopsRunningStream() throws Exception {
+        CURRENT_FAKE.set(FakeChatModel.script()
+                .reply("第一段")
+                .reply("第二段")
+                .reply("第三段")
+                .stepDelay(Duration.ofMillis(400))
+                .build());
+        Long sessionId = createDebugSession(createPublishedSpec(), null);
+
+        List<String> events = new CopyOnWriteArrayList<>();
+        CountDownLatch finished = new CountDownLatch(1);
+        DebugSessionMessageCommand command = new DebugSessionMessageCommand();
+        command.setContent("慢慢来");
+        sessionController.sendMessage(sessionId, command)
+                .doOnNext(events::add)
+                .doFinally(signal -> finished.countDown())
+                .subscribe();
+        awaitFirstEvent(events);
+
+        assertTrue(sessionController.interruptSession(sessionId).getData(), "应命中运行中的流并触发中断");
+        assertTrue(finished.await(STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS), "中断后流应及时终结");
+        assertEquals("AGENT_END", eventType(events.get(events.size() - 1)), "中断后事件流应正常收尾");
+        String emittedText = events.stream()
+                .filter(event -> eventType(event).equals("TEXT_BLOCK_DELTA"))
+                .map(event -> textDelta(event)).collect(Collectors.joining());
+        assertFalse(emittedText.contains("第三段"), "中断生效后不应继续跑完全部脚本，实际输出：" + emittedText);
+
+        // 中断旗标在下一次调用开始时复位：会话可立即继续新消息
+        CURRENT_FAKE.set(FakeChatModel.script().reply("中断后的新答复").build());
+        List<String> followUp = collectEvents(sessionId, "继续");
+        assertTrue(lastOf(followUp, "AGENT_RESULT").contains("中断后的新答复"), "中断后应能继续对话");
+        assertFalse(sessionController.interruptSession(sessionId).getData(),
+                "无运行中的流时中断幂等返回 false");
+    }
+
+    @Test
+    @DisplayName("运行防护：同一会话流运行中再发消息 → 业务错误（同一时刻至多一条流）")
+    void sendMessage_rejectsConcurrentStream() throws Exception {
+        CURRENT_FAKE.set(FakeChatModel.script()
+                .reply("慢答复").reply("慢答复")
+                .stepDelay(Duration.ofMillis(400))
+                .build());
+        Long sessionId = createDebugSession(createPublishedSpec(), null);
+
+        List<String> events = new CopyOnWriteArrayList<>();
+        CountDownLatch finished = new CountDownLatch(1);
+        DebugSessionMessageCommand command = new DebugSessionMessageCommand();
+        command.setContent("第一条");
+        sessionController.sendMessage(sessionId, command)
+                .doOnNext(events::add)
+                .doFinally(signal -> finished.countDown())
+                .subscribe();
+        awaitFirstEvent(events);
+
+        DebugSessionMessageCommand second = new DebugSessionMessageCommand();
+        second.setContent("第二条");
+        assertServiceException(() -> sessionController.sendMessage(sessionId, second), SESSION_RUNNING);
+
+        assertTrue(finished.await(STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS), "首条流应不受影响正常完成");
+    }
+
+    @Test
+    @DisplayName("克隆重跑：复制对话历史为新调试会话，推理参数覆盖生效、消息轮数归零")
+    void cloneSession_copiesHistoryAndOverrides() {
+        CURRENT_FAKE.set(FakeChatModel.script().reply("原会话答复").build());
+        Long sourceId = createDebugSession(createPublishedSpec(), null);
+        collectEvents(sourceId, "原会话问题");
+
+        DebugSessionCloneCommand cloneCommand = new DebugSessionCloneCommand();
+        cloneCommand.setMaxIters(9);
+        cloneCommand.setTemperature(0.9);
+        Long clonedId = sessionController.cloneSession(sourceId, cloneCommand).getData();
+
+        assertNotEquals(sourceId, clonedId);
+        SessionDTO cloned = sessionController.getSessionPage(pageOf(null)).getData().getList().stream()
+                .filter(session -> session.getId().equals(clonedId)).findFirst().orElseThrow();
+        assertEquals(10, cloned.getType(), "克隆产物恒为调试会话");
+        assertEquals(0, cloned.getMessageRounds(), "克隆会话消息轮数归零");
+        assertEquals(9, cloned.getOverrideMaxIters(), "推理参数覆盖应落库");
+        assertEquals(0.9, cloned.getOverrideTemperature());
+        assertTrue(cloned.getTitle() != null && cloned.getTitle().contains("（克隆）"),
+                "缺省标题应派生自源会话并带克隆标记");
+
+        // 状态复制验证：克隆会话首轮推理请求携带源会话的完整问答历史
+        CURRENT_FAKE.set(FakeChatModel.script().reply("克隆后答复").build());
+        List<String> events = collectEvents(clonedId, "克隆会话问题");
+        String firstRound = io.agentscope.core.util.JsonUtils.getJsonCodec()
+                .toJson(fake().getReceivedMessages().get(0));
+        assertTrue(firstRound.contains("原会话问题") && firstRound.contains("原会话答复"),
+                "克隆会话首轮推理应携带源会话历史（agentscope 状态整体复制）");
+        assertTrue(lastOf(events, "AGENT_RESULT").contains("克隆后答复"), "克隆会话应可正常完成推理");
+        assertEquals(1, sessionController.getSessionPage(pageOf(null)).getData().getList().stream()
+                .filter(session -> session.getId().equals(clonedId))
+                .map(SessionDTO::getMessageRounds).findFirst().orElse(-1), "克隆会话轮数从 0 起计");
+    }
+
     // ==================== 测试链路构建与断言辅助 ====================
 
     /** 建渠道并登记模型，返回模型编号 */
@@ -416,6 +618,50 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
         List<String> events = sessionController.sendMessage(sessionId, command)
                 .collectList().block(STREAM_TIMEOUT);
         return events == null ? List.of() : events;
+    }
+
+    /** 发起一条会触发确认请求的消息并等待挂起轮收尾（脚本第 1 步已消费），返回会话编号 */
+    private Long preparedAskingSession() {
+        CURRENT_FAKE.set(FakeChatModel.script()
+                .callTool("confirmable_echo", Map.of("text", "敲黑板"))
+                .reply("工具执行完毕")
+                .build());
+        Long sessionId = createDebugSession(createPublishedSpec(), null);
+        List<String> events = collectEvents(sessionId, "请回显：敲黑板");
+        assertTrue(events.stream().anyMatch(event -> eventType(event).equals("REQUIRE_USER_CONFIRM")),
+                "前置条件：本轮应触发确认请求挂起");
+        return sessionId;
+    }
+
+    /** 回应待确认工具调用并阻塞收集后续事件流 */
+    private List<String> confirmAndCollect(Long sessionId, String toolCallId, String toolName,
+                                           String arguments, boolean approved) {
+        DebugSessionConfirmCommand command = new DebugSessionConfirmCommand();
+        DebugSessionConfirmCommand.Decision decision = new DebugSessionConfirmCommand.Decision();
+        decision.setToolCallId(toolCallId);
+        decision.setToolName(toolName);
+        decision.setArguments(arguments);
+        decision.setApproved(approved);
+        command.setDecisions(List.of(decision));
+        List<String> events = sessionController.confirmToolCalls(sessionId, command)
+                .collectList().block(STREAM_TIMEOUT);
+        return events == null ? List.of() : events;
+    }
+
+    /** 轮询等待事件流产出首条事件（AGENT_START），保证中断/并发断言不与流启动竞态 */
+    private void awaitFirstEvent(List<String> events) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + STREAM_TIMEOUT.toMillis();
+        while (events.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+        assertFalse(events.isEmpty(), "事件流应及时产出首条事件（AGENT_START）");
+    }
+
+    /** 取 TEXT_BLOCK_DELTA 事件的增量文本 */
+    private String textDelta(String eventJson) {
+        Object delta = io.agentscope.core.util.JsonUtils.getJsonCodec()
+                .fromJson(eventJson, Map.class).get("delta");
+        return delta == null ? "" : String.valueOf(delta);
     }
 
     private FakeChatModel fake() {

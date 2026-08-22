@@ -3528,6 +3528,8 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6422, '会话查询', 'ai:session:query', 3, 1, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6423, '会话创建', 'ai:session:create', 3, 2, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6424, '会话发消息', 'ai:session:message', 3, 3, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6425, '会话中断', 'ai:session:interrupt', 3, 4, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6426, '会话克隆', 'ai:session:clone', 3, 5, 6421, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-22 00:00:00', '1', '2026-08-22 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
@@ -6198,6 +6200,8 @@ CREATE TABLE ai_session (
     spec_id int8 NOT NULL,
     version_no int4 NOT NULL,
     title varchar(128) NULL DEFAULT NULL,
+    override_max_iters int4 NULL DEFAULT NULL,
+    override_temperature numeric(3,2) NULL DEFAULT NULL,
     message_rounds int4 NOT NULL DEFAULT 0,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -6206,6 +6210,9 @@ CREATE TABLE ai_session (
     deleted int2 NOT NULL DEFAULT 0,
     tenant_id int8 NOT NULL DEFAULT 0
 );
+-- 已按工单 06 建过表的存量库执行以下幂等迁移（工单 08：会话级推理参数覆盖，克隆重跑微调落点）：
+-- ALTER TABLE ai_session ADD COLUMN IF NOT EXISTS override_max_iters int4 NULL DEFAULT NULL;
+-- ALTER TABLE ai_session ADD COLUMN IF NOT EXISTS override_temperature numeric(3,2) NULL DEFAULT NULL;
 
 ALTER TABLE ai_session ADD CONSTRAINT pk_ai_session PRIMARY KEY (id);
 
@@ -6215,6 +6222,8 @@ COMMENT ON COLUMN ai_session.type IS '会话类型（10 调试 / 20 终端用户
 COMMENT ON COLUMN ai_session.spec_id IS '绑定的规格编号（ai_agent_spec.id）';
 COMMENT ON COLUMN ai_session.version_no IS '绑定的规格版本号（不可变快照定位键，会话绑定稳定版本）';
 COMMENT ON COLUMN ai_session.title IS '会话标题';
+COMMENT ON COLUMN ai_session.override_max_iters IS '推理参数覆盖：最大迭代轮数（null 沿用版本快照，克隆重跑微调落点）';
+COMMENT ON COLUMN ai_session.override_temperature IS '推理参数覆盖：温度（null 沿用版本快照）';
 COMMENT ON COLUMN ai_session.message_rounds IS '已发送的消息轮数';
 COMMENT ON COLUMN ai_session.creator IS '创建者';
 COMMENT ON COLUMN ai_session.create_time IS '创建时间';

@@ -43,6 +43,14 @@ public class SessionDO extends TenantBaseDO {
      */
     private String title;
     /**
+     * 推理参数覆盖：最大迭代轮数（null 沿用版本快照，克隆重跑微调落点）
+     */
+    private Integer overrideMaxIters;
+    /**
+     * 推理参数覆盖：温度（null 沿用版本快照）
+     */
+    private Double overrideTemperature;
+    /**
      * 已发送的消息轮数
      */
     private Integer messageRounds;

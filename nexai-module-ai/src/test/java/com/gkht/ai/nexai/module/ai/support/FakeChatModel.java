@@ -11,6 +11,7 @@ import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
 import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,16 +29,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 可确定性验证，不碰真实 LLM。脚本耗尽仍被调用即测试预期失败，快速暴露断言错误。</p>
  *
  * <p>同时记录每轮收到的消息列表（{@link #getReceivedMessages()}），供断言系统提示注入、
- * 多轮上下文延续与工具结果回填等行为。</p>
+ * 多轮上下文延续与工具结果回填等行为。{@code stepDelay} 给每步应答施加发射延迟，
+ * 使中断（InterruptControl）测试能在轮次间触发并观察到流的及时收尾（工单 08）。</p>
  */
 public final class FakeChatModel implements Model {
 
     private final List<ChatResponse> script;
+    private final Duration stepDelay;
     private final AtomicInteger nextStep = new AtomicInteger();
     private final List<List<Msg>> receivedMessages = new CopyOnWriteArrayList<>();
 
-    private FakeChatModel(List<ChatResponse> script) {
+    private FakeChatModel(List<ChatResponse> script, Duration stepDelay) {
         this.script = List.copyOf(script);
+        this.stepDelay = stepDelay;
     }
 
     /**
@@ -56,7 +60,8 @@ public final class FakeChatModel implements Model {
                     "FakeChatModel 脚本已耗尽（共 " + script.size() + " 步），第 " + (step + 1)
                             + " 次推理调用未编排——请检查用例编排与被测行为的匹配"));
         }
-        return Flux.just(script.get(step));
+        return stepDelay == null ? Flux.just(script.get(step))
+                : Flux.just(script.get(step)).delayElements(stepDelay);
     }
 
     @Override
@@ -79,6 +84,7 @@ public final class FakeChatModel implements Model {
         private static final ChatUsage USAGE = new ChatUsage(11, 7, 0.01d);
 
         private final List<ChatResponse> steps = new ArrayList<>();
+        private Duration stepDelay;
 
         /**
          * 本轮推理以文本应答（ReAct 收到无工具调用的回复即结束循环并产出 AgentResult）
@@ -101,6 +107,15 @@ public final class FakeChatModel implements Model {
                     .build());
         }
 
+        /**
+         * 每步应答延迟发射（模拟慢模型）：中断测试用——延迟期间触发 InterruptControl，
+         * 流应在下一个检查点收尾而非跑完全部脚本
+         */
+        public ScriptBuilder stepDelay(Duration delay) {
+            this.stepDelay = delay;
+            return this;
+        }
+
         private ScriptBuilder step(ContentBlock block) {
             steps.add(ChatResponse.builder()
                     .id("fake-response-" + steps.size())
@@ -112,7 +127,7 @@ public final class FakeChatModel implements Model {
         }
 
         public FakeChatModel build() {
-            return new FakeChatModel(steps);
+            return new FakeChatModel(steps, stepDelay);
         }
 
     }
