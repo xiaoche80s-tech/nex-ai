@@ -17,8 +17,11 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecVersionNo
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.SubagentMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverter;
@@ -42,9 +45,13 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CODE_DUPLICATE;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_EDIT_FORBIDDEN;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PUBLISH_WITHOUT_DRAFT;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_SELF_MOUNTING_REJECTED;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
 
@@ -52,11 +59,16 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXI
  * 智能体规格应用服务实现。写走聚合（Repository 端口），读按轻量读写分离经 Mapper 直查并批量补充模型信息。
  *
  * <p>模型引用存在性在编辑与发布两个时点都校验（草稿保存后模型仍可能被删除）；
- * 启用性不校验——停用模型只影响运行时装配（工单 06 兜底），不影响规格迭代。</p>
+ * 启用性不校验——停用模型只影响运行时装配（工单 06 兜底），不影响规格迭代。
+ * spec_code 唯一性按归属层级：应用层预校验（{@link AgentSpecMapper#existsBySpecCode}）
+ * + 数据库部分唯一索引兜底并发。</p>
  */
 @Service
 @Validated
 public class AgentSpecServiceImpl implements AgentSpecService {
+
+    /** 归属层级缺省值 */
+    private static final OwnerLevel DEFAULT_OWNER_LEVEL = OwnerLevel.TENANT;
 
     @Resource
     private AgentSpecRepository agentSpecRepository;
@@ -75,16 +87,32 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createSpec(AgentSpecCreateCommand command) {
+    public Long createSpec(AgentSpecCreateCommand command, Long userId) {
         requireModel(command.getModelId());
-        AgentSpec spec = AgentSpec.create(command.getName(), command.getIcon(), toConfig(command));
+        // M1 开放范围：TENANT/USER（命令层 @Pattern 之外，服务层直调场景同样拦截）
+        OwnerLevel ownerLevel = command.getOwnerLevel() == null
+                ? DEFAULT_OWNER_LEVEL : OwnerLevel.valueOf(command.getOwnerLevel());
+        if (ownerLevel == OwnerLevel.PLATFORM) {
+            throw exception(AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED);
+        }
+        // 用户级归属 = 创建者（归属用户由服务端从登录态填充，不信任前端传入）
+        Long ownerUserId = ownerLevel == OwnerLevel.USER ? userId : null;
+        if (ownerLevel == OwnerLevel.USER && ownerUserId == null) {
+            throw exception(AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED);
+        }
+        if (agentSpecMapper.existsBySpecCode(ownerLevel.name(), ownerUserId, command.getSpecCode())) {
+            throw exception(AGENT_SPEC_CODE_DUPLICATE, command.getSpecCode());
+        }
+        AgentSpec spec = AgentSpec.create(command.getName(), command.getSpecCode(), command.getIcon(),
+                ownerLevel, ownerUserId, toConfig(command));
         return agentSpecRepository.save(spec);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateSpec(AgentSpecUpdateCommand command) {
+    public void updateSpec(AgentSpecUpdateCommand command, Long userId) {
         AgentSpec spec = requireSpec(command.getId());
+        requireEditable(spec, userId);
         requireModel(command.getModelId());
         try {
             spec.editDraft(command.getName(), command.getIcon(), toConfig(command));
@@ -96,15 +124,17 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteSpec(Long id) {
-        requireSpec(id);
+    public void deleteSpec(Long id, Long userId) {
+        AgentSpec spec = requireSpec(id);
+        requireEditable(spec, userId);
         agentSpecRepository.deleteByIdCascade(id);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Integer publishSpec(AgentSpecPublishCommand command) {
+    public Integer publishSpec(AgentSpecPublishCommand command, Long userId) {
         AgentSpec spec = requireSpec(command.getId());
+        requireEditable(spec, userId);
         AgentSpecVersion version;
         try {
             version = spec.publish(command.getRemark());
@@ -121,8 +151,9 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void switchDefaultVersion(AgentSpecSwitchVersionCommand command) {
+    public void switchDefaultVersion(AgentSpecSwitchVersionCommand command, Long userId) {
         AgentSpec spec = requireSpec(command.getId());
+        requireEditable(spec, userId);
         try {
             spec.switchDefaultVersion(command.getVersionNo());
         } catch (AgentSpecVersionNotExistsException ex) {
@@ -132,8 +163,8 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     @Override
-    public PageResult<AgentSpecDTO> getSpecPage(AgentSpecPageQuery query) {
-        PageResult<AgentSpecDO> page = agentSpecMapper.selectPage(query, query.getName());
+    public PageResult<AgentSpecDTO> getSpecPage(AgentSpecPageQuery query, Long userId) {
+        PageResult<AgentSpecDO> page = agentSpecMapper.selectPage(query, query.getName(), userId);
         PageResult<AgentSpecDTO> result = agentSpecConverter.toDTOPage(page);
         fillRowConfigInfo(page.getList(), result.getList());
         return result;
@@ -248,19 +279,43 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     /**
-     * command → 领域配置值对象（创建/编辑命令共用）：平铺字段组装为三层结构——
-     * agent 层直取，调用参数合成 GenerateOptions（全空则整组省略），挂载转结构化值对象
+     * command → 领域配置值对象（创建/编辑命令共用）：平铺字段组装为「三层 + 执行环境层」结构——
+     * agent 层直取，调用参数合成 GenerateOptions（全空则整组省略），挂载转结构化值对象，
+     * 执行环境三开关合成 ExecutionEnvConfig（全关则省略 = 纯对话）
      */
     private AgentSpecConfig toConfig(AgentSpecDraftCommand command) {
         GenerateOptions generateOptions = command.getTemperature() == null && command.getTopP() == null
                 && command.getMaxTokens() == null ? null
                 : GenerateOptions.of(command.getTemperature(), command.getTopP(), command.getMaxTokens());
+        ExecutionEnvConfig executionEnv = toExecutionEnv(command);
         return AgentSpecConfig.of(command.getModelId(), command.getDescription(), command.getSystemPrompt(),
-                command.getMaxIters(), generateOptions, command.getSkillIds(), command.getKnowledgeBaseIds(),
+                command.getMaxIters(), generateOptions, command.getSkillIds(),
                 command.getMcpServers() == null ? null : command.getMcpServers().stream()
                         .map(mount -> McpServerMount.of(mount.getServerId(), mount.getAllowedTools())).toList(),
                 command.getSubagents() == null ? null : command.getSubagents().stream()
-                        .map(mount -> SubagentMount.of(mount.getSpecId(), mount.getTools())).toList());
+                        .map(mount -> SubagentMount.of(mount.getSpecId(), mount.getTools())).toList(),
+                executionEnv);
+    }
+
+    /** 执行环境三开关平铺 → 值对象；全关（含未填）省略为 null（纯对话默认），非法组合由值对象自校验拒绝 */
+    private ExecutionEnvConfig toExecutionEnv(AgentSpecDraftCommand command) {
+        boolean workspace = Boolean.TRUE.equals(command.getWorkspaceEnabled());
+        boolean sandbox = Boolean.TRUE.equals(command.getSandboxEnabled());
+        List<ExecutionCapability> capabilities = command.getCapabilities() == null || command.getCapabilities().isEmpty()
+                ? List.of() : command.getCapabilities().stream().map(ExecutionCapability::valueOf).toList();
+        if (!workspace && !sandbox && capabilities.isEmpty()) {
+            return null;
+        }
+        return ExecutionEnvConfig.of(workspace, sandbox, capabilities);
+    }
+
+    /**
+     * 写操作编辑权（用户级仅归属用户；归属层级语义见 AgentSpec#editableBy）
+     */
+    private void requireEditable(AgentSpec spec, Long userId) {
+        if (!spec.editableBy(userId)) {
+            throw exception(AGENT_SPEC_EDIT_FORBIDDEN);
+        }
     }
 
     private AgentSpec requireSpec(Long id) {

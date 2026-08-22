@@ -29,10 +29,15 @@ class AgentSpecTest {
                 GenerateOptions.of(0.7d, null, null), null, null, null, null);
     }
 
-    /** 模拟已落库、携带草稿、尚未发布过的规格 */
+    private static AgentSpec spec(Long id, String specCode, OwnerLevel ownerLevel, Long ownerUserId,
+                                  AgentSpecConfig draft) {
+        return AgentSpec.reconstitute(id, "客服助手", specCode, "ep:service", ownerLevel, ownerUserId,
+                0, null, draft, null);
+    }
+
+    /** 模拟已落库、携带草稿、尚未发布过的规格（租户级） */
     private static AgentSpec persistedDraftSpec() {
-        return AgentSpec.reconstitute(1L, "客服助手", "ep:service", 0, null,
-                config("你是客服"), null);
+        return spec(1L, "customer-service", OwnerLevel.TENANT, null, config("你是客服"));
     }
 
     /** 模拟已落库且已发布 v1（草稿已清空）的规格 */
@@ -43,13 +48,17 @@ class AgentSpecTest {
     }
 
     @Test
-    @DisplayName("创建规格：主体只收管理元数据（名称/图标），携带首个草稿")
+    @DisplayName("创建规格：主体收管理元数据（名称/编码/图标/归属），携带首个草稿")
     void createCarriesInitialDraft() {
-        AgentSpec spec = AgentSpec.create("客服助手", "ep:service", config("你是客服"));
+        AgentSpec spec = AgentSpec.create("客服助手", "customer-service", "ep:service",
+                OwnerLevel.TENANT, null, config("你是客服"));
 
         assertNull(spec.getId());
         assertEquals("客服助手", spec.getName());
+        assertEquals("customer-service", spec.getSpecCode());
         assertEquals("ep:service", spec.getIcon());
+        assertEquals(OwnerLevel.TENANT, spec.getOwnerLevel());
+        assertNull(spec.getOwnerUserId());
         assertTrue(spec.hasDraft());
         assertEquals(config("你是客服"), spec.getDraft());
         assertEquals(0, spec.getLatestVersionNo());
@@ -60,9 +69,55 @@ class AgentSpecTest {
     @DisplayName("创建规格：名称空白或草稿缺失被拒绝")
     void createValidatesInput() {
         assertThrows(IllegalArgumentException.class,
-                () -> AgentSpec.create("  ", null, config("提示")));
+                () -> AgentSpec.create("  ", "customer-service", null,
+                        OwnerLevel.TENANT, null, config("提示")));
         assertThrows(IllegalArgumentException.class,
-                () -> AgentSpec.create("客服助手", null, null));
+                () -> AgentSpec.create("客服助手", "customer-service", null,
+                        OwnerLevel.TENANT, null, null));
+    }
+
+    @Test
+    @DisplayName("spec_code 格式校验：小写字母开头的 slug，非法格式被拒绝")
+    void createValidatesSpecCode() {
+        for (String invalid : new String[]{null, "a", "Aervice", "客服", "service_1",
+                "1service", "-service", "a".repeat(65)}) {
+            assertThrows(IllegalArgumentException.class, () -> AgentSpec.create("客服助手",
+                    invalid, null, OwnerLevel.TENANT, null, config("提示")),
+                    "spec_code 应被拒绝：" + invalid);
+        }
+        // 合法边界：2 位、64 位、数字中段、连字符
+        AgentSpec.create("客服助手", "ab", null, OwnerLevel.TENANT, null, config("提示"));
+        AgentSpec.create("客服助手", "a".repeat(64), null, OwnerLevel.TENANT, null, config("提示"));
+        AgentSpec.create("客服助手", "cs-2-x", null, OwnerLevel.TENANT, null, config("提示"));
+    }
+
+    @Test
+    @DisplayName("归属层级：用户级必须携带归属用户，非用户级不得携带")
+    void createValidatesOwnerIdentity() {
+        assertThrows(IllegalArgumentException.class, () -> AgentSpec.create("客服助手",
+                "customer-service", null, OwnerLevel.USER, null, config("提示")));
+        assertThrows(IllegalArgumentException.class, () -> AgentSpec.create("客服助手",
+                "customer-service", null, OwnerLevel.TENANT, 1L, config("提示")));
+        assertThrows(IllegalArgumentException.class, () -> AgentSpec.create("客服助手",
+                "customer-service", null, null, null, config("提示")));
+
+        AgentSpec userSpec = AgentSpec.create("客服助手", "customer-service", null,
+                OwnerLevel.USER, 7L, config("提示"));
+        assertEquals(OwnerLevel.USER, userSpec.getOwnerLevel());
+        assertEquals(7L, userSpec.getOwnerUserId());
+    }
+
+    @Test
+    @DisplayName("编辑权：用户级仅归属用户可编辑，租户级租户内（任意登录用户）可编辑")
+    void editableByOwnerLevel() {
+        AgentSpec userSpec = spec(1L, "mine", OwnerLevel.USER, 7L, config("提示"));
+        assertTrue(userSpec.editableBy(7L));
+        assertFalse(userSpec.editableBy(8L));
+        assertFalse(userSpec.editableBy(null));
+
+        AgentSpec tenantSpec = spec(2L, "shared", OwnerLevel.TENANT, null, config("提示"));
+        assertTrue(tenantSpec.editableBy(8L));
+        assertTrue(tenantSpec.editableBy(null));
     }
 
     @Test
@@ -82,7 +137,7 @@ class AgentSpecTest {
     void editDraftRejectsSelfMounting() {
         AgentSpec spec = persistedDraftSpec();
         AgentSpecConfig selfMounting = AgentSpecConfig.of(1L, "描述", null, null, null,
-                null, null, null, List.of(SubagentMount.of(1L, null)));
+                null, null, List.of(SubagentMount.of(1L, null)), null);
 
         assertThrows(AgentSpecSelfMountingException.class,
                 () -> spec.editDraft("客服助手", null, selfMounting));

@@ -94,6 +94,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         SessionConverterImpl.class,
         com.gkht.ai.nexai.module.ai.session.infrastructure.gateway.AgentscopeRuntimeGateway.class,
         AgentStateStoreProvider.class,
+        com.gkht.ai.nexai.module.ai.session.framework.config.AiRuntimeProperties.class,
+        com.gkht.ai.nexai.module.ai.session.infrastructure.gateway.SandboxImageResolver.class,
+        com.gkht.ai.nexai.module.ai.session.infrastructure.gateway.DockerAvailabilityProbe.class,
         AgentSpecController.class, AgentSpecServiceImpl.class, AgentSpecRepositoryImpl.class, AgentSpecConverterImpl.class,
         ModelController.class, ModelServiceImpl.class, ModelRepositoryImpl.class, ModelConverterImpl.class,
         ChannelController.class, ChannelServiceImpl.class, ChannelRepositoryImpl.class, ChannelConverterImpl.class,
@@ -108,6 +111,10 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
 
     /** 当前用例注入的 FakeChatModel（每个测试方法开头重设脚本） */
     static final AtomicReference<FakeChatModel> CURRENT_FAKE = new AtomicReference<>();
+
+    /** 规格业务编码序号（spec_code 唯一性要求同用例多规格不撞码） */
+    static final java.util.concurrent.atomic.AtomicInteger SPEC_CODE_SEQ =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     private static final String SYSTEM_PROMPT = "你是测试智能体，请简洁作答";
     private static final Duration STREAM_TIMEOUT = Duration.ofSeconds(30);
@@ -594,6 +601,8 @@ public class DebugSessionControllerTest extends BasePgDbAndRedisUnitTest {
     private AgentSpecCreateCommand specCreateCommand(Long modelId) {
         AgentSpecCreateCommand command = new AgentSpecCreateCommand();
         command.setName("测试规格");
+        // 编码按规格实例唯一（同用例可建多个规格，发布版本递增不换码）
+        command.setSpecCode("debug-console-spec-" + SPEC_CODE_SEQ.incrementAndGet());
         command.setDescription("调试台测试规格，验证事件流与装配链");
         command.setSystemPrompt(SYSTEM_PROMPT);
         command.setModelId(modelId);

@@ -263,6 +263,14 @@ nexai:
   info:
     version: 1.0.0
     base-package: com.gkht.ai.nexai
+  ai:
+    runtime: # 智能体运行时装配（ADR-0007）：环境事实，不进规格版本快照
+      workspace:
+        root: ~/.agentscope/nexai/workspace # per-spec 常驻 workspace 根目录（归属层级布局挂其下，目录不删除）
+      sandbox:
+        images: # 沙箱能力组合 → 镜像（key 为能力组合如 shell/python/python-shell，或 default 兜底；未配置用内置默认表）
+#          default: ubuntu:22.04
+#          python: python:3.12-slim
   web:
     admin-ui:
       url: http://dashboard.nexai.iocoder.cn # Admin 管理后台 UI 的地址

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -20,6 +21,15 @@ public class AgentSpecCreateCommand implements AgentSpecDraftCommand {
     @NotBlank(message = "规格名称不能为空")
     @Size(max = 64, message = "规格名称不能超过 64 个字符")
     private String name;
+
+    @Schema(description = "业务编码（slug，创建后不可变）", requiredMode = Schema.RequiredMode.REQUIRED, example = "customer-service")
+    @NotBlank(message = "业务编码不能为空")
+    @Pattern(regexp = "^[a-z][a-z0-9-]{1,63}$", message = "业务编码须为小写字母开头的小写字母/数字/连字符组合（2~64 位）")
+    private String specCode;
+
+    @Schema(description = "归属层级（M1 开放 TENANT/USER，平台级 M2+；不填默认租户级）", example = "TENANT")
+    @Pattern(regexp = "TENANT|USER", message = "M1 仅支持租户级（TENANT）与用户级（USER）归属")
+    private String ownerLevel;
 
     @Schema(description = "图标标识", example = "ep:service")
     @Size(max = 128, message = "图标标识不能超过 128 个字符")
@@ -59,13 +69,19 @@ public class AgentSpecCreateCommand implements AgentSpecDraftCommand {
     @Schema(description = "技能引用列表（M2 预留）", example = "[1]")
     private List<Long> skillIds;
 
-    @Schema(description = "知识库引用列表（M2 预留）", example = "[1]")
-    private List<Long> knowledgeBaseIds;
-
     @Schema(description = "MCP 服务挂载列表（M2 预留）")
     private List<McpServerMountCommand> mcpServers;
 
     @Schema(description = "子智能体挂载列表（M2 预留）")
     private List<SubagentMountCommand> subagents;
+
+    @Schema(description = "是否启用 workspace（文件工具与落盘总开关）", example = "false")
+    private Boolean workspaceEnabled;
+
+    @Schema(description = "是否启用 Docker 沙箱（仅 workspace 启用时可选）", example = "false")
+    private Boolean sandboxEnabled;
+
+    @Schema(description = "沙箱内开放的执行能力（SHELL/PYTHON/NODE，仅沙箱模式可选）", example = "[\"PYTHON\"]")
+    private List<@Pattern(regexp = "SHELL|PYTHON|NODE", message = "执行能力仅支持 SHELL/PYTHON/NODE") String> capabilities;
 
 }

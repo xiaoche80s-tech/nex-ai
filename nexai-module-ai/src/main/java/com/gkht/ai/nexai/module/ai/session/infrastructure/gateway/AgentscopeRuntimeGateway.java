@@ -1,17 +1,20 @@
 package com.gkht.ai.nexai.module.ai.session.infrastructure.gateway;
 
 import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.model.infrastructure.gateway.ChatModelFactory;
 import com.gkht.ai.nexai.module.ai.session.domain.exception.SessionRunningException;
+import com.gkht.ai.nexai.module.ai.session.domain.exception.SessionSandboxUnavailableException;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
+import com.gkht.ai.nexai.module.ai.session.framework.config.AiRuntimeProperties;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.message.Msg;
-import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.GenerateOptions;
@@ -20,6 +23,10 @@ import io.agentscope.core.state.AgentState;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.util.JsonUtils;
+import io.agentscope.harness.agent.HarnessAgent;
+import io.agentscope.harness.agent.IsolationScope;
+import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
+import io.agentscope.harness.agent.sandbox.impl.docker.DockerFilesystemSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -27,30 +34,32 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * 运行时网关（agentscope 适配器，工单 06 核心，工单 08 扩中断/HITL/克隆）：
- * 管理面表数据 → agentscope 运行时的装配链。
+ * 运行时网关（agentscope-harness 适配器，ADR-0007）：管理面表数据 → HarnessAgent 运行时的装配链。
  *
  * <p>装配方向（spec 总体架构决策）：表数据 → 每请求经 {@link ChatModelFactory} 构造 ChatModel
- * → 编程式命名注册进 {@link ModelRegistry}（不走 SPI）→ ReActAgent 按名字解析装配。
- * 注册名带租户前缀防跨租户碰撞；每次装配覆盖注册——渠道密钥等配置变更即时生效，
- * Model 实例不可变，覆盖不影响正在使用旧实例的会话。</p>
+ * → 编程式命名注册进 {@link ModelRegistry}（不走 SPI）→ HarnessAgent 按名字解析装配。
+ * 注册名带租户前缀防跨租户碰撞；每次装配覆盖注册——渠道密钥等配置变更即时生效。</p>
  *
- * <p>线程模型：装配（含运行注册）在调用线程（Servlet）同步完成（无 DB 访问），
- * 事件流的生产经 {@code subscribeOn} 整体切换到弹性线程——不在 Reactor 序列中做阻塞调用，
- * 也不占用容器线程等待 LLM 响应。流终结后关闭 agent（状态存储为共享单例，不在此关闭）。</p>
+ * <p><b>规格驱动装配矩阵（ExecutionEnvConfig → 内置行为）</b>：
+ * 纯对话（无 workspace）零落盘——文件/执行/记忆/transcript 全禁、系统提示直传；
+ * workspace 启用——per-spec 常驻目录（归属层级布局）+ 文件六件套 + subagents + memory 四件套 +
+ * transcript 持久化，人格经 AGENTS.md 物化注入（快照 systemPrompt 是唯一事实源，装配时内容比对覆写）；
+ * 沙箱启用——文件与执行进 Docker 容器（能力→镜像查表），非沙箱本地模式禁执行能力
+ * （宿主 shell 无隔离）。web_fetch/web_search 框架无条件注册，装配后 toolkit 显式移除。</p>
  *
- * <p><b>运行注册与中断（工单 08）</b>：agentscope 的中断旗标挂在 per-(userId, sessionId) 的
- * {@code AgentState} 上，而 stateCache 是 agent 实例内的——本网关每请求新建 agent 实例，
- * 跨实例 {@code interrupt(userId, sessionId)} 只会触发新实例加载到的另一个旗标副本，对运行中的流无效。
- * 故以 {@link #runningAgents} 注册表持有「运行中流的 agent 实例 + RuntimeContext」，
- * 中断经原实例触发其真实旗标；注册与注销在流订阅生命周期内完成，同一会话并发第二条流
- * 在注册时即被拒绝（{@link SessionRunningException}）。</p>
+ * <p>线程模型与运行注册（interrupt 寻址、同会话并发拒绝）沿用工单 06/08 的机制：
+ * 装配在调用线程同步完成，事件流生产切弹性线程；{@link #runningAgents} 注册表持有运行中流的
+ * agent 实例 + RuntimeContext，中断经原实例的 delegate（HarnessAgent 未透传
+ * {@code interrupt(RuntimeContext)}）触发真实旗标。</p>
  */
 @Component
 public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
@@ -60,14 +69,27 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     /** 事件流出错时降级输出的自定义事件类型（SSE 端点保证流以可读错误收尾而非中断连接） */
     static final String ERROR_EVENT_TYPE = "SESSION_ERROR";
 
-    /** ReActAgent 会话状态的存储 key（对话上下文、工具调用状态、确认元数据都在其中） */
+    /** HarnessAgent 会话状态的存储 key（对话上下文、工具调用状态、确认元数据都在其中） */
     private static final String AGENT_STATE_KEY = "agent_state";
 
     /** 确认回应时挂在消息上的说明文本：HITL 恢复分支不把消息本体写入上下文，仅作构建合法性占位 */
     private static final String CONFIRM_MESSAGE_TEXT = "[工具确认回应]";
 
+    /** workspace 人格物化文件（WorkspaceContextMiddleware 注入系统提示，快照 systemPrompt 的投影） */
+    static final String AGENTS_MD = "AGENTS.md";
+
+    /** web 工具名（框架无条件注册，toolkit 层显式移除） */
+    private static final String WEB_FETCH_TOOL = "web_fetch";
+    private static final String WEB_SEARCH_TOOL = "web_search";
+
+    /** 沙箱容器内 workspace 挂载根 */
+    private static final String SANDBOX_WORKSPACE_ROOT = "/workspace";
+
     private final ChatModelFactory chatModelFactory;
     private final AgentStateStoreProvider agentStateStoreProvider;
+    private final AiRuntimeProperties runtimeProperties;
+    private final SandboxImageResolver sandboxImageResolver;
+    private final DockerAvailabilityProbe dockerAvailabilityProbe;
     /** 无实现者时为空列表（ObjectProvider 惰性收集，避免空集合注入失败） */
     private final List<RuntimeToolContributor> runtimeToolContributors;
 
@@ -75,14 +97,20 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     private final ConcurrentHashMap<String, RunningAgent> runningAgents = new ConcurrentHashMap<>();
 
     /** 一次事件流运行的寻址快照（agent 实例 + RuntimeContext） */
-    private record RunningAgent(ReActAgent agent, RuntimeContext context) {
+    private record RunningAgent(HarnessAgent agent, RuntimeContext context) {
     }
 
     public AgentscopeRuntimeGateway(ChatModelFactory chatModelFactory,
                                     AgentStateStoreProvider agentStateStoreProvider,
+                                    AiRuntimeProperties runtimeProperties,
+                                    SandboxImageResolver sandboxImageResolver,
+                                    DockerAvailabilityProbe dockerAvailabilityProbe,
                                     ObjectProvider<RuntimeToolContributor> runtimeToolContributors) {
         this.chatModelFactory = chatModelFactory;
         this.agentStateStoreProvider = agentStateStoreProvider;
+        this.runtimeProperties = runtimeProperties;
+        this.sandboxImageResolver = sandboxImageResolver;
+        this.dockerAvailabilityProbe = dockerAvailabilityProbe;
         this.runtimeToolContributors = runtimeToolContributors.orderedStream().toList();
     }
 
@@ -92,7 +120,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
             throw new IllegalArgumentException("消息内容不能为空");
         }
         return streamEvents(config, () -> {
-            ReActAgent agent = assemble(config);
+            HarnessAgent agent = assemble(config);
             RuntimeContext context = runtimeContext(config);
             return new AssembledStream(agent, context, agent.streamEvents(message, context));
         });
@@ -104,7 +132,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
             throw new IllegalArgumentException("确认决定列表不能为空");
         }
         return streamEvents(config, () -> {
-            ReActAgent agent = assemble(config);
+            HarnessAgent agent = assemble(config);
             RuntimeContext context = runtimeContext(config);
             // 三态决定 → agentscope ConfirmResult：改参数后批准 = confirmed + 携带修改后 toolCall；
             // 拒绝 = 原样 toolCall + confirmed=false。执行时参数取自 input（结构化 Map）而非
@@ -131,9 +159,10 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         if (running == null) {
             return false;
         }
-        // 经运行中的 agent 实例触发其真实 (userId, sessionId) 槽位旗标，
+        // 经运行中的 agent 实例触发其真实 (userId, sessionId) 槽位旗标——HarnessAgent 未透传
+        // interrupt(RuntimeContext)，经 delegate（内层 ReActAgent）触发；
         // 流在下一个检查点停止推理并以正常事件序列收尾（INTERRUPTED 恢复消息 + AGENT_END）
-        running.agent().interrupt(running.context());
+        delegateOf(running.agent()).interrupt(running.context());
         return true;
     }
 
@@ -174,26 +203,32 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                 .doFinally(signal -> {
                     // 条件注销：只移除自己注册的条目，防止误删紧随其后新流的注册
                     runningAgents.remove(config.getSessionKey(), running);
+                    // HarnessAutoCloseable：排空异步镜像写、关闭子代理任务池与 workspace 句柄（不删文件）
                     assembled.agent().close();
                 });
     }
 
     /** 一次装配的产物：agent 实例 + 寻址上下文 + 冷事件流 */
-    private record AssembledStream(ReActAgent agent, RuntimeContext context, Flux<AgentEvent> events) {
+    private record AssembledStream(HarnessAgent agent, RuntimeContext context, Flux<AgentEvent> events) {
+    }
+
+    private ReActAgent delegateOf(HarnessAgent agent) {
+        return agent.getDelegate();
     }
 
     /**
-     * 装配链：模型命名注册 → agent 构建（系统提示 / 推理参数 / 状态存储 / 工具）
+     * 装配链（规格驱动矩阵）：模型命名注册 → agent 构建（执行环境 → workspace/沙箱/内置行为开关）
+     * → toolkit 组装 → web 工具移除。包内可见供规格驱动矩阵测试直接断言装配产物。
      */
-    private ReActAgent assemble(AgentRuntimeConfig config) {
-        ReActAgent.Builder builder = ReActAgent.builder()
+    HarnessAgent assemble(AgentRuntimeConfig config) {
+        ExecutionEnvConfig env = config.getExecutionEnv();
+        boolean workspaceEnabled = env != null && env.isWorkspaceEnabled();
+
+        HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name(config.getAgentName())
                 .model(registerModel(config))
                 .stateStore(agentStateStoreProvider.get())
                 .defaultSessionId(config.getSessionKey());
-        if (config.getSystemPrompt() != null) {
-            builder.sysPrompt(config.getSystemPrompt());
-        }
         if (config.getMaxIters() != null) {
             builder.maxIters(config.getMaxIters());
         }
@@ -212,12 +247,114 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
             }
             builder.generateOptions(optionsBuilder.build());
         }
+
+        if (workspaceEnabled) {
+            // workspace 模式：人格经 AGENTS.md 物化注入（快照 systemPrompt 唯一事实源），
+            // builder.sysPrompt 不传以免双重注入
+            Path workspace = ensureWorkspace(config);
+            materializeAgentsMd(workspace, config.getSystemPrompt());
+            builder.workspace(workspace);
+            if (env.isSandboxEnabled()) {
+                requireDockerAvailable(config);
+                DockerFilesystemSpec sandboxSpec = new DockerFilesystemSpec();
+                sandboxSpec.image(sandboxImageResolver.resolveImage(env.getCapabilities()));
+                sandboxSpec.workspaceRoot(SANDBOX_WORKSPACE_ROOT);
+                // isolationScope 声明于父类 SandboxFilesystemSpec（返回父类型），拆开链式调用
+                sandboxSpec.isolationScope(isolationScope(config.getOwnerLevel()));
+                builder.filesystem(sandboxSpec);
+            } else {
+                // 本地模式：project 显式指向 workspace 自身（无外部只读层——不显式设置时框架
+                // 默认把服务器工作目录作为只读下层暴露）；本地 shell 无隔离，禁执行能力
+                LocalFilesystemSpec localSpec = new LocalFilesystemSpec()
+                        .project(workspace)
+                        .isolationScope(isolationScope(config.getOwnerLevel()));
+                builder.filesystem(localSpec).disableShellTool();
+            }
+        } else {
+            // 纯对话：零落盘——不设 workspace/filesystem（框架会回落默认本地 overlay，
+            // 但相关工具与落盘中间件全禁后无代码路径触达），系统提示直传
+            builder.disableFilesystemTools().disableShellTool().disableTranscript()
+                    .disableMemoryHooks().disableMemoryTools();
+            if (config.getSystemPrompt() != null) {
+                builder.sysPrompt(config.getSystemPrompt());
+            }
+        }
+
         Toolkit toolkit = new Toolkit();
         for (RuntimeToolContributor contributor : runtimeToolContributors) {
             contributor.contribute(toolkit);
         }
         builder.toolkit(toolkit);
-        return builder.build();
+
+        HarnessAgent agent = builder.build();
+        // web 工具框架层无条件注册且无 builder 开关，装配后显式移除（ADR-0007 决策 2）
+        agent.getToolkit().removeTool(WEB_FETCH_TOOL);
+        agent.getToolkit().removeTool(WEB_SEARCH_TOOL);
+        return agent;
+    }
+
+    /**
+     * workspace 目录（归属层级布局，ADR-0007 决策 3）：平台级 {root}/platform/{specCode}/、
+     * 租户级 {root}/t{tenantId}/{specCode}/、用户级 {root}/t{tenantId}/u{userId}/{specCode}/。
+     * 目录常驻不删除（膨胀由框架 retention 自治，目录治理为 M2/M3 债务）。包内可见供矩阵测试断言。
+     */
+    Path workspacePath(AgentRuntimeConfig config) {
+        Path root = runtimeProperties.getWorkspace().getRoot();
+        long tenantId = TenantContextHolder.getRequiredTenantId();
+        return switch (config.getOwnerLevel()) {
+            case PLATFORM -> root.resolve("platform").resolve(config.getSpecCode());
+            case TENANT -> root.resolve("t" + tenantId).resolve(config.getSpecCode());
+            case USER -> root.resolve("t" + tenantId)
+                    .resolve("u" + config.getOwnerUserId()).resolve(config.getSpecCode());
+        };
+    }
+
+    /**
+     * IsolationScope（ADR-0007 决策 5）：租户级/平台级 USER（种子共享一份零复制、
+     * 记忆/用户文件 per-user namespace）；用户级 AGENT（workspace 已在该用户目录下，物理目录即隔离）
+     */
+    private IsolationScope isolationScope(OwnerLevel ownerLevel) {
+        return ownerLevel == OwnerLevel.USER ? IsolationScope.AGENT : IsolationScope.USER;
+    }
+
+    /** 建目录（幂等）。装配线程同步执行，workspace 属首次使用时创建 */
+    private Path ensureWorkspace(AgentRuntimeConfig config) {
+        Path workspace = workspacePath(config);
+        try {
+            Files.createDirectories(workspace);
+        } catch (IOException ex) {
+            throw new IllegalStateException("workspace 目录创建失败：" + workspace, ex);
+        }
+        return workspace;
+    }
+
+    /**
+     * AGENTS.md 物化（ADR-0007 决策 4）：每次装配从 DB 版本快照（config.systemPrompt）比对
+     * 本地 {workspace}/AGENTS.md，相同跳过、不同覆写——本地盘只是物化缓存，一致性靠使用前校验。
+     * systemPrompt 为空不物化（框架对缺失 AGENTS.md 只告警）。
+     */
+    private void materializeAgentsMd(Path workspace, String systemPrompt) {
+        if (systemPrompt == null || systemPrompt.isBlank()) {
+            return;
+        }
+        Path agentsMd = workspace.resolve(AGENTS_MD);
+        try {
+            if (Files.exists(agentsMd) && systemPrompt.equals(Files.readString(agentsMd))) {
+                return;
+            }
+            Files.writeString(agentsMd, systemPrompt);
+        } catch (IOException ex) {
+            throw new IllegalStateException("AGENTS.md 物化失败：" + agentsMd, ex);
+        }
+    }
+
+    /**
+     * 沙箱前置检查：环境无 docker 而规格要求沙箱 → 显式报错（不静默降级）
+     */
+    private void requireDockerAvailable(AgentRuntimeConfig config) {
+        if (!dockerAvailabilityProbe.isAvailable()) {
+            throw new SessionSandboxUnavailableException(config.getAgentName());
+        }
     }
 
     /**

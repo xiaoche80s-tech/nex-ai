@@ -15,6 +15,15 @@ public class AgentSpecDTO {
     @Schema(description = "规格名称", example = "客服助手")
     private String name;
 
+    @Schema(description = "业务编码（slug，创建后不可变；workspace 目录与运行时标识用）", example = "customer-service")
+    private String specCode;
+
+    @Schema(description = "归属层级（PLATFORM/TENANT/USER）", example = "TENANT")
+    private String ownerLevel;
+
+    @Schema(description = "归属用户编号（用户级规格 = 创建者），非用户级为 null", example = "1")
+    private Long ownerUserId;
+
     @Schema(description = "描述", example = "回答客户咨询的智能客服")
     private String description;
 

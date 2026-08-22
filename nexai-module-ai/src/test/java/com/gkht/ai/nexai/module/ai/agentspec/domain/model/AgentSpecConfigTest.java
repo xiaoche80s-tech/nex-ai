@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * AgentSpecConfig 值对象 S3 纯 JUnit 测试：三层结构（agent 层 / 模型调用层 / 挂载层）校验与按值判等。
+ * AgentSpecConfig 值对象 S3 纯 JUnit 测试：「三层 + 执行环境层」结构
+ * （agent 层 / 模型调用层 / 挂载层 / 执行环境层）校验与按值判等；
+ * 执行环境不变量（非沙箱禁执行能力等）在 {@link ExecutionEnvConfigTest}。
  */
 class AgentSpecConfigTest {
 
@@ -72,10 +74,9 @@ class AgentSpecConfigTest {
         McpServerMount mcp = McpServerMount.of(3L, List.of("search"));
         SubagentMount subagent = SubagentMount.of(2L, List.of("calc"));
         AgentSpecConfig config = AgentSpecConfig.of(1L, "描述", null, null, null,
-                List.of(9L), null, List.of(mcp), List.of(subagent));
+                List.of(9L), List.of(mcp), List.of(subagent), null);
 
         assertEquals(List.of(9L), config.getSkillIds());
-        assertTrue(config.getKnowledgeBaseIds().isEmpty());
         assertEquals(3L, config.getMcpServers().get(0).getServerId());
         assertEquals(List.of("search"), config.getMcpServers().get(0).getAllowedTools());
         assertEquals(2L, config.getSubagents().get(0).getSpecId());
@@ -89,29 +90,46 @@ class AgentSpecConfigTest {
     }
 
     @Test
+    @DisplayName("执行环境层：整组携带（null = 全关纯对话），随值对象按值判等")
+    void carriesExecutionEnv() {
+        ExecutionEnvConfig env = ExecutionEnvConfig.of(true, true,
+                List.of(ExecutionCapability.PYTHON));
+        AgentSpecConfig config = AgentSpecConfig.of(1L, "描述", null, null, null,
+                null, null, null, env);
+
+        assertEquals(env, config.getExecutionEnv());
+        // 未填 = 纯对话
+        assertNull(AgentSpecConfig.of(1L, "描述", null, null, null, null, null, null, null)
+                .getExecutionEnv());
+        // 执行环境不同即配置不同
+        assertNotEquals(config, AgentSpecConfig.of(1L, "描述", null, null, null,
+                null, null, null, ExecutionEnvConfig.disabled()));
+    }
+
+    @Test
     @DisplayName("按值判等：任一层字段不同即不等（含嵌套调用参数组与挂载列表）")
     void equalsByValueAcrossLayers() {
         AgentSpecConfig base = AgentSpecConfig.of(1L, "描述", "提示", 10,
-                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)));
+                GenerateOptions.of(0.7d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)), null);
 
         assertEquals(base, AgentSpecConfig.of(1L, "描述", "提示", 10,
-                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null))));
+                GenerateOptions.of(0.7d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)), null));
         AgentSpecConfig same = AgentSpecConfig.of(1L, "描述", "提示", 10,
-                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)));
+                GenerateOptions.of(0.7d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)), null);
         assertEquals(base.hashCode(), same.hashCode());
 
         assertNotEquals(base, AgentSpecConfig.of(1L, "别的描述", "提示", 10,
-                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null))));
+                GenerateOptions.of(0.7d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)), null));
         assertNotEquals(base, AgentSpecConfig.of(1L, "描述", "提示", 10,
-                GenerateOptions.of(0.5d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null))));
+                GenerateOptions.of(0.5d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(4L, null)), null));
         assertNotEquals(base, AgentSpecConfig.of(1L, "描述", "提示", 10,
-                GenerateOptions.of(0.7d, null, null), List.of(1L), List.of(2L),
-                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(5L, null))));
+                GenerateOptions.of(0.7d, null, null), List.of(1L),
+                List.of(McpServerMount.of(3L, null)), List.of(SubagentMount.of(5L, null)), null));
     }
 
 }

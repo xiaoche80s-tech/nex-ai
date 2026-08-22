@@ -36,13 +36,15 @@ public class AgentSpecConfigDTO {
     @Schema(description = "技能引用列表", example = "[1]")
     private List<Long> skillIds;
 
-    @Schema(description = "知识库引用列表", example = "[1]")
-    private List<Long> knowledgeBaseIds;
-
     @Schema(description = "MCP 服务挂载列表")
     private List<McpServerMountDTO> mcpServers;
 
     @Schema(description = "子智能体挂载列表")
     private List<SubagentMountDTO> subagents;
+
+    // —— 执行环境层 ——
+
+    @Schema(description = "执行环境配置，null 表示全关（纯对话智能体）")
+    private ExecutionEnvDTO executionEnv;
 
 }

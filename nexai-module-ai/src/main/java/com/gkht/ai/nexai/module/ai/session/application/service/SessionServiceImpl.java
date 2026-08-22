@@ -1,10 +1,12 @@
 package com.gkht.ai.nexai.module.ai.session.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
+import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.model.domain.model.Model;
@@ -17,6 +19,7 @@ import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessa
 import com.gkht.ai.nexai.module.ai.session.application.dto.SessionDTO;
 import com.gkht.ai.nexai.module.ai.session.application.query.SessionPageQuery;
 import com.gkht.ai.nexai.module.ai.session.domain.exception.SessionRunningException;
+import com.gkht.ai.nexai.module.ai.session.domain.exception.SessionSandboxUnavailableException;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.model.Session;
 import com.gkht.ai.nexai.module.ai.session.domain.repository.SessionRepository;
@@ -43,6 +46,7 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXI
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_MODEL_UNAVAILABLE;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_RUNNING;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_SANDBOX_UNAVAILABLE;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_SPEC_NOT_PUBLISHED;
 
 /**
@@ -124,13 +128,18 @@ public class SessionServiceImpl implements SessionService {
 
     /**
      * 发起事件流的共用入口：网关在同步段发现同一会话已有运行中的流时抛
-     * {@link SessionRunningException}，转业务错误（此时轮次等变更随事务一并回滚）
+     * {@link SessionRunningException}、环境无 docker 而规格要求沙箱时抛
+     * {@link SessionSandboxUnavailableException}，分别转业务错误
+     * （此时轮次等变更随事务一并回滚）
      */
     private Flux<String> startStream(java.util.function.Supplier<Flux<String>> stream) {
         try {
             return stream.get();
         } catch (SessionRunningException ex) {
             throw exception(SESSION_RUNNING);
+        } catch (SessionSandboxUnavailableException ex) {
+            log.warn("[startStream][{}]", ex.getMessage());
+            throw exception(SESSION_SANDBOX_UNAVAILABLE);
         }
     }
 
@@ -150,7 +159,7 @@ public class SessionServiceImpl implements SessionService {
         // 对话历史随克隆复制（同一状态存储内搬移）；源无状态或复制失败降级为空白新会话，不阻断克隆
         try {
             agentRuntimeGateway.copySessionState(stateUserId(source), source.getSessionKey(),
-                    runtimeUserId(userId), cloned.getSessionKey());
+                    runtimeUserId(userId, requireSpecForRuntime(source)), cloned.getSessionKey());
         } catch (Exception ex) {
             log.warn("[cloneDebugSession][源会话 {} 状态复制到 {} 失败，降级为空白克隆：{}]",
                     source.getId(), cloned.getSessionKey(), ex.getMessage());
@@ -174,12 +183,14 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
-     * 发起事件流前的共用装配链：会话绑定的版本快照 + 渠道模型解析 + 会话级推理参数覆盖。
+     * 发起事件流前的共用装配链：会话绑定的版本快照 + 规格归属（spec_code/层级，workspace 布局与
+     * agentName 用）+ 渠道模型解析 + 会话级推理参数覆盖 + 执行环境透传。
      * 覆盖优先于快照（克隆重跑微调参数的生效点；调试台目前仅支持温度覆盖，
      * topP/maxTokens 恒取快照值）。运行中重复发起由网关抛
      * {@link SessionRunningException}，此处统一转业务错误。
      */
     private AgentRuntimeConfig assembleRuntime(Session session, Long userId) {
+        AgentSpec spec = requireSpecForRuntime(session);
         AgentSpecVersion version = requireVersion(session);
         AgentSpecConfigParts parts = resolveRuntimeModel(version);
         AgentSpecConfig snapshot = version.getConfig();
@@ -192,9 +203,20 @@ public class SessionServiceImpl implements SessionService {
                 snapshotOptions == null ? null : snapshotOptions.getTopP(),
                 snapshotOptions == null ? null : snapshotOptions.getMaxTokens());
         return AgentRuntimeConfig.of(session.getSessionKey(),
-                runtimeUserId(userId), agentName(session), snapshot.getSystemPrompt(),
-                maxIters, effectiveOptions,
+                runtimeUserId(userId, spec), agentName(spec, session.getVersionNo()),
+                spec.getSpecCode(), spec.getOwnerLevel(), spec.getOwnerUserId(),
+                snapshot.getSystemPrompt(), maxIters, effectiveOptions,
+                snapshot.getExecutionEnv(),
                 parts.channel(), parts.model());
+    }
+
+    /** 会话绑定的规格必须仍可读取（逻辑删除兜底） */
+    private AgentSpec requireSpecForRuntime(Session session) {
+        AgentSpec spec = agentSpecRepository.findById(session.getSpecId());
+        if (spec == null) {
+            throw exception(AGENT_SPEC_NOT_EXISTS);
+        }
+        return spec;
     }
 
     /**
@@ -228,19 +250,27 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
-     * agent 名用「规格 + 版本」的稳定标识而非规格显示名（agentscope 用它做追踪与日志，
-     * 规格名可改且可能含空格/特殊字符，不适合作为标识）
+     * agent 名 = {spec_code}-v{versionNo}（agentscope 用它做追踪与日志；spec_code 创建后
+     * 不可变、字符集受控，比规格显示名（可改、可含特殊字符）与主键（外溢敏感）都合适）
      */
-    private String agentName(Session session) {
-        return "spec-" + session.getSpecId() + "-v" + session.getVersionNo();
+    private String agentName(AgentSpec spec, Integer versionNo) {
+        return spec.getSpecCode() + "-v" + versionNo;
     }
 
     /**
-     * 运行时用户标识：生产恒有登录态；无登录上下文时（如直连服务层测试）落到匿名槽位，
-     * 同一会话的寻址键（userId, sessionKey）保持稳定即可
+     * 运行时用户标识（agentscope 状态存储 userId 槽位与 USER scope namespace 前缀）：
+     * 生产恒有登录态；无登录上下文时（如直连服务层测试）落到匿名槽位，同一会话的寻址键
+     * （userId, sessionKey）保持稳定即可。平台级规格跨租户复复合 id（t{tenant}-u{user}），
+     * 使记忆/用户数据天然按租户+用户分桶（M2+ 平台级开放时生效）。
      */
-    private String runtimeUserId(Long userId) {
-        return userId != null ? String.valueOf(userId) : ANONYMOUS_USER_ID;
+    private String runtimeUserId(Long userId, AgentSpec spec) {
+        if (userId == null) {
+            return ANONYMOUS_USER_ID;
+        }
+        if (spec.getOwnerLevel() == OwnerLevel.PLATFORM) {
+            return "t" + TenantContextHolder.getRequiredTenantId() + "-u" + userId;
+        }
+        return String.valueOf(userId);
     }
 
     /**

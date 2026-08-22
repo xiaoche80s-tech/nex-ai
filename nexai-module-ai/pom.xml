@@ -26,10 +26,15 @@
 
         <!-- AI 智能体运行时：agentscope-java v2（库嵌入，ADR-0001；版本经 nexai-dependencies 的
              agentscope-bom 管理）。使用面：模型构造（连通性探测与运行时装配共用 ChatModelFactory）
+             + 运行时基座 HarnessAgent（workspace/沙箱/子代理/记忆/转录，ADR-0007）
              + 会话状态存储（PostgresAgentStateStore，注入容器 DataSource） -->
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
         </dependency>
         <dependency>
             <groupId>io.agentscope</groupId>

@@ -6,11 +6,15 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecConfigDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.ExecutionEnvDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.SubagentMount;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecVersionDO;
@@ -30,6 +34,7 @@ import java.util.List;
 public interface AgentSpecConverter {
 
     @Mapping(target = "draft", source = "draft", qualifiedByName = "configToJson")
+    @Mapping(target = "ownerLevel", source = "ownerLevel", qualifiedByName = "ownerLevelToString")
     AgentSpecDO toDataObject(AgentSpec spec);
 
     @Mapping(target = "snapshot", source = "config", qualifiedByName = "configToJson")
@@ -62,7 +67,27 @@ public interface AgentSpecConverter {
     AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
 
     @Mapping(target = "modelName", ignore = true)
+    @Mapping(target = "executionEnv", source = "executionEnv", qualifiedByName = "toExecutionEnvDTO")
     AgentSpecConfigDTO toConfigDTO(AgentSpecConfig config);
+
+    /** 执行环境值对象 → 出参 DTO（null 保持 null，表示纯对话默认） */
+    @Named("toExecutionEnvDTO")
+    default ExecutionEnvDTO toExecutionEnvDTO(ExecutionEnvConfig env) {
+        if (env == null) {
+            return null;
+        }
+        ExecutionEnvDTO dto = new ExecutionEnvDTO();
+        dto.setWorkspaceEnabled(env.isWorkspaceEnabled());
+        dto.setSandboxEnabled(env.isSandboxEnabled());
+        dto.setCapabilities(env.getCapabilities().stream().map(Enum::name).toList());
+        return dto;
+    }
+
+    /** 归属层级枚举 → 存储字符串 */
+    @Named("ownerLevelToString")
+    default String ownerLevelToString(OwnerLevel level) {
+        return level == null ? null : level.name();
+    }
 
     /**
      * 配置值对象 → JSON 字符串；null 草稿保持 null（表示无草稿）
@@ -94,7 +119,7 @@ public interface AgentSpecConverter {
 
     /**
      * JSON 编解码桥接 POJO：domain 值对象零框架依赖（无 Jackson 注解与默认构造器），
-     * 经此同构 POJO 完成序列化，字段与 {@link AgentSpecConfig} 三层结构一一对应。
+     * 经此同构 POJO 完成序列化，字段与 {@link AgentSpecConfig} 分层结构一一对应。
      */
     @Data
     class ConfigJSON {
@@ -105,9 +130,9 @@ public interface AgentSpecConverter {
         private Integer maxIters;
         private GenerateOptionsJSON generateOptions;
         private List<Long> skillIds;
-        private List<Long> knowledgeBaseIds;
         private List<McpServerMountJSON> mcpServers;
         private List<SubagentMountJSON> subagents;
+        private ExecutionEnvJSON executionEnv;
 
         static ConfigJSON from(AgentSpecConfig config) {
             ConfigJSON json = new ConfigJSON();
@@ -118,20 +143,48 @@ public interface AgentSpecConverter {
             json.setGenerateOptions(config.getGenerateOptions() == null ? null
                     : GenerateOptionsJSON.from(config.getGenerateOptions()));
             json.setSkillIds(config.getSkillIds());
-            json.setKnowledgeBaseIds(config.getKnowledgeBaseIds());
             json.setMcpServers(config.getMcpServers() == null ? null
                     : config.getMcpServers().stream().map(McpServerMountJSON::from).toList());
             json.setSubagents(config.getSubagents() == null ? null
                     : config.getSubagents().stream().map(SubagentMountJSON::from).toList());
+            json.setExecutionEnv(ExecutionEnvJSON.from(config.getExecutionEnv()));
             return json;
         }
 
         AgentSpecConfig toDomain() {
             return AgentSpecConfig.of(modelId, description, systemPrompt, maxIters,
                     generateOptions == null ? null : generateOptions.toDomain(),
-                    skillIds, knowledgeBaseIds,
+                    skillIds,
                     mcpServers == null ? null : mcpServers.stream().map(McpServerMountJSON::toDomain).toList(),
-                    subagents == null ? null : subagents.stream().map(SubagentMountJSON::toDomain).toList());
+                    subagents == null ? null : subagents.stream().map(SubagentMountJSON::toDomain).toList(),
+                    executionEnv == null ? null : executionEnv.toDomain());
+        }
+
+    }
+
+    @Data
+    class ExecutionEnvJSON {
+
+        private Boolean workspaceEnabled;
+        private Boolean sandboxEnabled;
+        private List<String> capabilities;
+
+        static ExecutionEnvJSON from(ExecutionEnvConfig env) {
+            if (env == null) {
+                return null;
+            }
+            ExecutionEnvJSON json = new ExecutionEnvJSON();
+            json.setWorkspaceEnabled(env.isWorkspaceEnabled());
+            json.setSandboxEnabled(env.isSandboxEnabled());
+            json.setCapabilities(env.getCapabilities().stream().map(Enum::name).toList());
+            return json;
+        }
+
+        ExecutionEnvConfig toDomain() {
+            return ExecutionEnvConfig.of(Boolean.TRUE.equals(workspaceEnabled),
+                    Boolean.TRUE.equals(sandboxEnabled),
+                    capabilities == null ? null
+                            : capabilities.stream().map(ExecutionCapability::valueOf).toList());
         }
 
     }

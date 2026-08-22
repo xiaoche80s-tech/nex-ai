@@ -16,6 +16,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
+import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecService;
 import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecServiceImpl;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverterImpl;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.mapper.AgentSpecMapper;
@@ -58,7 +59,10 @@ import java.util.List;
 
 import static com.gkht.ai.nexai.framework.common.exception.enums.GlobalErrorCodeConstants.SUCCESS;
 import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServiceException;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CODE_DUPLICATE;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_EDIT_FORBIDDEN;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PUBLISH_WITHOUT_DRAFT;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
@@ -84,6 +88,9 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
 
     @Resource
     private AgentSpecController agentSpecController;
+
+    @Resource
+    private AgentSpecService agentSpecService;
 
     @Resource
     private ModelController modelController;
@@ -163,6 +170,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
     private AgentSpecCreateCommand createCommand(Long modelId) {
         AgentSpecCreateCommand command = new AgentSpecCreateCommand();
         command.setName("客服助手");
+        command.setSpecCode("customer-service");
         command.setDescription("回答客户咨询");
         command.setIcon("ep:service");
         command.setModelId(modelId);
@@ -331,6 +339,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         // 第二个规格：发布后无草稿，行模型名来自默认版本快照
         AgentSpecCreateCommand second = createCommand(modelId);
         second.setName("翻译助手");
+        second.setSpecCode("translator");
         Long secondId = agentSpecController.createSpec(second).getData();
         publish(secondId, null);
 
@@ -363,6 +372,95 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         assertNull(detail.getCurrentVersion());
         assertEquals("GPT-4o 主力", detail.getDraft().getModelName());
         assertEquals(0.7d, detail.getDraft().getGenerateOptions().getTemperature());
+    }
+
+    @Test
+    @DisplayName("spec_code 唯一性：同归属层级重复被拒，不同层级/不同编码可用")
+    public void specCodeUniquenessByOwnerLevel() {
+        Long modelId = createModel("GPT-4o 主力");
+        agentSpecController.createSpec(createCommand(modelId)).getData();
+
+        // 同租户级同编码重复
+        assertServiceException(() -> agentSpecController.createSpec(createCommand(modelId)),
+                AGENT_SPEC_CODE_DUPLICATE);
+        // 用户级与租户级同编码不冲突（层级隔离）
+        AgentSpecCreateCommand userLevel = createCommand(modelId);
+        userLevel.setOwnerLevel("USER");
+        Long userSpecId = agentSpecService.createSpec(userLevel, 7L);
+        assertNotNull(userSpecId);
+        // 同一用户内重复仍拒
+        AgentSpecCreateCommand userLevelDup = createCommand(modelId);
+        userLevelDup.setOwnerLevel("USER");
+        Long anotherSpecId = agentSpecService.createSpec(userLevelDup, 8L);
+        assertNotNull(anotherSpecId);
+        assertServiceException(() -> agentSpecService.createSpec(createCommand(modelId), 7L),
+                AGENT_SPEC_CODE_DUPLICATE);
+    }
+
+    @Test
+    @DisplayName("用户级可见性：分页仅归属用户可见租户级 + 自己的用户级规格")
+    public void ownerLevelVisibility() {
+        Long modelId = createModel("GPT-4o 主力");
+        agentSpecController.createSpec(createCommand(modelId)).getData();
+        AgentSpecCreateCommand mine = createCommand(modelId);
+        mine.setSpecCode("my-private");
+        mine.setOwnerLevel("USER");
+        agentSpecService.createSpec(mine, 7L).longValue();
+        AgentSpecCreateCommand others = createCommand(modelId);
+        others.setSpecCode("others-private");
+        others.setOwnerLevel("USER");
+        agentSpecService.createSpec(others, 8L);
+
+        // 归属用户 7：租户级 1 条 + 自己 1 条
+        assertEquals(2, agentSpecService.getSpecPage(new AgentSpecPageQuery(), 7L).getTotal());
+        // 用户 8：租户级 1 条 + 自己 1 条（看不到 7 的私享规格）
+        PageResult<AgentSpecDTO> page8 = agentSpecService.getSpecPage(new AgentSpecPageQuery(), 8L);
+        assertEquals(2, page8.getTotal());
+        assertTrue(page8.getList().stream().noneMatch(row -> "my-private".equals(row.getSpecCode())));
+        // 无登录态：仅非用户级
+        assertEquals(1, agentSpecService.getSpecPage(new AgentSpecPageQuery(), null).getTotal());
+    }
+
+    @Test
+    @DisplayName("用户级编辑权：非归属用户更新/发布/删除被拒，归属用户可用")
+    public void userLevelEditPermission() {
+        Long modelId = createModel("GPT-4o 主力");
+        AgentSpecCreateCommand mine = createCommand(modelId);
+        mine.setOwnerLevel("USER");
+        Long specId = agentSpecService.createSpec(mine, 7L);
+
+        AgentSpecUpdateCommand update = updateCommand(specId, modelId);
+        assertServiceException(() -> agentSpecService.updateSpec(update, 8L), AGENT_SPEC_EDIT_FORBIDDEN);
+        assertServiceException(() -> agentSpecService.deleteSpec(specId, 8L), AGENT_SPEC_EDIT_FORBIDDEN);
+        assertServiceException(() -> agentSpecService.publishSpec(publishCommand(specId, null), 8L),
+                AGENT_SPEC_EDIT_FORBIDDEN);
+
+        agentSpecService.updateSpec(update, 7L);
+        assertEquals(1, agentSpecService.publishSpec(publishCommand(specId, null), 7L));
+    }
+
+    @Test
+    @DisplayName("编辑不改变 spec_code 与归属：编辑后身份字段保持创建时值")
+    public void specCodeImmutableAcrossEdit() {
+        Long modelId = createModel("GPT-4o 主力");
+        Long specId = agentSpecController.createSpec(createCommand(modelId)).getData();
+
+        agentSpecController.updateSpec(updateCommand(specId, modelId));
+
+        AgentSpecDetailDTO detail = agentSpecController.getSpec(specId).getData();
+        assertEquals("customer-service", detail.getSpecCode());
+        assertEquals("TENANT", detail.getOwnerLevel());
+        assertNull(detail.getOwnerUserId());
+    }
+
+    @Test
+    @DisplayName("创建规格：平台级归属 M1 被拒（服务层防线，命令层 @Pattern 之外）")
+    public void platformOwnerRejectedInM1() {
+        Long modelId = createModel("GPT-4o 主力");
+        AgentSpecCreateCommand platform = createCommand(modelId);
+        platform.setOwnerLevel("PLATFORM");
+        assertServiceException(() -> agentSpecService.createSpec(platform, null),
+                AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED);
     }
 
     @Test

@@ -26,12 +26,17 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_004_001, "规格当前没有可发布的草稿，请先编辑生成新草稿");
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_002, "规格版本不存在");
     ErrorCode AGENT_SPEC_SELF_MOUNTING_REJECTED = new ErrorCode(1_022_004_003, "规格不能把自己挂载为子智能体");
+    ErrorCode AGENT_SPEC_CODE_DUPLICATE = new ErrorCode(1_022_004_004, "同归属层级下业务编码已存在：{0}");
+    ErrorCode AGENT_SPEC_EDIT_FORBIDDEN = new ErrorCode(1_022_004_005, "用户级规格仅归属用户可操作");
+    ErrorCode AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED = new ErrorCode(1_022_004_006, "M1 仅支持租户级（TENANT）与用户级（USER）归属，平台级 M2+ 开放");
+    ErrorCode AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED = new ErrorCode(1_022_004_007, "用户级规格必须登录后创建（归属用户取当前登录态）");
 
     // ========== 会话 SESSION 1-022-005-000 ==========
     ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");
     ErrorCode SESSION_SPEC_NOT_PUBLISHED = new ErrorCode(1_022_005_001, "规格尚未发布任何版本，无法发起会话");
     ErrorCode SESSION_MODEL_UNAVAILABLE = new ErrorCode(1_022_005_002, "会话绑定的模型或渠道已停用或不存在，无法装配运行时");
     ErrorCode SESSION_RUNNING = new ErrorCode(1_022_005_003, "该会话已有运行中的事件流，请先停止或等待其结束");
+    ErrorCode SESSION_SANDBOX_UNAVAILABLE = new ErrorCode(1_022_005_004, "规格要求沙箱但当前环境无可用 Docker，无法装配运行时");
 
     // ========== 技能 SKILL 1-022-006-000 ==========
     ErrorCode SKILL_NOT_EXISTS = new ErrorCode(1_022_006_000, "技能不存在");

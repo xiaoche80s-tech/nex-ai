@@ -60,8 +60,10 @@ CREATE SEQUENCE IF NOT EXISTS ai_agent_spec_seq START 1;
 CREATE TABLE IF NOT EXISTS ai_agent_spec (
     id int8 NOT NULL,
     name varchar(64) NOT NULL,
-    description varchar(512) NULL DEFAULT NULL,
+    spec_code varchar(64) NOT NULL,
     icon varchar(128) NULL DEFAULT NULL,
+    owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
+    owner_user_id int8 NULL DEFAULT NULL,
     latest_version_no int4 NOT NULL DEFAULT 0,
     current_version_no int4 NULL DEFAULT NULL,
     draft text NULL DEFAULT NULL,
@@ -73,6 +75,13 @@ CREATE TABLE IF NOT EXISTS ai_agent_spec (
     tenant_id int8 NOT NULL DEFAULT 0,
     CONSTRAINT pk_ai_agent_spec PRIMARY KEY (id)
 );
+-- 工单 05 重写二：共享库已建表时幂等补列（spec_code/归属层级）
+ALTER TABLE ai_agent_spec ADD COLUMN IF NOT EXISTS spec_code varchar(64);
+ALTER TABLE ai_agent_spec ADD COLUMN IF NOT EXISTS owner_level varchar(16) NOT NULL DEFAULT 'TENANT';
+ALTER TABLE ai_agent_spec ADD COLUMN IF NOT EXISTS owner_user_id int8 NULL DEFAULT NULL;
+-- spec_code 唯一性按归属层级（部分唯一索引：仅存活行；COALESCE 使非用户级 owner_user_id=NULL 也参与判重）
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_agent_spec_code ON ai_agent_spec (
+    owner_level, tenant_id, COALESCE(owner_user_id, 0), spec_code) WHERE deleted = 0;
 
 CREATE SEQUENCE IF NOT EXISTS ai_agent_spec_version_seq START 1;
 CREATE TABLE IF NOT EXISTS ai_agent_spec_version (

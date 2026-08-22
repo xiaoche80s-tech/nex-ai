@@ -3,8 +3,8 @@ package com.gkht.ai.nexai.module.ai.agentspec.infrastructure.repository;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecVersionImmutableException;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverter;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
@@ -38,6 +38,7 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
             agentSpecMapper.insert(dataObject);
         } else {
             // updateById 默认忽略 null 字段，而发布会把草稿（及可空主体字段）写回 null，故显式全量 set；
+            // spec_code/owner_level/owner_user_id 创建后不可变（编辑面不含，不参与 update set）
             // 首参传空 DO 承接 updater/update_time 自动填充
             agentSpecMapper.update(new AgentSpecDO(), new LambdaUpdateWrapper<AgentSpecDO>()
                     .eq(AgentSpecDO::getId, dataObject.getId())
@@ -86,7 +87,9 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
 
     private AgentSpec reconstitute(AgentSpecDO dataObject) {
         return AgentSpec.reconstitute(dataObject.getId(), dataObject.getName(),
-                dataObject.getIcon(), dataObject.getLatestVersionNo(),
+                dataObject.getSpecCode(), dataObject.getIcon(),
+                dataObject.getOwnerLevel() == null ? null : OwnerLevel.valueOf(dataObject.getOwnerLevel()),
+                dataObject.getOwnerUserId(), dataObject.getLatestVersionNo(),
                 dataObject.getCurrentVersionNo(), agentSpecConverter.jsonToConfig(dataObject.getDraft()),
                 dataObject.getCreateTime());
     }

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -62,13 +63,19 @@ public class AgentSpecUpdateCommand implements AgentSpecDraftCommand {
     @Schema(description = "技能引用列表（M2 预留）", example = "[1]")
     private List<Long> skillIds;
 
-    @Schema(description = "知识库引用列表（M2 预留）", example = "[1]")
-    private List<Long> knowledgeBaseIds;
-
     @Schema(description = "MCP 服务挂载列表（M2 预留）")
     private List<McpServerMountCommand> mcpServers;
 
     @Schema(description = "子智能体挂载列表（M2 预留）")
     private List<SubagentMountCommand> subagents;
+
+    @Schema(description = "是否启用 workspace（文件工具与落盘总开关）", example = "false")
+    private Boolean workspaceEnabled;
+
+    @Schema(description = "是否启用 Docker 沙箱（仅 workspace 启用时可选）", example = "false")
+    private Boolean sandboxEnabled;
+
+    @Schema(description = "沙箱内开放的执行能力（SHELL/PYTHON/NODE，仅沙箱模式可选）", example = "[\"PYTHON\"]")
+    private List<@Pattern(regexp = "SHELL|PYTHON|NODE", message = "执行能力仅支持 SHELL/PYTHON/NODE") String> capabilities;
 
 }

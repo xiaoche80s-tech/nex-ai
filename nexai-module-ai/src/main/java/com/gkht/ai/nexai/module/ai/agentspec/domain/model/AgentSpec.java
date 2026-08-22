@@ -6,6 +6,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.exception.AgentSpecVersionNo
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * 智能体规格聚合根（充血模型，零框架依赖）：描述一个智能体的声明式配置，有版本，是图纸而非实体。
@@ -13,6 +14,10 @@ import java.util.Objects;
  * <p>发布语义状态机：草稿（draft）→ 发布（锁定为不可变版本快照，默认版本指针前移，草稿清空）
  * → 再编辑（生成新草稿，内容默认延续最新提交）。默认版本指针与最新版本号均以版本号（而非版本记录编号）
  * 表达，使发布在聚合内完全自治——无需等待版本落库回填编号。</p>
+ *
+ * <p>主体元数据含业务编码 spec_code（创建后不可变——数据库主键不外溢到文件系统/日志/运行时标识，
+ * workspace 目录段与装配 agentName 用它）与归属层级（决定可见性、编辑权与 workspace 布局，
+ * 同样创建后不可变）；二者均不进版本快照（ADR-0006 决策 7/8）。</p>
  */
 public class AgentSpec {
 
@@ -20,13 +25,21 @@ public class AgentSpec {
     static final int NAME_MAX_LENGTH = 64;
     /** 图标长度上限（字符） */
     static final int ICON_MAX_LENGTH = 128;
+    /** 业务编码格式：小写字母开头，小写字母/数字/连字符组成，总长 2~64 */
+    static final Pattern SPEC_CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,63}$");
 
     /** 编号，未落库时为 null */
     private Long id;
     /** 规格名称（管理元数据；给 LLM 的自描述在 AgentSpecConfig 内、随版本快照固化） */
     private String name;
+    /** 业务编码（slug），创建后不可变：workspace 目录段与装配 agentName 的标识来源 */
+    private final String specCode;
     /** 图标标识，可空 */
     private String icon;
+    /** 归属层级，创建后不可变 */
+    private final OwnerLevel ownerLevel;
+    /** 归属用户编号（用户级 = 创建者），非用户级为 null，创建后不可变 */
+    private final Long ownerUserId;
     /** 已发布的最新版本号，从未发布为 0 */
     private int latestVersionNo;
     /** 当前默认版本号（会话默认绑定的版本），从未发布为 null */
@@ -36,11 +49,15 @@ public class AgentSpec {
     /** 创建时间，由持久化填充，新建时为 null */
     private LocalDateTime createTime;
 
-    private AgentSpec(Long id, String name, String icon, int latestVersionNo,
-                      Integer currentVersionNo, AgentSpecConfig draft, LocalDateTime createTime) {
+    private AgentSpec(Long id, String name, String specCode, String icon, OwnerLevel ownerLevel,
+                      Long ownerUserId, int latestVersionNo, Integer currentVersionNo,
+                      AgentSpecConfig draft, LocalDateTime createTime) {
         this.id = id;
         this.name = name;
+        this.specCode = specCode;
         this.icon = icon;
+        this.ownerLevel = ownerLevel;
+        this.ownerUserId = ownerUserId;
         this.latestVersionNo = latestVersionNo;
         this.currentVersionNo = currentVersionNo;
         this.draft = draft;
@@ -50,30 +67,38 @@ public class AgentSpec {
     /**
      * 创建规格，携带首个草稿
      *
-     * @param name  规格名称，不能为空白
-     * @param icon  图标标识，可空
-     * @param draft 首个草稿配置，不能为 null
+     * @param name       规格名称，不能为空白
+     * @param specCode   业务编码（slug），须匹配 {@code ^[a-z][a-z0-9-]{1,63}$}
+     * @param icon       图标标识，可空
+     * @param ownerLevel 归属层级，不能为 null
+     * @param ownerUserId 归属用户编号，用户级必填（创建者），其余层级须为 null
+     * @param draft      首个草稿配置，不能为 null
      */
-    public static AgentSpec create(String name, String icon, AgentSpecConfig draft) {
+    public static AgentSpec create(String name, String specCode, String icon,
+                                   OwnerLevel ownerLevel, Long ownerUserId, AgentSpecConfig draft) {
         validateProfile(name, icon);
+        validateIdentity(specCode, ownerLevel, ownerUserId);
         if (draft == null) {
             throw new IllegalArgumentException("新规格必须携带初始草稿");
         }
-        return new AgentSpec(null, name.strip(), normalizeNullable(icon), 0, null, draft, null);
+        return new AgentSpec(null, name.strip(), specCode.strip(), normalizeNullable(icon),
+                ownerLevel, ownerUserId, 0, null, draft, null);
     }
 
     /**
      * 从持久化数据重建聚合（Repository 专用，字段原样恢复）
      */
-    public static AgentSpec reconstitute(Long id, String name, String icon, int latestVersionNo,
+    public static AgentSpec reconstitute(Long id, String name, String specCode, String icon,
+                                         OwnerLevel ownerLevel, Long ownerUserId, int latestVersionNo,
                                          Integer currentVersionNo, AgentSpecConfig draft,
                                          LocalDateTime createTime) {
-        return new AgentSpec(id, name, icon, latestVersionNo, currentVersionNo, draft, createTime);
+        return new AgentSpec(id, name, specCode, icon, ownerLevel, ownerUserId,
+                latestVersionNo, currentVersionNo, draft, createTime);
     }
 
     /**
      * 编辑规格：更新主体信息并覆盖草稿。无草稿时即「再编辑生成新草稿」（发布后的迭代入口），
-     * 草稿内容以本次全量提交为准。
+     * 草稿内容以本次全量提交为准。spec_code 与归属层级不可变，不在编辑面内。
      */
     public void editDraft(String name, String icon, AgentSpecConfig draft) {
         validateProfile(name, icon);
@@ -132,6 +157,35 @@ public class AgentSpec {
     }
 
     /**
+     * 身份字段共用校验：spec_code 格式与归属层级一致性（用户级必须携带归属用户）
+     */
+    private static void validateIdentity(String specCode, OwnerLevel ownerLevel, Long ownerUserId) {
+        if (specCode == null || !SPEC_CODE_PATTERN.matcher(specCode).matches()) {
+            throw new IllegalArgumentException(
+                    "业务编码必须为小写字母开头的小写字母/数字/连字符组合（2~64 位）");
+        }
+        if (ownerLevel == null) {
+            throw new IllegalArgumentException("规格必须声明归属层级");
+        }
+        if (ownerLevel == OwnerLevel.USER && ownerUserId == null) {
+            throw new IllegalArgumentException("用户级规格必须携带归属用户");
+        }
+        if (ownerLevel != OwnerLevel.USER && ownerUserId != null) {
+            throw new IllegalArgumentException("非用户级规格不携带归属用户");
+        }
+    }
+
+    /**
+     * 编辑权判定（ADR-0006 决策 8）：用户级仅归属用户可编辑；租户级租户内可编辑
+     * （租户隔离由查询侧保证）；平台级仅平台运营方（M2+ 引入运营入口后收紧）。
+     *
+     * @param userId 当前登录用户编号，无登录态为 null
+     */
+    public boolean editableBy(Long userId) {
+        return ownerLevel != OwnerLevel.USER || Objects.equals(ownerUserId, userId);
+    }
+
+    /**
      * 拒绝挂载自己（防自引用循环 spawn）：已落库的规格（id 非空）草稿中的子智能体挂载不得指向自身。
      * 新建时尚无编号，无从自引用；A↔B 互挂的循环检测留给 M2 挂载生效工单。
      */
@@ -162,8 +216,20 @@ public class AgentSpec {
         return name;
     }
 
+    public String getSpecCode() {
+        return specCode;
+    }
+
     public String getIcon() {
         return icon;
+    }
+
+    public OwnerLevel getOwnerLevel() {
+        return ownerLevel;
+    }
+
+    public Long getOwnerUserId() {
+        return ownerUserId;
     }
 
     public int getLatestVersionNo() {
