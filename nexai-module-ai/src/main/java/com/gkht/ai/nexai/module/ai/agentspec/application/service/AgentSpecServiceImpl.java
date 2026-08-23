@@ -2,7 +2,7 @@ package com.gkht.ai.nexai.module.ai.agentspec.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
-import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.McpServerMountCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
@@ -10,8 +10,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverter;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.mapper.AgentSpecMapper;
@@ -100,8 +101,8 @@ public class AgentSpecServiceImpl implements AgentSpecService {
         GenerateOptions generateOptions = command.getTemperature() == null && command.getTopP() == null
                 && command.getMaxTokens() == null ? null
                 : GenerateOptions.of(command.getTemperature(), command.getTopP(), command.getMaxTokens());
-        List<McpServerMount> mcpServers = command.getMcpServers() == null ? null
-                : command.getMcpServers().stream().map(this::toMount).toList();
+        List<ToolMount> tools = command.getTools() == null ? null
+                : command.getTools().stream().map(this::toMount).toList();
         ExecutionEnvConfig executionEnv = Boolean.TRUE.equals(command.getWorkspaceEnabled())
                 || Boolean.TRUE.equals(command.getSandboxEnabled())
                 || command.getCapabilities() != null && !command.getCapabilities().isEmpty()
@@ -111,11 +112,12 @@ public class AgentSpecServiceImpl implements AgentSpecService {
                                 : command.getCapabilities().stream().map(ExecutionCapability::valueOf).toList())
                 : null;
         return AgentSpecConfig.of(command.getModelId(), command.getDescription(), command.getSystemPrompt(),
-                command.getMaxIters(), generateOptions, command.getSkillIds(), mcpServers, executionEnv);
+                command.getMaxIters(), generateOptions, command.getSkillIds(), tools, executionEnv);
     }
 
-    private McpServerMount toMount(McpServerMountCommand mountCommand) {
-        return McpServerMount.of(mountCommand.getServerId(), mountCommand.getAllowedTools());
+    private ToolMount toMount(ToolMountCommand mountCommand) {
+        return ToolMount.of(ToolSource.valueOf(mountCommand.getSource()),
+                mountCommand.getSourceId(), mountCommand.getAllowedTools());
     }
 
 }

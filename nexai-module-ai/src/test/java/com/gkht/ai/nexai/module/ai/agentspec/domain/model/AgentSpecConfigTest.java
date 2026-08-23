@@ -61,26 +61,35 @@ class AgentSpecConfigTest {
     }
 
     @Test
-    @DisplayName("挂载层：skillIds/mcpServers null 归空列表；MCP 挂载缺服务编号被拒绝")
-    void normalizesMountsAndValidatesMcpMount() {
+    @DisplayName("挂载层：skillIds/tools null 归空列表；工具挂载缺来源或编号被拒绝")
+    void normalizesMountsAndValidatesToolMount() {
         AgentSpecConfig config = configOf(null, null, null);
         assertEquals(List.of(), config.getSkillIds());
-        assertEquals(List.of(), config.getMcpServers());
+        assertEquals(List.of(), config.getTools());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> McpServerMount.of(null, List.of("search")));
-        assertEquals("MCP 挂载必须携带服务编号", ex.getMessage());
+        IllegalArgumentException noSource = assertThrows(IllegalArgumentException.class,
+                () -> ToolMount.of(null, 1L, List.of("search")));
+        assertEquals("工具挂载必须声明来源", noSource.getMessage());
+
+        IllegalArgumentException noRef = assertThrows(IllegalArgumentException.class,
+                () -> ToolMount.of(ToolSource.MCP, null, List.of("search")));
+        assertEquals("工具挂载必须携带来源条目编号", noRef.getMessage());
     }
 
     @Test
-    @DisplayName("挂载层：同一 MCP 服务重复挂载被拒绝（白名单合并语义有歧义）")
-    void rejectsDuplicateMcpServerMount() {
-        McpServerMount first = McpServerMount.of(1L, List.of("search"));
-        McpServerMount duplicated = McpServerMount.of(1L, null);
+    @DisplayName("挂载层：同一工具来源条目重复挂载被拒绝；跨来源同编号可共存")
+    void rejectsDuplicateToolMount() {
+        ToolMount mcpOne = ToolMount.of(ToolSource.MCP, 1L, List.of("search"));
+        ToolMount mcpDuplicated = ToolMount.of(ToolSource.MCP, 1L, null);
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> AgentSpecConfig.of(null, null, null, null, null, null,
-                        List.of(first, duplicated), null));
-        assertEquals("同一 MCP 服务不能重复挂载", ex.getMessage());
+                        List.of(mcpOne, mcpDuplicated), null));
+        assertEquals("同一工具来源条目不能重复挂载", ex.getMessage());
+
+        // MCP 与平台工具库是不同来源：同编号不冲突
+        ToolMount platform = ToolMount.of(ToolSource.PLATFORM, 1L, null);
+        assertDoesNotThrow(() -> AgentSpecConfig.of(null, null, null, null, null, null,
+                List.of(mcpOne, platform), null));
     }
 
 }

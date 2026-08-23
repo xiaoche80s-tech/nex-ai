@@ -1,6 +1,6 @@
 package com.gkht.ai.nexai.module.ai.agentspec.application.command;
 
-import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.McpServerMountCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -79,8 +79,8 @@ public class AgentSpecCreateCommand {
     @Schema(description = "技能引用列表（编辑面后置）", example = "[1]")
     private List<Long> skillIds;
 
-    @Schema(description = "MCP 服务挂载列表（服务 + 工具白名单，编辑面后置）")
-    private List<McpServerMountCommand> mcpServers;
+    @Schema(description = "工具挂载列表（来源 + 引用 + 可选白名单，编辑面后置）")
+    private List<ToolMountCommand> tools;
 
     // —— 执行环境层 ——
 

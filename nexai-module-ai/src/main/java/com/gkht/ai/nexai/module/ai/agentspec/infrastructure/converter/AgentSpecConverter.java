@@ -8,8 +8,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.model.McpServerMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
 import lombok.Data;
 import org.mapstruct.Mapper;
@@ -88,7 +89,7 @@ public interface AgentSpecConverter {
         private Integer maxIters;
         private GenerateOptionsJSON generateOptions;
         private List<Long> skillIds;
-        private List<McpServerMountJSON> mcpServers;
+        private List<ToolMountJSON> tools;
         private ExecutionEnvJSON executionEnv;
 
         static ConfigJSON from(AgentSpecConfig config) {
@@ -100,8 +101,8 @@ public interface AgentSpecConverter {
             json.setGenerateOptions(config.getGenerateOptions() == null ? null
                     : GenerateOptionsJSON.from(config.getGenerateOptions()));
             json.setSkillIds(config.getSkillIds());
-            json.setMcpServers(config.getMcpServers() == null ? null
-                    : config.getMcpServers().stream().map(McpServerMountJSON::from).toList());
+            json.setTools(config.getTools() == null ? null
+                    : config.getTools().stream().map(ToolMountJSON::from).toList());
             json.setExecutionEnv(ExecutionEnvJSON.from(config.getExecutionEnv()));
             return json;
         }
@@ -110,7 +111,7 @@ public interface AgentSpecConverter {
             return AgentSpecConfig.of(modelId, description, systemPrompt, maxIters,
                     generateOptions == null ? null : generateOptions.toDomain(),
                     skillIds,
-                    mcpServers == null ? null : mcpServers.stream().map(McpServerMountJSON::toDomain).toList(),
+                    tools == null ? null : tools.stream().map(ToolMountJSON::toDomain).toList(),
                     executionEnv == null ? null : executionEnv.toDomain());
         }
 
@@ -165,20 +166,23 @@ public interface AgentSpecConverter {
     }
 
     @Data
-    class McpServerMountJSON {
+    class ToolMountJSON {
 
-        private Long serverId;
+        private String source;
+        private Long sourceId;
         private List<String> allowedTools;
 
-        static McpServerMountJSON from(McpServerMount mount) {
-            McpServerMountJSON json = new McpServerMountJSON();
-            json.setServerId(mount.getServerId());
+        static ToolMountJSON from(ToolMount mount) {
+            ToolMountJSON json = new ToolMountJSON();
+            json.setSource(mount.getSource().name());
+            json.setSourceId(mount.getSourceId());
             json.setAllowedTools(mount.getAllowedTools());
             return json;
         }
 
-        McpServerMount toDomain() {
-            return McpServerMount.of(serverId, allowedTools);
+        ToolMount toDomain() {
+            return ToolMount.of(source == null ? null : ToolSource.valueOf(source),
+                    sourceId, allowedTools);
         }
 
     }

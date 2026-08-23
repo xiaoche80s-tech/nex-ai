@@ -6,7 +6,8 @@ import java.util.Objects;
 /**
  * 智能体规格配置值对象（不可变，按值判等）：草稿与已发布版本快照共用同一结构，
  * 按 agentscope 的分层组织为「三层 + 执行环境层」——agent 层（模型引用 / 自描述 / 系统提示 /
- * 迭代上限）、模型调用层（{@link GenerateOptions}）、挂载层（技能 / MCP，MVP 仅建模不露编辑面）、
+ * 迭代上限）、模型调用层（{@link GenerateOptions}）、挂载层（技能 / 工具，MVP 仅建模不露编辑面；
+ * 工具挂载统一为 {@link ToolMount}，MCP 与平台工具库共用）、
  * 执行环境层（{@link ExecutionEnvConfig}：workspace / 沙箱 / 执行能力）。
  *
  * <p>分层判据：影响智能体行为的配置进快照（本值对象全部字段），纯管理元数据
@@ -37,8 +38,8 @@ public final class AgentSpecConfig {
     // —— 挂载层（MVP 仅建模，编辑面后置）——
     /** 技能引用列表 */
     private final List<Long> skillIds;
-    /** MCP 服务挂载列表（服务 + 工具白名单） */
-    private final List<McpServerMount> mcpServers;
+    /** 工具挂载列表（来源 + 引用 + 可选白名单，MCP 与平台工具库共用） */
+    private final List<ToolMount> tools;
 
     // —— 执行环境层 ——
     /** 执行环境配置，null 视为全关（纯对话智能体） */
@@ -46,14 +47,14 @@ public final class AgentSpecConfig {
 
     private AgentSpecConfig(Long modelId, String description, String systemPrompt, Integer maxIters,
                             GenerateOptions generateOptions, List<Long> skillIds,
-                            List<McpServerMount> mcpServers, ExecutionEnvConfig executionEnv) {
+                            List<ToolMount> tools, ExecutionEnvConfig executionEnv) {
         this.modelId = modelId;
         this.description = description;
         this.systemPrompt = systemPrompt;
         this.maxIters = maxIters;
         this.generateOptions = generateOptions;
         this.skillIds = skillIds;
-        this.mcpServers = mcpServers;
+        this.tools = tools;
         this.executionEnv = executionEnv;
     }
 
@@ -66,12 +67,12 @@ public final class AgentSpecConfig {
      * @param maxIters        最大迭代轮数，可空，须 >= 1
      * @param generateOptions 调用参数组，可空 = 全默认
      * @param skillIds        技能引用列表，可空
-     * @param mcpServers      MCP 服务挂载列表，可空
+     * @param tools           工具挂载列表，可空
      * @param executionEnv    执行环境配置，可空 = 全关（纯对话）
      */
     public static AgentSpecConfig of(Long modelId, String description, String systemPrompt, Integer maxIters,
                                      GenerateOptions generateOptions, List<Long> skillIds,
-                                     List<McpServerMount> mcpServers, ExecutionEnvConfig executionEnv) {
+                                     List<ToolMount> tools, ExecutionEnvConfig executionEnv) {
         String strippedDescription = normalizeNullable(description);
         if (strippedDescription != null && strippedDescription.length() > DESCRIPTION_MAX_LENGTH) {
             throw new IllegalArgumentException("规格自描述不能超过 " + DESCRIPTION_MAX_LENGTH + " 个字符");
@@ -83,10 +84,11 @@ public final class AgentSpecConfig {
         if (maxIters != null && maxIters < 1) {
             throw new IllegalArgumentException("最大迭代轮数不能小于 1");
         }
-        // 挂载层语义：同一 MCP 服务只挂一次（重复挂载的 whitelist 合并语义有歧义，直接拒绝）
-        List<McpServerMount> mounts = mcpServers == null ? List.of() : List.copyOf(mcpServers);
-        if (mounts.stream().map(McpServerMount::getServerId).distinct().count() != mounts.size()) {
-            throw new IllegalArgumentException("同一 MCP 服务不能重复挂载");
+        // 挂载层语义：同一工具来源条目只挂一次（重复挂载的 whitelist 合并语义有歧义，直接拒绝）
+        List<ToolMount> mounts = tools == null ? List.of() : List.copyOf(tools);
+        if (mounts.stream().map(tool -> tool.getSource() + ":" + tool.getSourceId()).distinct().count()
+                != mounts.size()) {
+            throw new IllegalArgumentException("同一工具来源条目不能重复挂载");
         }
         return new AgentSpecConfig(modelId, strippedDescription, prompt, maxIters, generateOptions,
                 snapshotIds(skillIds), mounts, executionEnv);
@@ -129,8 +131,8 @@ public final class AgentSpecConfig {
         return skillIds;
     }
 
-    public List<McpServerMount> getMcpServers() {
-        return mcpServers;
+    public List<ToolMount> getTools() {
+        return tools;
     }
 
     /** 执行环境配置，null = 全关（纯对话智能体） */
@@ -152,14 +154,14 @@ public final class AgentSpecConfig {
                 && Objects.equals(maxIters, other.maxIters)
                 && Objects.equals(generateOptions, other.generateOptions)
                 && Objects.equals(skillIds, other.skillIds)
-                && Objects.equals(mcpServers, other.mcpServers)
+                && Objects.equals(tools, other.tools)
                 && Objects.equals(executionEnv, other.executionEnv);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(modelId, description, systemPrompt, maxIters, generateOptions,
-                skillIds, mcpServers, executionEnv);
+                skillIds, tools, executionEnv);
     }
 
 }

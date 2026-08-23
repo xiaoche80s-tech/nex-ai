@@ -7,10 +7,15 @@ export interface GenerateOptions {
   maxTokens: number | null
 }
 
-/** MCP 服务挂载（服务 + 工具白名单，编辑面后置） */
-export interface McpServerMount {
-  serverId: number
-  /** 空 = 该服务全部工具 */
+/** 工具来源（MCP = MCP Server；PLATFORM = 平台工具库 @Tool 业务工具；内置工具随执行环境启用不走挂载） */
+export type ToolSource = 'MCP' | 'PLATFORM'
+
+/** 工具挂载（来源 + 引用 + 可选白名单，编辑面后置） */
+export interface ToolMount {
+  source: ToolSource
+  /** MCP = MCP Server 编号；PLATFORM = 平台工具库条目编号 */
+  sourceId: number
+  /** 空 = 该来源全部工具 */
   allowedTools?: string[]
 }
 
@@ -37,7 +42,7 @@ export interface AgentSpecConfig {
   generateOptions: GenerateOptions | null
   // —— 挂载层（编辑面后置）——
   skillIds?: number[]
-  mcpServers?: McpServerMount[]
+  tools?: ToolMount[]
   // —— 执行环境层 ——
   /** null 表示全关（纯对话智能体） */
   executionEnv?: ExecutionEnv | null
