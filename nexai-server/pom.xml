@@ -103,8 +103,8 @@
 
         <!-- AI 大模型相关模块。默认注释，保证编译速度 -->
 
-        <!-- NexAI 智能体平台业务模块（聚合垂直切分；agentscope-java v2 运行时依赖已随
-             工单 06 收拢进本模块：模型构造 + PG 会话状态存储，经传递依赖生效） -->
+        <!-- NexAI 智能体平台业务模块（七聚合垂直切分；agentscope-java v2 运行时依赖收拢在
+             本模块：模型构造 + PG 会话状态存储，经传递依赖生效） -->
         <dependency>
             <groupId>com.gkht.ai</groupId>
             <artifactId>nexai-module-ai</artifactId>
