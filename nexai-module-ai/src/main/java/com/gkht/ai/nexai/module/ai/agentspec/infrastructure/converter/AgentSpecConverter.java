@@ -3,8 +3,10 @@ package com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter;
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
@@ -12,6 +14,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
+import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecVersionDO;
 import lombok.Data;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -22,7 +25,8 @@ import java.util.List;
 /**
  * 智能体规格转换器：领域模型 → DO、领域模型/DO → 出参 DTO。
  * DO → 领域模型（聚合重建）在 RepositoryImpl 经 reconstitute 完成。
- * draft 在 DO 侧为 JSON 字符串、领域侧为 {@link AgentSpecConfig}，互转集中于此。
+ * draft 在 DO 侧为 JSON 字符串、领域侧为 {@link AgentSpecConfig}，互转集中于此；
+ * 版本快照的 config 与草稿 JSON 同构，复用同一组编解码。
  */
 @Mapper(componentModel = "spring")
 public interface AgentSpecConverter {
@@ -31,11 +35,19 @@ public interface AgentSpecConverter {
     @Mapping(target = "ownerLevel", source = "ownerLevel", qualifiedByName = "ownerLevelToString")
     AgentSpecDO toDataObject(AgentSpec spec);
 
+    @Mapping(target = "config", source = "config", qualifiedByName = "configToJson")
+    AgentSpecVersionDO toVersionDataObject(AgentSpecVersion version);
+
     @Mapping(target = "hasDraft", source = "draft", qualifiedByName = "draftToPresent")
     @Mapping(target = "description", source = "draft", qualifiedByName = "draftToDescription")
     AgentSpecDTO toDTO(AgentSpecDO specDO);
 
     List<AgentSpecDTO> toDTOList(List<AgentSpecDO> list);
+
+    /**
+     * 版本快照 → 列表 DTO（不含全量配置；current 当前版本标识由应用服务按版本指针设置）
+     */
+    AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
 
     default PageResult<AgentSpecDTO> toDTOPage(PageResult<AgentSpecDO> page) {
         return new PageResult<>(toDTOList(page.getList()), page.getTotal());
@@ -53,8 +65,7 @@ public interface AgentSpecConverter {
         return config == null ? null : JsonUtils.toJsonString(ConfigJSON.from(config));
     }
 
-    /** JSON 字符串 → 配置值对象；null / 空白返回 null */
-    @Named("jsonToConfig")
+    /** JSON 字符串 → 配置值对象；null / 空白返回 null（草稿与版本快照 config 共用） */
     default AgentSpecConfig jsonToConfig(String json) {
         if (json == null || json.isBlank()) {
             return null;

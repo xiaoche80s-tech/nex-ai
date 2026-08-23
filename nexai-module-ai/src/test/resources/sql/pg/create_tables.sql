@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS ai_agent_spec (
     owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
     owner_user_id int8 NULL DEFAULT NULL,
     draft text NULL DEFAULT NULL,
+    current_version_no int4 NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater varchar(64) NULL DEFAULT '',
@@ -23,3 +24,61 @@ CREATE TABLE IF NOT EXISTS ai_agent_spec (
 -- spec_code 唯一性按归属层级（部分唯一索引：仅存活行；COALESCE 使非用户级 owner_user_id=NULL 也参与判重）
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_agent_spec_code ON ai_agent_spec (
     owner_level, tenant_id, COALESCE(owner_user_id, 0), spec_code) WHERE deleted = 0;
+
+CREATE SEQUENCE IF NOT EXISTS ai_agent_spec_version_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_agent_spec_version (
+    id int8 NOT NULL,
+    spec_id int8 NOT NULL,
+    version_no int4 NOT NULL,
+    config text NOT NULL,
+    note varchar(255) NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_agent_spec_version PRIMARY KEY (id)
+);
+-- 同一规格内版本号唯一（并发发布兜底）
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_agent_spec_version ON ai_agent_spec_version (
+    tenant_id, spec_id, version_no) WHERE deleted = 0;
+
+CREATE SEQUENCE IF NOT EXISTS ai_channel_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_channel (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    provider varchar(32) NOT NULL,
+    base_url varchar(512) NOT NULL,
+    api_key varchar(1024) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    owner_type varchar(16) NOT NULL DEFAULT 'tenant',
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_channel PRIMARY KEY (id)
+);
+
+CREATE SEQUENCE IF NOT EXISTS ai_model_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_model (
+    id int8 NOT NULL,
+    channel_id int8 NOT NULL,
+    model_id varchar(128) NOT NULL,
+    name varchar(64) NOT NULL,
+    context_window int4 NULL DEFAULT NULL,
+    input_price numeric(12, 6) NULL DEFAULT NULL,
+    output_price numeric(12, 6) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_model PRIMARY KEY (id)
+);
+-- 同渠道下模型标识唯一（仅存活行；应用层预校验 + 此索引兜底并发）
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_model_channel_model ON ai_model (channel_id, model_id) WHERE deleted = 0;

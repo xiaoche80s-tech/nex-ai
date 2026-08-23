@@ -11,8 +11,10 @@ import java.util.regex.Pattern;
  * workspace 目录段与装配 agentName 用它）与归属层级（决定可见性、编辑权与 workspace 布局，
  * 同样创建后不可变）；二者均不进版本快照。</p>
  *
- * <p>MVP 范围：创建（携带首个草稿）与查询。发布固化为不可变版本快照、默认版本指针等
- * 状态机随版本工单扩展。</p>
+ * <p>版本语义：草稿 {@link #draft} 与已发布不可变快照（{@link AgentSpecVersion}，独立表）
+ * 分离——发布把草稿固化为版本快照并推进 {@link #currentVersionNo}（当前版本指针，运行寻址）；
+ * 再编辑只改草稿不动快照；切换当前版本仅回退指针。DB 版本快照是唯一权威源，
+ * 本地盘仅为其物化缓存。</p>
  */
 public class AgentSpec {
 
@@ -37,6 +39,8 @@ public class AgentSpec {
     private final Long ownerUserId;
     /** 草稿配置，null 表示当前无草稿 */
     private AgentSpecConfig draft;
+    /** 当前生效版本号（当前版本指针，运行寻址），null 表示从未发布 */
+    private Integer currentVersionNo;
     /** 创建时间，由持久化填充，新建时为 null */
     private LocalDateTime createTime;
 
@@ -78,8 +82,70 @@ public class AgentSpec {
      */
     public static AgentSpec reconstitute(Long id, String name, String specCode, String icon,
                                          OwnerLevel ownerLevel, Long ownerUserId,
-                                         AgentSpecConfig draft, LocalDateTime createTime) {
-        return new AgentSpec(id, name, specCode, icon, ownerLevel, ownerUserId, draft, createTime);
+                                         AgentSpecConfig draft, Integer currentVersionNo,
+                                         LocalDateTime createTime) {
+        AgentSpec spec = new AgentSpec(id, name, specCode, icon, ownerLevel, ownerUserId, draft, createTime);
+        spec.currentVersionNo = currentVersionNo;
+        return spec;
+    }
+
+    /**
+     * 发布当前草稿：固化为不可变版本快照并推进当前版本指针。
+     *
+     * <p>发布校验（补齐草稿态可空的行为性配置）：模型引用必须非空（无模型即无可运行）。
+     * 挂载引用的条目存在性由装配期校验（跨聚合只读），此处不校验。</p>
+     *
+     * @param nextVersionNo 新版本号（现有最大 + 1，由仓储在事务内计算）
+     * @param note          发布备注，可空
+     * @return 固化后的不可变版本快照
+     * @throws IllegalStateException 无草稿或草稿缺模型引用时抛出
+     */
+    public AgentSpecVersion publish(int nextVersionNo, String note) {
+        if (draft == null) {
+            throw new IllegalStateException("没有可发布的草稿");
+        }
+        if (draft.getModelId() == null) {
+            throw new IllegalStateException("发布前必须为规格配置模型");
+        }
+        AgentSpecVersion version = AgentSpecVersion.create(id, nextVersionNo, draft, note);
+        currentVersionNo = version.getVersionNo();
+        return version;
+    }
+
+    /**
+     * 用新草稿整体替换当前草稿（编辑面）：只动草稿，不触碰任何已发布快照。
+     *
+     * @param newDraft 新草稿配置，不能为 null
+     */
+    public void replaceDraft(AgentSpecConfig newDraft) {
+        if (newDraft == null) {
+            throw new IllegalArgumentException("草稿配置不能为空");
+        }
+        this.draft = newDraft;
+    }
+
+    /**
+     * 切换当前生效版本（回退指针）：仅校验目标版本确实存在。
+     *
+     * @param versionNo    目标版本号
+     * @param versionExists 目标版本是否已发布
+     * @throws IllegalStateException 目标版本未被发布（悬空指针）时抛出
+     */
+    public void switchToVersion(int versionNo, boolean versionExists) {
+        if (!versionExists) {
+            throw new IllegalStateException("版本 " + versionNo + " 不存在");
+        }
+        this.currentVersionNo = versionNo;
+    }
+
+    /** 当前生效版本号（当前版本指针），null 表示从未发布 */
+    public Integer getCurrentVersionNo() {
+        return currentVersionNo;
+    }
+
+    /** 是否已有已发布版本 */
+    public boolean hasPublishedVersion() {
+        return currentVersionNo != null;
     }
 
     /**

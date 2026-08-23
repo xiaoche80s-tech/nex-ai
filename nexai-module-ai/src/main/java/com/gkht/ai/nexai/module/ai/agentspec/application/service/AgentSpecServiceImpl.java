@@ -2,11 +2,15 @@ package com.gkht.ai.nexai.module.ai.agentspec.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
@@ -27,8 +31,12 @@ import java.util.List;
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CODE_DUPLICATE;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CONFIG_INVALID;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PUBLISH_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_CONFLICT;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
 
 /**
  * 智能体规格应用服务实现。写走聚合（Repository 端口），读按轻量读写分离经 Mapper 直查转 DTO。
@@ -94,6 +102,63 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     public PageResult<AgentSpecDTO> getSpecPage(AgentSpecPageQuery query, Long userId) {
         return agentSpecConverter.toDTOPage(
                 agentSpecMapper.selectPage(query, query.getName(), query.getSpecCode(), userId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Integer publishSpec(AgentSpecPublishCommand command) {
+        AgentSpec spec = requireSpec(command.getId());
+        Integer maxVersionNo = agentSpecRepository.findMaxVersionNo(command.getId());
+        int nextVersionNo = maxVersionNo == null ? 1 : maxVersionNo + 1;
+        AgentSpecVersion version;
+        try {
+            version = spec.publish(nextVersionNo, command.getNote());
+        } catch (IllegalStateException ex) {
+            throw exception(AGENT_SPEC_PUBLISH_INVALID, ex.getMessage());
+        }
+        try {
+            agentSpecRepository.saveVersion(version);
+            agentSpecRepository.update(spec);
+        } catch (DuplicateKeyException ex) {
+            // 并发发布由版本唯一索引兜底（版本号重复），转业务错误码而非 500
+            throw exception(AGENT_SPEC_VERSION_CONFLICT);
+        }
+        return version.getVersionNo();
+    }
+
+    @Override
+    public List<AgentSpecVersionDTO> listSpecVersions(Long specId) {
+        AgentSpec spec = requireSpec(specId);
+        List<AgentSpecVersionDTO> versions = agentSpecRepository.listVersions(specId).stream()
+                .map(agentSpecConverter::toVersionDTO).toList();
+        // 当前生效版本标识按版本指针判等（当前版本指针指向哪个版本号，哪个版本即 current；
+        // 未发布规格全部非 current——恒为非 null，前端直接判断）
+        Integer currentVersionNo = spec.getCurrentVersionNo();
+        versions.forEach(version ->
+                version.setCurrent(currentVersionNo != null && currentVersionNo.equals(version.getVersionNo())));
+        return versions;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void switchSpecVersion(AgentSpecSwitchVersionCommand command) {
+        AgentSpec spec = requireSpec(command.getId());
+        try {
+            spec.switchToVersion(command.getVersionNo(),
+                    agentSpecRepository.existsVersion(command.getId(), command.getVersionNo()));
+        } catch (IllegalStateException ex) {
+            throw exception(AGENT_SPEC_VERSION_NOT_EXISTS, command.getId());
+        }
+        agentSpecRepository.update(spec);
+    }
+
+    /** 读取规格，不存在报业务异常（不存在/跨租户/已删除均归此） */
+    private AgentSpec requireSpec(Long id) {
+        AgentSpec spec = agentSpecRepository.findById(id);
+        if (spec == null) {
+            throw exception(AGENT_SPEC_NOT_EXISTS);
+        }
+        return spec;
     }
 
     /** 平铺命令 → 四层配置值对象（模型引用/自描述草稿态可空，发布时校验补齐） */

@@ -48,5 +48,9 @@ public class AgentSpecDO extends TenantBaseDO {
      * 草稿配置 JSON 字符串（模型引用/自描述/系统提示/推理参数/调用参数/挂载列表/执行环境）
      */
     private String draft;
+    /**
+     * 当前生效版本号（当前版本指针，运行寻址），NULL 表示从未发布
+     */
+    private Integer currentVersionNo;
 
 }

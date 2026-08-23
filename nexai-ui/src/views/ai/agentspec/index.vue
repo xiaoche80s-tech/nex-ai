@@ -84,9 +84,12 @@
           <span>{{ scope.row.description || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('ai.spec.tableStatus')" align="center" width="90">
-        <template #default>
-          <el-tag type="warning" disable-transitions>{{ t('ai.spec.statusDraft') }}</el-tag>
+      <el-table-column :label="t('ai.spec.tableStatus')" align="center" width="110">
+        <template #default="scope">
+          <el-tag v-if="scope.row.currentVersionNo" type="success" disable-transitions>
+            {{ t('ai.spec.statusPublished') }} v{{ scope.row.currentVersionNo }}
+          </el-tag>
+          <el-tag v-else type="warning" disable-transitions>{{ t('ai.spec.statusDraft') }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column
@@ -96,6 +99,18 @@
         width="180"
         :formatter="dateFormatter"
       />
+      <el-table-column :label="t('table.action')" align="center" width="90" fixed="right">
+        <template #default="scope">
+          <el-button
+            link
+            type="primary"
+            v-hasPermi="['ai:spec:query']"
+            @click="openVersion(scope.row.id)"
+          >
+            {{ t('ai.spec.version') }}
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
     <!-- 分页 -->
     <Pagination
@@ -108,11 +123,14 @@
 
   <!-- 创建表单弹窗 -->
   <AgentSpecForm ref="formRef" @success="getList" />
+  <!-- 版本管理弹窗（发布/列表/切换） -->
+  <SpecVersion ref="versionRef" @success="getList" />
 </template>
 <script lang="ts" setup>
 import { dateFormatter } from '@/utils/formatTime'
 import * as SpecApi from '@/api/ai/spec'
 import AgentSpecForm from './AgentSpecForm.vue'
+import SpecVersion from './SpecVersion.vue'
 
 defineOptions({ name: 'AiAgentSpec' })
 
@@ -157,6 +175,12 @@ const resetQuery = () => {
 const formRef = ref()
 const openForm = () => {
   formRef.value.open()
+}
+
+/** 打开版本管理弹窗 */
+const versionRef = ref()
+const openVersion = (id: number) => {
+  versionRef.value.open(id)
 }
 
 /** 初始化 **/

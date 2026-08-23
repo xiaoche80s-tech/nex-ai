@@ -68,7 +68,35 @@ export interface AgentSpecVO {
   icon: string | null
   /** 是否有未发布草稿（当前无发布能力时恒为草稿态） */
   hasDraft: boolean
+  /** 当前生效版本号（当前版本指针，运行寻址），null = 从未发布 */
+  currentVersionNo: number | null
   createTime: Date
+}
+
+/** 版本快照列表项（不可变快照的元信息，不含全量配置） */
+export interface AgentSpecVersionVO {
+  id: number
+  /** 版本号（规格内严格递增，1 起；发布后不可变，运行寻址用） */
+  versionNo: number
+  /** 发布备注 */
+  note: string | null
+  /** 是否为当前生效版本 */
+  current: boolean
+  createTime: Date
+}
+
+/** 发布命令（把当前草稿固化为不可变版本快照并推进当前版本指针） */
+export interface AgentSpecPublishForm {
+  id: number
+  /** 发布备注 */
+  note?: string
+}
+
+/** 切换当前版本命令（仅回退当前版本指针，快照本身不可变） */
+export interface AgentSpecSwitchVersionForm {
+  id: number
+  /** 目标版本号 */
+  versionNo: number
 }
 
 /** 规格分页查询参数 */
@@ -105,4 +133,19 @@ export const createSpec = (data: AgentSpecCreateForm) => {
 // 查询规格分页
 export const getSpecPage = (params: AgentSpecPageParams) => {
   return request.get({ url: '/ai/spec/page', params })
+}
+
+// 发布规格版本（返回新版本号）
+export const publishSpec = (data: AgentSpecPublishForm) => {
+  return request.post({ url: '/ai/spec/publish', data })
+}
+
+// 查询规格版本列表
+export const getSpecVersionPage = (specId: number) => {
+  return request.get({ url: '/ai/spec/version-page', params: { specId } })
+}
+
+// 切换当前版本（回退指针）
+export const switchSpecVersion = (data: AgentSpecSwitchVersionForm) => {
+  return request.put({ url: '/ai/spec/switch-version', data })
 }

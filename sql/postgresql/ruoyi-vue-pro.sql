@@ -1658,6 +1658,13 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3446, 0, '草稿', '0', 'mes_pro_task_status', 0, '', '', NULL, '1', '2026-04-16 09:47:00', '1', '2026-04-16 09:47:00', '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3447, 1, '已完成', '4', 'mes_pro_task_status', 0, '', '', NULL, '1', '2026-04-16 09:47:00', '1', '2026-04-16 09:47:00', '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3448, 2, '已取消', '5', 'mes_pro_task_status', 0, '', '', NULL, '1', '2026-04-16 09:47:00', '1', '2026-04-16 09:47:00', '0');
+-- NexAI 智能体平台：渠道提供商类型（工单 03）
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3453, 1, 'OpenAI', 'openai', 'ai_channel_provider', 0, 'primary', '', '渠道提供商：OpenAI 官方', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3454, 2, 'OpenAI 兼容', 'openai-compat', 'ai_channel_provider', 0, 'success', '', '渠道提供商：OpenAI 兼容端点（中转/自建网关）', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3455, 3, '通义千问', 'dashscope', 'ai_channel_provider', 0, 'warning', '', '渠道提供商：阿里云 DashScope', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3456, 4, 'Anthropic', 'anthropic', 'ai_channel_provider', 0, 'danger', '', '渠道提供商：Anthropic Claude', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3457, 5, 'Gemini', 'gemini', 'ai_channel_provider', 0, 'info', '', '渠道提供商：Google Gemini', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (3458, 6, 'Ollama', 'ollama', 'ai_channel_provider', 0, 'info', '', '渠道提供商：Ollama 本地服务（通常无需密钥）', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
@@ -1889,6 +1896,7 @@ INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_ti
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2134, 'MES 缺陷检测项类型', 'mes_defect_type', 0, '缺陷模块的检测项类型字典', '1', '2026-04-04 12:49:51', '1', '2026-04-04 12:49:51', '0', NULL);
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2135, 'MES 上下工状态类型', 'mes_pro_work_record_type', 0, 'MES 上下工状态类型', '1', '2026-04-05 14:07:27', '1', '2026-04-05 14:07:27', '0', NULL);
 INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2138, 'MES 生产入库单状态', 'mes_wm_product_produce_status', 0, 'MES 生产入库单状态', '1', '2026-04-05 15:53:46', '1', '2026-04-05 15:53:46', '0', '1970-01-01 00:00:00');
+INSERT INTO system_dict_type (id, name, type, status, remark, creator, create_time, updater, update_time, deleted, deleted_time) VALUES (2140, '渠道提供商类型', 'ai_channel_provider', 0, 'NexAI 智能体平台渠道提供商类型（工单 03）', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0', NULL);
 COMMIT;
 -- @formatter:on
 
@@ -3491,9 +3499,22 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (5985, 'MES 首页', 'mes:home:query', 2, 0, 5100, 'mes/home/index', 'ep:home-filled', 'mes/home/index', 'MesHome', 0, '1', '1', '1', '1', '2026-04-05 23:24:03', '1', '2026-04-06 01:20:52', '0');
 -- NexAI 智能体平台（AI 平台，菜单号段 6400+；各聚合工单按需追加子菜单）
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6400, 'AI 平台', '', 1, 100, 0, '/ai', 'ep:cpu', NULL, NULL, 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6415, '智能体规格', '', 2, 1, 6400, 'spec', 'ep:magic-stick', 'ai/agentspec/index', 'AiAgentSpec', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', 2026-08-23 00:00:00, '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6416, '规格查询', 'ai:spec:query', 3, 1, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', 2026-08-23 00:00:00, '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6417, '规格创建', 'ai:spec:create', 3, 2, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', 2026-08-23 00:00:00, '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6415, '智能体规格', '', 2, 1, 6400, 'spec', 'ep:magic-stick', 'ai/agentspec/index', 'AiAgentSpec', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+-- NexAI 模型渠道与模型管理（工单 03）
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6405, '模型管理', '', 2, 0, 6400, 'model', 'ep:box', 'ai/channel/index', 'AiChannel', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6406, '渠道查询', 'ai:channel:query', 3, 1, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6407, '渠道创建', 'ai:channel:create', 3, 2, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6408, '渠道更新', 'ai:channel:update', 3, 3, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6409, '渠道删除', 'ai:channel:delete', 3, 4, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6410, '模型查询', 'ai:model:query', 3, 5, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6411, '模型创建', 'ai:model:create', 3, 6, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6412, '模型更新', 'ai:model:update', 3, 7, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6413, '模型删除', 'ai:model:delete', 3, 8, 6405, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6416, '规格查询', 'ai:spec:query', 3, 1, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6417, '规格创建', 'ai:spec:create', 3, 2, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+-- 工单 04：版本发布/切换（切换复用 update 权限）
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6418, '规格更新', 'ai:spec:update', 3, 3, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6419, '规格发布', 'ai:spec:publish', 3, 4, 6415, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
@@ -5963,6 +5984,7 @@ CREATE TABLE ai_agent_spec (
     owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
     owner_user_id int8 NULL DEFAULT NULL,
     draft text NULL DEFAULT NULL,
+    current_version_no int4 NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater varchar(64) NULL DEFAULT '',
@@ -5983,7 +6005,8 @@ COMMENT ON COLUMN ai_agent_spec.spec_code IS '业务编码（slug），创建后
 COMMENT ON COLUMN ai_agent_spec.icon IS '图标标识（管理元数据，不参与版本化）';
 COMMENT ON COLUMN ai_agent_spec.owner_level IS '归属层级（PLATFORM/TENANT/USER），创建后不可变；MVP 开放 TENANT/USER';
 COMMENT ON COLUMN ai_agent_spec.owner_user_id IS '归属用户编号（用户级 = 创建者），非用户级为 NULL，创建后不可变';
-COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON，按 agentscope 分层：agent 层（模型引用/自描述/系统提示/maxIters）+ 模型调用层（generateOptions: temperature/topP/maxTokens）+ 挂载层（skillIds/mcpServers，编辑面后置）+ 执行环境层（executionEnv: workspace/sandbox/capabilities），NULL 表示无草稿';
+COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON，按 agentscope 分层：agent 层（模型引用/自描述/系统提示/maxIters）+ 模型调用层（generateOptions: temperature/topP/maxTokens）+ 挂载层（skillIds/tools，编辑面后置）+ 执行环境层（executionEnv: workspace/sandbox/capabilities），NULL 表示无草稿';
+COMMENT ON COLUMN ai_agent_spec.current_version_no IS '当前生效版本号（当前版本指针，运行寻址），NULL 表示从未发布';
 COMMENT ON COLUMN ai_agent_spec.creator IS '创建者';
 COMMENT ON COLUMN ai_agent_spec.create_time IS '创建时间';
 COMMENT ON COLUMN ai_agent_spec.updater IS '更新者';
@@ -5994,4 +6017,122 @@ COMMENT ON TABLE ai_agent_spec IS 'AI 平台智能体规格表（行为性配置
 
 DROP SEQUENCE IF EXISTS ai_agent_spec_seq;
 CREATE SEQUENCE ai_agent_spec_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_agent_spec_version（NexAI 智能体平台：智能体规格版本快照，工单 04）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_agent_spec_version_seq;
+DROP TABLE IF EXISTS ai_agent_spec_version;
+CREATE TABLE ai_agent_spec_version (
+    id int8 NOT NULL,
+    spec_id int8 NOT NULL,
+    version_no int4 NOT NULL,
+    config text NOT NULL,
+    note varchar(255) NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_agent_spec_version ADD CONSTRAINT pk_ai_agent_spec_version PRIMARY KEY (id);
+
+-- 同一规格内版本号唯一（并发发布兜底；快照不可变，无部分索引需求）
+CREATE UNIQUE INDEX uk_ai_agent_spec_version ON ai_agent_spec_version (
+    tenant_id, spec_id, version_no) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_agent_spec_version.id IS '版本快照编号';
+COMMENT ON COLUMN ai_agent_spec_version.spec_id IS '所属规格编号（聚合根引用）';
+COMMENT ON COLUMN ai_agent_spec_version.version_no IS '版本号（规格内严格递增，1 起；发布后不可变，运行寻址用）';
+COMMENT ON COLUMN ai_agent_spec_version.config IS '全量四层配置快照 JSON（与草稿同构：agent 层/模型调用层/挂载层/执行环境层）；DB 快照为唯一权威源，本地盘仅是物化缓存';
+COMMENT ON COLUMN ai_agent_spec_version.note IS '发布备注';
+COMMENT ON COLUMN ai_agent_spec_version.creator IS '创建者';
+COMMENT ON COLUMN ai_agent_spec_version.create_time IS '创建时间';
+COMMENT ON COLUMN ai_agent_spec_version.updater IS '更新者';
+COMMENT ON COLUMN ai_agent_spec_version.update_time IS '更新时间';
+COMMENT ON COLUMN ai_agent_spec_version.deleted IS '是否删除';
+COMMENT ON COLUMN ai_agent_spec_version.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_agent_spec_version IS 'AI 平台智能体规格版本快照表（不可变：只插不改不删；版本按规格聚合，租户归属继承自规格）';
+
+DROP SEQUENCE IF EXISTS ai_agent_spec_version_seq;
+CREATE SEQUENCE ai_agent_spec_version_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_channel（NexAI 智能体平台：模型渠道 BYOK，工单 03）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_channel_seq;
+DROP TABLE IF EXISTS ai_channel;
+CREATE TABLE ai_channel (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    provider varchar(32) NOT NULL,
+    base_url varchar(512) NOT NULL,
+    api_key varchar(1024) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    owner_type varchar(16) NOT NULL DEFAULT 'tenant',
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_channel ADD CONSTRAINT pk_ai_channel PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_channel.id IS '渠道编号';
+COMMENT ON COLUMN ai_channel.name IS '渠道名称（同一提供商多渠道时用于区分）';
+COMMENT ON COLUMN ai_channel.provider IS '提供商类型编码（ai_channel_provider 字典：openai/openai-compat/dashscope/anthropic/gemini/ollama）';
+COMMENT ON COLUMN ai_channel.base_url IS '端点地址（http/https）';
+COMMENT ON COLUMN ai_channel.api_key IS 'API 密钥（AES 密文落库，EncryptTypeHandler）';
+COMMENT ON COLUMN ai_channel.enabled IS '是否启用';
+COMMENT ON COLUMN ai_channel.owner_type IS '归属维度（platform 平台共享 / tenant 租户 BYOK），MVP 固定 tenant，platform 预留';
+COMMENT ON TABLE ai_channel IS 'AI 平台模型渠道表（租户自带密钥接入模型服务）';
+
+-- ----------------------------
+-- Table structure for ai_model（NexAI 智能体平台：模型元数据，工单 03）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_model_seq;
+DROP TABLE IF EXISTS ai_model;
+CREATE TABLE ai_model (
+    id int8 NOT NULL,
+    channel_id int8 NOT NULL,
+    model_id varchar(128) NOT NULL,
+    name varchar(64) NOT NULL,
+    context_window int4 NULL DEFAULT NULL,
+    input_price numeric(12, 6) NULL DEFAULT NULL,
+    output_price numeric(12, 6) NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_model ADD CONSTRAINT pk_ai_model PRIMARY KEY (id);
+-- 同渠道下模型标识唯一（仅存活行；应用层预校验 + 此索引兜底并发）
+CREATE UNIQUE INDEX uk_ai_model_channel_model ON ai_model (channel_id, model_id) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_model.id IS '模型编号（AgentSpec 引用的 ai_model.id）';
+COMMENT ON COLUMN ai_model.channel_id IS '所属渠道编号（ai_channel.id，Channel 聚合根）';
+COMMENT ON COLUMN ai_model.model_id IS '模型标识（调用时传给提供商的 ID，如 gpt-4o / qwen-plus）';
+COMMENT ON COLUMN ai_model.name IS '显示名';
+COMMENT ON COLUMN ai_model.context_window IS '上下文窗口（tokens），未知为 NULL';
+COMMENT ON COLUMN ai_model.input_price IS '输入单价（元 / 百万 tokens），未定价为 NULL';
+COMMENT ON COLUMN ai_model.output_price IS '输出单价（元 / 百万 tokens），未定价为 NULL';
+COMMENT ON COLUMN ai_model.enabled IS '是否启用';
+COMMENT ON TABLE ai_model IS 'AI 平台模型元数据表（挂接渠道；agentscope 无模型目录发现能力，元数据自管）';
+
+DROP SEQUENCE IF EXISTS ai_channel_seq;
+CREATE SEQUENCE ai_channel_seq
+    START 1;
+
+DROP SEQUENCE IF EXISTS ai_model_seq;
+CREATE SEQUENCE ai_model_seq
     START 1;
