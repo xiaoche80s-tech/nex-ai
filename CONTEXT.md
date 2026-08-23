@@ -36,6 +36,14 @@ _Avoid_: 模型服务、LLM
 平台注册的外部 MCP 服务连接（端点、传输类型、认证、工具白名单），可被 AgentSpec 挂载。
 _Avoid_: MCP 接入、工具服务
 
+**AgentRuntimeGateway（运行时端口）**:
+Session 聚合的领域端口（六边形架构语义）：把「渠道 + 模型 + 版本快照 + 会话寻址」交给运行时，换回事件流。是平台自己的接缝，与 agentscope 框架的 Gateway（多 agent 路由容器）同名不同物。
+_Avoid_: 与 agentscope Gateway 混称、网关（泛称）
+
+**AgentInstanceManager（智能体实例管理器）**:
+Agent 资产侧的运行时组件：按 AgentSpec 惰性构建并常驻 HarnessAgent 实例（懒构建、版本戳失效、引用计数善后），向 agentscope Gateway 注册路由。管实例生死，不管消息路由。
+_Avoid_: agent 池、容器（泛称）、与 AgentRuntimeGateway 混同
+
 ## 治理对象
 
 治理分两级：AgentSpec 为资产侧（版本、发布、权限），Session 为运行侧（审计、配额）。

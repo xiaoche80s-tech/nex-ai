@@ -48,7 +48,7 @@ ADR-0006（2026-08-22 版）的挂载语义——SubagentDeclaration、agent_spa
    - workspace 无沙箱规格：文件六件套存在、`execute` 不存在、种子共享 + 用户文件 COW 落 `<userId>/`；
    - workspace+沙箱规格：文件 + `execute` 存在（**用例 docker 门控**，无 docker 环境跳过）；
    - 通用断言：`agent_spawn` 系与 memory 四件套存在、`web_fetch`/`web_search` 不存在、AGENTS.md 注入内容 = 快照 systemPrompt、记忆按 `<userId>/` 隔离。
-9. **版本基线与并发**：`agentscope-bom:2.0.3-SNAPSHOT`（本地源码 mvn install）不变，API 命名漂移（`maxIters→steps` 信号）由映射层隔离。并发：M1 接受 per-会话装配实例的多实例并发写风险（同 spec 并发会话写同一 MEMORY.md，调试台并发低可容忍），per-spec 常驻实例缓存（官方「单实例服务数千用户」形态）为已知演进方向。
+9. **版本基线与并发**：`agentscope-bom:2.0.3-SNAPSHOT`（本地源码 mvn install）不变，API 命名漂移（`maxIters→steps` 信号）由映射层隔离。并发：M1 接受 per-会话装配实例的多实例并发写风险（同 spec 并发会话写同一 MEMORY.md，调试台并发低可容忍），per-spec 常驻实例缓存（官方单例形态，HarnessAgent javadoc「safe to use as a singleton serving multiple users/sessions concurrently」；机制调研见 `docs/research/research-agentscope-agent-singleton-gateway.md`——memory 写互斥靠 WorkspaceManager 实例内锁，多实例即锁失效，单例常驻是根治）为已知演进方向。
 
 ## 实施补记（2026-08-23，随工单 05 重写二落地）
 
