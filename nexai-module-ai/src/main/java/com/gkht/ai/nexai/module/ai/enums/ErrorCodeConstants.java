@@ -12,4 +12,10 @@ import com.gkht.ai.nexai.framework.common.exception.ErrorCode;
  */
 public interface ErrorCodeConstants {
 
+    // ========== 智能体规格 AGENT_SPEC 1-022-004-000 ==========
+    ErrorCode AGENT_SPEC_CODE_DUPLICATE = new ErrorCode(1_022_004_004, "同归属层级下业务编码已存在：{}");
+    ErrorCode AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED = new ErrorCode(1_022_004_006, "MVP 仅支持租户级（TENANT）与用户级（USER）归属，平台级后置开放");
+    ErrorCode AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED = new ErrorCode(1_022_004_007, "用户级规格必须登录后创建（归属用户取当前登录态）");
+    ErrorCode AGENT_SPEC_CONFIG_INVALID = new ErrorCode(1_022_004_008, "规格配置校验失败：{}");
+
 }

@@ -1,0 +1,101 @@
+import request from '@/config/axios'
+
+/** 模型调用参数（与 agentscope GenerateOptions 同名同义） */
+export interface GenerateOptions {
+  temperature: number | null
+  topP: number | null
+  maxTokens: number | null
+}
+
+/** MCP 服务挂载（服务 + 工具白名单，编辑面后置） */
+export interface McpServerMount {
+  serverId: number
+  /** 空 = 该服务全部工具 */
+  allowedTools?: string[]
+}
+
+/** 执行能力（仅沙箱模式可选） */
+export type ExecutionCapability = 'SHELL' | 'PYTHON' | 'NODE'
+
+/** 执行环境配置（workspace / 沙箱 / 执行能力，随版本快照固化） */
+export interface ExecutionEnv {
+  workspaceEnabled: boolean
+  sandboxEnabled: boolean
+  capabilities: ExecutionCapability[]
+}
+
+/** 智能体规格配置（草稿与版本快照共用，按 agentscope「三层 + 执行环境层」分组） */
+export interface AgentSpecConfig {
+  // —— agent 层 ——
+  modelId: number | null
+  /** 自描述（列表展示用） */
+  description: string | null
+  systemPrompt: string | null
+  /** 推理参数：最大迭代轮数，null 表示运行时取默认 */
+  maxIters: number | null
+  // —— 模型调用层 ——
+  generateOptions: GenerateOptions | null
+  // —— 挂载层（编辑面后置）——
+  skillIds?: number[]
+  mcpServers?: McpServerMount[]
+  // —— 执行环境层 ——
+  /** null 表示全关（纯对话智能体） */
+  executionEnv?: ExecutionEnv | null
+}
+
+/** 归属层级（MVP 开放 TENANT/USER，平台级后置） */
+export type OwnerLevel = 'TENANT' | 'USER'
+
+/** 智能体规格列表项（对应后端 AgentSpecDTO） */
+export interface AgentSpecVO {
+  id: number
+  name: string
+  /** 业务编码（创建后不可变） */
+  specCode: string
+  /** 归属层级 */
+  ownerLevel: string
+  /** 归属用户编号（用户级 = 创建者） */
+  ownerUserId: number | null
+  /** 描述（服务端从草稿 JSON 解析填充） */
+  description: string | null
+  icon: string | null
+  /** 是否有未发布草稿（当前无发布能力时恒为草稿态） */
+  hasDraft: boolean
+  createTime: Date
+}
+
+/** 规格分页查询参数 */
+export interface AgentSpecPageParams extends PageParam {
+  name?: string
+  specCode?: string
+}
+
+/** 规格创建表单。调用参数平铺，提交时由服务端组装为分层结构 */
+export interface AgentSpecCreateForm {
+  name: string
+  /** 创建后不可变 */
+  specCode: string
+  /** 默认租户级；创建后不可变 */
+  ownerLevel?: OwnerLevel
+  icon?: string
+  modelId?: number
+  description?: string
+  systemPrompt?: string
+  maxIters?: number
+  temperature?: number
+  topP?: number
+  maxTokens?: number
+  workspaceEnabled?: boolean
+  sandboxEnabled?: boolean
+  capabilities?: ExecutionCapability[]
+}
+
+// 创建规格（携带首个草稿）
+export const createSpec = (data: AgentSpecCreateForm) => {
+  return request.post({ url: '/ai/spec/create', data })
+}
+
+// 查询规格分页
+export const getSpecPage = (params: AgentSpecPageParams) => {
+  return request.get({ url: '/ai/spec/page', params })
+}
