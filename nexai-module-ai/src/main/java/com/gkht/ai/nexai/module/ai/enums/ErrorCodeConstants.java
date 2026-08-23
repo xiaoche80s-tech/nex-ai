@@ -26,7 +26,7 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_004_001, "规格当前没有可发布的草稿，请先编辑生成新草稿");
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_002, "规格版本不存在");
     ErrorCode AGENT_SPEC_SELF_MOUNTING_REJECTED = new ErrorCode(1_022_004_003, "规格不能把自己挂载为子智能体");
-    ErrorCode AGENT_SPEC_CODE_DUPLICATE = new ErrorCode(1_022_004_004, "同归属层级下业务编码已存在：{0}");
+    ErrorCode AGENT_SPEC_CODE_DUPLICATE = new ErrorCode(1_022_004_004, "同归属层级下业务编码已存在：{}");
     ErrorCode AGENT_SPEC_EDIT_FORBIDDEN = new ErrorCode(1_022_004_005, "用户级规格仅归属用户可操作");
     ErrorCode AGENT_SPEC_OWNER_LEVEL_UNSUPPORTED = new ErrorCode(1_022_004_006, "M1 仅支持租户级（TENANT）与用户级（USER）归属，平台级 M2+ 开放");
     ErrorCode AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED = new ErrorCode(1_022_004_007, "用户级规格必须登录后创建（归属用户取当前登录态）");
@@ -40,8 +40,8 @@ public interface ErrorCodeConstants {
 
     // ========== 技能 SKILL 1-022-006-000 ==========
     ErrorCode SKILL_NOT_EXISTS = new ErrorCode(1_022_006_000, "技能不存在");
-    ErrorCode SKILL_MD_INVALID = new ErrorCode(1_022_006_001, "SKILL.md 校验失败：{0}");
-    ErrorCode SKILL_NAME_DUPLICATE = new ErrorCode(1_022_006_002, "同名技能已存在：{0}");
+    ErrorCode SKILL_MD_INVALID = new ErrorCode(1_022_006_001, "SKILL.md 校验失败：{}");
+    ErrorCode SKILL_NAME_DUPLICATE = new ErrorCode(1_022_006_002, "同名技能已存在：{}");
     ErrorCode SKILL_PUBLISH_WITHOUT_DRAFT = new ErrorCode(1_022_006_003, "技能当前没有可发布的草稿，请先编辑生成新草稿");
     ErrorCode SKILL_VERSION_NOT_EXISTS = new ErrorCode(1_022_006_004, "技能版本不存在");
 

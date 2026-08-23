@@ -382,7 +382,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
 
         // 同租户级同编码重复
         assertServiceException(() -> agentSpecController.createSpec(createCommand(modelId)),
-                AGENT_SPEC_CODE_DUPLICATE);
+                AGENT_SPEC_CODE_DUPLICATE, "customer-service");
         // 用户级与租户级同编码不冲突（层级隔离）
         AgentSpecCreateCommand userLevel = createCommand(modelId);
         userLevel.setOwnerLevel("USER");
@@ -394,7 +394,7 @@ public class AgentSpecControllerTest extends BaseDbAndRedisUnitTest {
         Long anotherSpecId = agentSpecService.createSpec(userLevelDup, 8L);
         assertNotNull(anotherSpecId);
         assertServiceException(() -> agentSpecService.createSpec(createCommand(modelId), 7L),
-                AGENT_SPEC_CODE_DUPLICATE);
+                AGENT_SPEC_CODE_DUPLICATE, "customer-service");
     }
 
     @Test

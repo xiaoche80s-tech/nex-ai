@@ -49,7 +49,21 @@ public class AiRuntimeProperties {
         }
 
         public void setRoot(Path root) {
-            this.root = root;
+            this.root = expandHome(root);
+        }
+
+        /**
+         * 展开起始 {@code ~} 段为用户主目录——yaml 中 {@code ~/...} 是自然写法，
+         * 但 Path 属性不会自动展开（落成进程工作目录下的字面 ~ 目录）
+         */
+        private static Path expandHome(Path path) {
+            if (path == null || path.isAbsolute() || path.getNameCount() == 0
+                    || !"~".equals(path.getName(0).toString())) {
+                return path;
+            }
+            Path home = Path.of(System.getProperty("user.home"));
+            return path.getNameCount() == 1 ? home
+                    : home.resolve(path.subpath(1, path.getNameCount()));
         }
 
     }

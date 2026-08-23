@@ -267,10 +267,12 @@ nexai:
     runtime: # 智能体运行时装配（ADR-0007）：环境事实，不进规格版本快照
       workspace:
         root: ~/.agentscope/nexai/workspace # per-spec 常驻 workspace 根目录（归属层级布局挂其下，目录不删除）
-      sandbox:
-        images: # 沙箱能力组合 → 镜像（key 为能力组合如 shell/python/python-shell，或 default 兜底；未配置用内置默认表）
-#          default: ubuntu:22.04
-#          python: python:3.12-slim
+      # 沙箱能力组合 → 镜像映射可选配置（key 为组合如 shell/python/python-shell 或 default 兜底；
+      # 不配置时用内置默认表。注意：键须带至少一个真实条目，显式空值（images:/images: {}）
+      # 会触发 Spring Boot 对 Map 属性的空字面量绑定失败）
+      # sandbox:
+      #   images:
+      #     python: python:3.12-slim
   web:
     admin-ui:
       url: http://dashboard.nexai.iocoder.cn # Admin 管理后台 UI 的地址
