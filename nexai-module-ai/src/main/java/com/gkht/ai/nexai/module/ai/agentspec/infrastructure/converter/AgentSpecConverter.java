@@ -171,18 +171,20 @@ public interface AgentSpecConverter {
         private String source;
         private Long sourceId;
         private List<String> allowedTools;
+        private List<String> sensitiveTools;
 
         static ToolMountJSON from(ToolMount mount) {
             ToolMountJSON json = new ToolMountJSON();
             json.setSource(mount.getSource().name());
             json.setSourceId(mount.getSourceId());
             json.setAllowedTools(mount.getAllowedTools());
+            json.setSensitiveTools(mount.getSensitiveTools());
             return json;
         }
 
         ToolMount toDomain() {
             return ToolMount.of(source == null ? null : ToolSource.valueOf(source),
-                    sourceId, allowedTools);
+                    sourceId, allowedTools, sensitiveTools);
         }
 
     }

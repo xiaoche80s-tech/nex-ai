@@ -117,7 +117,8 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     private ToolMount toMount(ToolMountCommand mountCommand) {
         return ToolMount.of(ToolSource.valueOf(mountCommand.getSource()),
-                mountCommand.getSourceId(), mountCommand.getAllowedTools());
+                mountCommand.getSourceId(), mountCommand.getAllowedTools(),
+                mountCommand.getSensitiveTools());
     }
 
 }

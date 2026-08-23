@@ -29,4 +29,8 @@ public class ToolMountCommand {
     @Size(max = 128, message = "工具白名单不能超过 128 项")
     private List<String> allowedTools;
 
+    @Schema(description = "敏感工具名单（工具名）：名单内工具调用前挂起等人工审批（HITL）；白名单非空时须为其子集", example = "[\"delete_user\"]")
+    @Size(max = 128, message = "敏感工具名单不能超过 128 项")
+    private List<String> sensitiveTools;
+
 }

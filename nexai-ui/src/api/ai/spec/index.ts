@@ -10,13 +10,15 @@ export interface GenerateOptions {
 /** 工具来源（MCP = MCP Server；PLATFORM = 平台工具库 @Tool 业务工具；内置工具随执行环境启用不走挂载） */
 export type ToolSource = 'MCP' | 'PLATFORM'
 
-/** 工具挂载（来源 + 引用 + 可选白名单，编辑面后置） */
+/** 工具挂载（来源 + 引用 + 放行面 + 敏感面，编辑面后置） */
 export interface ToolMount {
   source: ToolSource
   /** MCP = MCP Server 编号；PLATFORM = 平台工具库条目编号 */
   sourceId: number
-  /** 空 = 该来源全部工具 */
+  /** 放行面：空 = 该来源全部工具 */
   allowedTools?: string[]
+  /** 敏感面：名单内工具调用前挂起等人工审批（HITL）；allowedTools 非空时须为其子集 */
+  sensitiveTools?: string[]
 }
 
 /** 执行能力（仅沙箱模式可选） */

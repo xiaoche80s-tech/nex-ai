@@ -68,26 +68,44 @@ class AgentSpecConfigTest {
         assertEquals(List.of(), config.getTools());
 
         IllegalArgumentException noSource = assertThrows(IllegalArgumentException.class,
-                () -> ToolMount.of(null, 1L, List.of("search")));
+                () -> ToolMount.of(null, 1L, List.of("search"), null));
         assertEquals("工具挂载必须声明来源", noSource.getMessage());
 
         IllegalArgumentException noRef = assertThrows(IllegalArgumentException.class,
-                () -> ToolMount.of(ToolSource.MCP, null, List.of("search")));
+                () -> ToolMount.of(ToolSource.MCP, null, List.of("search"), null));
         assertEquals("工具挂载必须携带来源条目编号", noRef.getMessage());
+    }
+
+    @Test
+    @DisplayName("挂载层：敏感工具名单空白/重复被拒绝；白名单非空时敏感名单须为其子集")
+    void validatesSensitiveTools() {
+        IllegalArgumentException duplicate = assertThrows(IllegalArgumentException.class,
+                () -> ToolMount.of(ToolSource.MCP, 1L, null, List.of("del", "del")));
+        assertEquals("敏感工具名单不能含空白或重复项且最多 128 项", duplicate.getMessage());
+
+        IllegalArgumentException notSubset = assertThrows(IllegalArgumentException.class,
+                () -> ToolMount.of(ToolSource.MCP, 1L, List.of("search"), List.of("delete_user")));
+        assertEquals("敏感工具必须在白名单内（标了审批的工具须先在放行面内）", notSubset.getMessage());
+
+        // 白名单为空 = 放行全部，敏感名单允许列任意工具（全集运行时才知道，无法静态校验子集）
+        assertDoesNotThrow(() -> ToolMount.of(ToolSource.MCP, 1L, null, List.of("delete_user")));
+        // 敏感工具在放行面内：合法
+        assertDoesNotThrow(() -> ToolMount.of(ToolSource.PLATFORM, 2L,
+                List.of("search", "delete_user"), List.of("delete_user")));
     }
 
     @Test
     @DisplayName("挂载层：同一工具来源条目重复挂载被拒绝；跨来源同编号可共存")
     void rejectsDuplicateToolMount() {
-        ToolMount mcpOne = ToolMount.of(ToolSource.MCP, 1L, List.of("search"));
-        ToolMount mcpDuplicated = ToolMount.of(ToolSource.MCP, 1L, null);
+        ToolMount mcpOne = ToolMount.of(ToolSource.MCP, 1L, List.of("search"), null);
+        ToolMount mcpDuplicated = ToolMount.of(ToolSource.MCP, 1L, null, null);
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> AgentSpecConfig.of(null, null, null, null, null, null,
                         List.of(mcpOne, mcpDuplicated), null));
         assertEquals("同一工具来源条目不能重复挂载", ex.getMessage());
 
         // MCP 与平台工具库是不同来源：同编号不冲突
-        ToolMount platform = ToolMount.of(ToolSource.PLATFORM, 1L, null);
+        ToolMount platform = ToolMount.of(ToolSource.PLATFORM, 1L, null, null);
         assertDoesNotThrow(() -> AgentSpecConfig.of(null, null, null, null, null, null,
                 List.of(mcpOne, platform), null));
     }
