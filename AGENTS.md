@@ -35,6 +35,8 @@ mvn test -pl nexai-module-infra           # 单模块测试
 
 从 `nexai-server` 启动服务端：profile 为 `local`（默认），端口 48080。`application-local.yaml` 指向共享的远端 Postgres/Redis（`1p.inas.club`，账号密码见该文件），因此无需本地数据库。
 
+**构建注意（实测踩坑）**：打 `nexai-server` 的 fat jar 时 `-am` 不可省——省略会从 `~/.m2` 解析旧版业务模块 jar 嵌进 fat jar（症状：新接口 404/501 兜底）。且旧 target 产物存在时 Maven 增量构建可能误判 up-to-date（server 模块 0.2 秒"构建完成"即为信号），改过模块代码后先 `mvn -pl nexai-server clean` 再打包。遇到「NoSuchMethod/找不到类文件/同名类不兼容」等无源码依据的怪编译错误，先 `mvn clean` 重建再排查。
+
 前端（在 `nexai-ui/` 内执行，Node ≥ 20.19，pnpm ≥ 8.6）：
 
 ```bash
@@ -43,6 +45,18 @@ pnpm dev        # vite --mode env.local，端口 5173，请求 http://localhost:
 pnpm ts:check   # vue-tsc 类型检查
 pnpm lint       # eslint + stylelint + prettier 检查模式；lint:eslint / lint:format / lint:style 自动修复
 ```
+
+## 开发流程规则
+
+**用户已确立：每次会话遵循 karpathy-guidelines skill**——先想后写（显式陈述假设）、最小实现（不做投机性设计）、外科手术式修改（每行改动可追溯到需求）、目标驱动验证（先定可验证的成功标准再动手）。
+
+**开发一个新功能前，先查看以下资料是否已有相关实现或调研结论**，避免重复设计与实现：
+
+1. 本仓库 `docs/research/` —— 已完成的技术调研文档。
+2. `/Users/jerry/agent-project/agentscope-java/.qoder/repowiki` —— agentscope-java 框架 wiki（`zh/` 中文文档、`knowledge/` 知识库）。
+3. `/Users/jerry/agent-project/agentscope-java/agentscope-examples` —— agentscope-java 官方示例代码（`agents/`、`agui/`、`documentation/` 等）。
+
+发现相关实现时优先对齐其模式；确认无相关实现后再自行设计。
 
 ## 后端开发约定
 
