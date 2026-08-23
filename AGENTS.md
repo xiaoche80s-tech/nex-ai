@@ -9,7 +9,7 @@
 
 ## 项目概况
 
-NexAI —— 基于 ruoyi-vue-pro（芋道/yudao）fork 并重命名的企业级开发脚手架：groupId `com.gkht.ai`、基础包名 `com.gkht.ai.nexai`、配置前缀 `nexai.*`。本仓库为精简版：仅保留 `system` 与 `infra` 两个业务模块，其余 yudao 模块（bpm、pay、mall、crm 等）已在根 `pom.xml` 中注释。技术栈：Java 25、Spring Boot 4.1、PostgreSQL + MyBatis Plus、Redis + Redisson。管理后台前端位于 `nexai-ui/`（Vue 3 + Vite + TypeScript + Element Plus + UnoCSS，pnpm）。
+NexAI —— 基于 ruoyi-vue-pro（芋道/yudao）fork 并重命名的企业级开发脚手架：groupId `com.gkht.ai`、基础包名 `com.gkht.ai.nexai`、配置前缀 `nexai.*`。本仓库为精简版：业务模块为 `system` 与 `infra`（其余 yudao 模块 bpm、pay、mall、crm 等已在根 `pom.xml` 中注释）；AI 平台模块 `nexai-module-ai` 旧实现因存在问题已被整体移除，**正在重新开发**（见目录结构与构建注意）。技术栈：Java 25、Spring Boot 4.1、PostgreSQL + MyBatis Plus、Redis + Redisson。管理后台前端位于 `nexai-ui/`（Vue 3 + Vite + TypeScript + Element Plus + UnoCSS，pnpm）。
 
 本工作区是 git 仓库，远程为 `origin` → https://github.com/xiaoche80s-tech/nex-ai （main 分支）。注意：`application-local.yaml`（含真实凭据）已被 `.gitignore` 排除，克隆者需从 `application-local-example.yaml` 复制并填写。
 
@@ -18,6 +18,7 @@ NexAI —— 基于 ruoyi-vue-pro（芋道/yudao）fork 并重命名的企业级
 - `nexai-dependencies/` —— Maven BOM；所有第三方版本统一在此管理。
 - `nexai-framework/` —— 自研 Spring Boot Starter（`nexai-common` 提供共享的 `CommonResult`/`PageResult`、错误码体系、工具类；`nexai-spring-boot-starter-*` 覆盖 web、security、mybatis、redis、tenant、test 等）。
 - `nexai-module-system/`、`nexai-module-infra/` —— 业务模块。
+- `nexai-module-ai/` —— AI 平台模块（agent 规格/skill/模型/会话调试等聚合，DDD 布局，agentscope 接入），**重新开发中，当前不存在**。旧实现在提交 b2ab4a9 中被有意整体删除（连同前端页面 `nexai-ui/src/views/ai/`）；`docs/research/` 下的 agentscope 调研结论仍是有效输入。
 - `nexai-server/` —— 装配应用；在此启动 `NexaiServerApplication`。
 - `nexai-ui/` —— 前端 SPA。
 - `sql/postgresql/` —— 完整数据库初始化脚本 `ruoyi-vue-pro.sql` 与 `quartz.sql`（另有 `sql/mysql/`、`sql/dm/` 变体）。
@@ -35,7 +36,7 @@ mvn test -pl nexai-module-infra           # 单模块测试
 
 从 `nexai-server` 启动服务端：profile 为 `local`（默认），端口 48080。`application-local.yaml` 指向共享的远端 Postgres/Redis（`1p.inas.club`，账号密码见该文件），因此无需本地数据库。
 
-**构建注意（实测踩坑）**：打 `nexai-server` 的 fat jar 时 `-am` 不可省——省略会从 `~/.m2` 解析旧版业务模块 jar 嵌进 fat jar（症状：新接口 404/501 兜底）。且旧 target 产物存在时 Maven 增量构建可能误判 up-to-date（server 模块 0.2 秒"构建完成"即为信号），改过模块代码后先 `mvn -pl nexai-server clean` 再打包。遇到「NoSuchMethod/找不到类文件/同名类不兼容」等无源码依据的怪编译错误，先 `mvn clean` 重建再排查。
+**构建注意（实测踩坑）**：`nexai-module-ai` 重新开发落地新 pom 时，需放开根 `pom.xml` 中被注释的 `<module>` 登记、并在 `nexai-server` 的 pom 添加依赖——缺任一处该模块不参与构建/装配（用 `mvn validate` 快速确认）。其余已知坑：打 `nexai-server` 的 fat jar 时 `-am` 不可省——省略会从 `~/.m2` 解析旧版业务模块 jar 嵌进 fat jar（症状：新接口 404/501 兜底）。且旧 target 产物存在时 Maven 增量构建可能误判 up-to-date（server 模块 0.2 秒"构建完成"即为信号），改过模块代码后先 `mvn -pl nexai-server clean` 再打包。遇到「NoSuchMethod/找不到类文件/同名类不兼容」等无源码依据的怪编译错误，先 `mvn clean` 重建再排查。
 
 前端（在 `nexai-ui/` 内执行，Node ≥ 20.19，pnpm ≥ 8.6）：
 
@@ -122,7 +123,7 @@ framework/                       # 模块内 Spring 配置
 - 逻辑删除通过 `deleted` 字段：1 = 已删除，0 = 存活。
 - Lombok + MapStruct 注解处理器在根 pom 的 `annotationProcessorPaths` 中装配（含 `lombok-mapstruct-binding`）；新增处理器需修改该列表。
 - 禁止使用 BeanUtils 做对象转换（Spring `BeanUtils`、Apache `BeanUtils`、hutool `BeanUtil`，以及 `nexai-common` 封装的 `BeanUtils.toBean()` 等运行时反射拷贝均含）：同名异义字段会静默错配且无法在编译期暴露。新写代码一律用 MapStruct 编译期生成——DDD 模块放 `{aggregate}/infrastructure/converter/`，存量模块放 `convert/`；存量代码不做专项迁移，仅当改动到某处转换时顺手替换为 MapStruct。
-- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。两个例外：① DDD 的 domain 层用纯 JUnit 直接构造实体测试，不继承任何基类；② **用户已确立**：依赖 PG 专属能力（agentscope 状态存储、PG 方言 DDL）的运行时链路测试经 `nexai-module-ai` 测试源集的 `BasePgDbAndRedisUnitTest`（profile `pg-test`）直连真实 PostgreSQL（连接信息 `application-pg-test.yaml`，环境变量可覆盖；测试数据落专用租户、按租户清理）。
+- 单元测试继承 `nexai-spring-boot-starter-test` 中的基类：`BaseDbUnitTest`（H2 内存库，profile `unit-test`，每个测试后清理 DB）、`BaseDbAndRedisUnitTest`、`BaseRedisUnitTest`、`BaseMockitoUnitTest`。DB 类测试无需外部服务。两个例外：① DDD 的 domain 层用纯 JUnit 直接构造实体测试，不继承任何基类；② **用户已确立**：依赖 PG 专属能力（agentscope 状态存储、PG 方言 DDL）的运行时链路测试经 `nexai-module-ai` 测试源集的 `BasePgDbAndRedisUnitTest`（profile `pg-test`）直连真实 PostgreSQL（连接信息 `application-pg-test.yaml`，环境变量可覆盖；测试数据落专用租户、按租户清理）——该基类随旧实现一并移除，`nexai-module-ai` 重新开发时此约定应随新模块重建。
 
 ### 存量芋道分层（维护 system/infra 时遵循）
 
