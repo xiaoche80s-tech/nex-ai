@@ -56,3 +56,5 @@ application-local.yaml
 /nexai-ui-app/unpackage/
 .DS_Store
 **/.DS_Store
+# agentscope 运行时本地产物（workspace/状态/技能物化缓存）
+.agentscope/

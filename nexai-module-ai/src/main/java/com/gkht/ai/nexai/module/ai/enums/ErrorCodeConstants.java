@@ -32,4 +32,16 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_012, "目标版本不存在");
     ErrorCode AGENT_SPEC_VERSION_CONFLICT = new ErrorCode(1_022_004_013, "版本发布冲突，请重试");
 
+    // ========== 会话 SESSION 1-022-005-000 ==========
+    ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");
+    ErrorCode SESSION_ASSEMBLE_INVALID = new ErrorCode(1_022_005_001, "会话装配失败：{}");
+    ErrorCode SESSION_ASKING_CONFIRM_REQUIRED = new ErrorCode(1_022_005_002, "会话挂起中，请先完成工具审批");
+
+    // ========== Skill 资产 SKILL 1-022-006-000 ==========
+    ErrorCode SKILL_NOT_EXISTS = new ErrorCode(1_022_006_000, "Skill 不存在");
+    ErrorCode SKILL_NAME_DUPLICATE = new ErrorCode(1_022_006_001, "同归属下技能名称已存在：{}");
+    ErrorCode SKILL_OWNER_LEVEL_UNSUPPORTED = new ErrorCode(1_022_006_002, "MVP 仅支持租户级（TENANT）与用户级（USER）Skill，平台级后置开放");
+    ErrorCode SKILL_CONFIG_INVALID = new ErrorCode(1_022_006_003, "Skill 配置校验失败：{}");
+    ErrorCode SKILL_TENANT_CONTEXT_MISSING = new ErrorCode(1_022_006_004, "租户上下文缺失，无法物化 Skill");
+
 }

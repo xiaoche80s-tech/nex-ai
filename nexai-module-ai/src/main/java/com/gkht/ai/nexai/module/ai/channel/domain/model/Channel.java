@@ -39,9 +39,12 @@ public class Channel {
     private ChannelOwnerType ownerType;
     /** 创建时间，由持久化填充，新建时为 null */
     private LocalDateTime createTime;
+    /** 更新时间，由持久化填充，新建时为 null；参与常驻实例版本戳（工单 08：渠道配置变更即失效重建） */
+    private LocalDateTime updateTime;
 
     private Channel(Long id, String name, ChannelProvider provider, String baseUrl, String apiKey,
-                    boolean enabled, ChannelOwnerType ownerType, LocalDateTime createTime) {
+                    boolean enabled, ChannelOwnerType ownerType, LocalDateTime createTime,
+                    LocalDateTime updateTime) {
         this.id = id;
         this.name = name;
         this.provider = provider;
@@ -50,6 +53,7 @@ public class Channel {
         this.enabled = enabled;
         this.ownerType = ownerType;
         this.createTime = createTime;
+        this.updateTime = updateTime;
     }
 
     /**
@@ -68,7 +72,7 @@ public class Channel {
             throw new IllegalArgumentException("渠道归属维度不能为空");
         }
         return new Channel(null, name.strip(), provider, baseUrl.strip(),
-                normalizeApiKey(apiKey), true, ownerType, null);
+                normalizeApiKey(apiKey), true, ownerType, null, null);
     }
 
     /**
@@ -76,8 +80,9 @@ public class Channel {
      */
     public static Channel reconstitute(Long id, String name, ChannelProvider provider, String baseUrl,
                                        String apiKey, boolean enabled, ChannelOwnerType ownerType,
-                                       LocalDateTime createTime) {
-        return new Channel(id, name, provider, baseUrl, apiKey, enabled, ownerType, createTime);
+                                       LocalDateTime createTime, LocalDateTime updateTime) {
+        return new Channel(id, name, provider, baseUrl, apiKey, enabled, ownerType,
+                createTime, updateTime);
     }
 
     /**
@@ -180,6 +185,11 @@ public class Channel {
 
     public LocalDateTime getCreateTime() {
         return createTime;
+    }
+
+    /** 更新时间（参与常驻实例版本戳），新建时为 null */
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
     }
 
     @Override

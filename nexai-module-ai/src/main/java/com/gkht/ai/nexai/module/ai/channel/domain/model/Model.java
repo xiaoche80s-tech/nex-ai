@@ -35,10 +35,12 @@ public class Model {
     private boolean enabled;
     /** 创建时间，由持久化填充，新建时为 null */
     private LocalDateTime createTime;
+    /** 更新时间，由持久化填充，新建时为 null；参与常驻实例版本戳（工单 08：模型配置变更即失效重建） */
+    private LocalDateTime updateTime;
 
     private Model(Long id, Long channelId, String modelId, String name, Integer contextWindow,
                   BigDecimal inputPrice, BigDecimal outputPrice, boolean enabled,
-                  LocalDateTime createTime) {
+                  LocalDateTime createTime, LocalDateTime updateTime) {
         this.id = id;
         this.channelId = channelId;
         this.modelId = modelId;
@@ -48,6 +50,7 @@ public class Model {
         this.outputPrice = outputPrice;
         this.enabled = enabled;
         this.createTime = createTime;
+        this.updateTime = updateTime;
     }
 
     /**
@@ -64,7 +67,7 @@ public class Model {
                                BigDecimal inputPrice, BigDecimal outputPrice) {
         validate(channelId, modelId, name, contextWindow, inputPrice, outputPrice);
         return new Model(null, channelId, modelId.strip(), name.strip(), contextWindow,
-                inputPrice, outputPrice, true, null);
+                inputPrice, outputPrice, true, null, null);
     }
 
     /**
@@ -73,9 +76,9 @@ public class Model {
     public static Model reconstitute(Long id, Long channelId, String modelId, String name,
                                      Integer contextWindow, BigDecimal inputPrice,
                                      BigDecimal outputPrice, boolean enabled,
-                                     LocalDateTime createTime) {
+                                     LocalDateTime createTime, LocalDateTime updateTime) {
         return new Model(id, channelId, modelId, name, contextWindow, inputPrice, outputPrice,
-                enabled, createTime);
+                enabled, createTime, updateTime);
     }
 
     /**
@@ -171,6 +174,11 @@ public class Model {
 
     public LocalDateTime getCreateTime() {
         return createTime;
+    }
+
+    /** 更新时间（参与常驻实例版本戳），新建时为 null */
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
     }
 
 }

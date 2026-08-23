@@ -77,7 +77,7 @@ public class ChannelRepositoryImpl implements ChannelRepository {
                 dataObject.getChannelId(), dataObject.getModelId(), dataObject.getName(),
                 dataObject.getContextWindow(), dataObject.getInputPrice(),
                 dataObject.getOutputPrice(), Boolean.TRUE.equals(dataObject.getEnabled()),
-                dataObject.getCreateTime());
+                dataObject.getCreateTime(), dataObject.getUpdateTime());
     }
 
     @Override
@@ -96,7 +96,7 @@ public class ChannelRepositoryImpl implements ChannelRepository {
         return Channel.reconstitute(dataObject.getId(), dataObject.getName(), provider,
                 dataObject.getBaseUrl(), dataObject.getApiKey(),
                 Boolean.TRUE.equals(dataObject.getEnabled()), ownerType,
-                dataObject.getCreateTime());
+                dataObject.getCreateTime(), dataObject.getUpdateTime());
     }
 
 }
