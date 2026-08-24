@@ -120,6 +120,10 @@ export interface AgentSpecCreateForm {
   temperature?: number
   topP?: number
   maxTokens?: number
+  /** 挂载层：技能引用（随版本快照固化，发布后生效） */
+  skillIds?: number[]
+  /** 挂载层：工具挂载（MCP Server / 平台工具库，随版本快照固化） */
+  tools?: ToolMount[]
   workspaceEnabled?: boolean
   sandboxEnabled?: boolean
   capabilities?: ExecutionCapability[]

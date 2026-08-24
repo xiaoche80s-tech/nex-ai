@@ -144,3 +144,27 @@ CREATE TABLE IF NOT EXISTS ai_skill_version (
 -- 同一 skill 内版本号唯一（并发兜底）
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_skill_version ON ai_skill_version (
     tenant_id, skill_id, version_no) WHERE deleted = 0;
+
+CREATE SEQUENCE IF NOT EXISTS ai_mcp_server_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_mcp_server (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    transport varchar(32) NOT NULL,
+    endpoint varchar(512) NULL DEFAULT NULL,
+    command varchar(255) NULL DEFAULT NULL,
+    args text NULL DEFAULT NULL,
+    env text NULL DEFAULT NULL,
+    headers text NULL DEFAULT NULL,
+    timeout_seconds int4 NULL DEFAULT NULL,
+    allowed_tools text NULL DEFAULT NULL,
+    available_tools text NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    owner_type varchar(16) NOT NULL DEFAULT 'tenant',
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_mcp_server PRIMARY KEY (id)
+);

@@ -11,3 +11,5 @@ DELETE FROM ai_session WHERE tenant_id = 999999;
 
 DELETE FROM ai_skill_version WHERE tenant_id = 999999;
 DELETE FROM ai_skill WHERE tenant_id = 999999;
+
+DELETE FROM ai_mcp_server WHERE tenant_id = 999999;

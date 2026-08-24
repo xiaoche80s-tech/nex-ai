@@ -4,13 +4,21 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory;
 import com.gkht.ai.nexai.module.ai.framework.config.AiRuntimeProperties;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
+import com.gkht.ai.nexai.module.ai.mcpserver.infrastructure.gateway.AgentscopeMcpServerGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType;
+import com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
+import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolEntry;
+import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry;
+import com.gkht.ai.nexai.module.ai.shared.util.RootCauses;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
@@ -23,6 +31,8 @@ import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.permission.PermissionRule;
+import io.agentscope.core.skill.SkillFilter;
+import io.agentscope.core.skill.repository.FileSystemSkillRepository;
 import io.agentscope.core.util.JsonUtils;
 import io.agentscope.extensions.postgresql.PostgresDistributedStore;
 import io.agentscope.harness.agent.DistributedStore;
@@ -31,10 +41,13 @@ import io.agentscope.harness.agent.IsolationScope;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.sandbox.impl.docker.DockerFilesystemSpec;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
+import io.agentscope.core.tool.mcp.McpClientWrapper;
+import io.agentscope.core.tool.Toolkit;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -43,6 +56,8 @@ import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -58,11 +73,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p><b>常驻实例（ADR-0001 沿用）</b>：任何链路不 per-请求新建实例——本类持
  * {@link AgentInstanceManager} 按「规格 + 版本号」缓存 HarnessAgent 实例，装配一次、常驻复用；
- * 版本戳（渠道/模型更新时间 + 规格当前版本号）变化时失效重建（工单 08），旧实例按引用计数善后
- * close。同 (userId, sessionId) 的并发调用由框架槽位门排队（FIFO），不同会话并行。</p>
+ * 版本戳（渠道/模型/MCP Server 更新时间 + 技能挂载指纹 + 规格当前版本号）变化时失效重建
+ * （工单 08/12/13），旧实例按引用计数善后 close（MCP client 一并关闭——框架不级联，平台自管）。
+ * 同 (userId, sessionId) 的并发调用由框架槽位门排队（FIFO），不同会话并行。</p>
  *
  * <p><b>模型注册</b>：{@code ModelRegistry} 为 JVM 级静态表，实例构建时按「租户:渠道:模型」注册
  * 一次；模型/密钥变更经版本戳失效重建时重新注册覆盖（进程内全局生效，重建即刷新）。</p>
+ *
+ * <p><b>挂载翻译（工单 12/13 语义定案）</b>：技能挂载目录 → {@code FileSystemSkillRepository}
+ * + {@code SkillFilter.only}（仅挂载技能对模型可见）；MCP 挂载 → {@code McpClientBuilder}
+ * 三传输注册 + {@code enableTools} 白名单收敛（挂载白名单优先，空则 server 级白名单）；
+ * 平台工具库挂载 → 注册表寻条目注册 + 白名单外工具移除。<b>MCP 不可达/超时为运行性缺失：
+ * 降级跳过该挂载（warn 日志 + {@code MCP_MOUNT_UNAVAILABLE} 语义），智能体照常装配不阻断会话
+ * ——工具缺位由调试台探测与事件流暴露；配置性缺失（server 不存在/停用）已由应用层显式报错。</b></p>
  */
 @Component
 public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
@@ -77,6 +100,10 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     private static final List<String> REMOVED_BUILTIN_TOOLS = List.of("web_fetch", "web_search");
     /** 沙箱缺省镜像（能力映射未配置时的兜底） */
     private static final String DEFAULT_SANDBOX_IMAGE = "ubuntu:22.04";
+    /** 事件载荷错误消息截断长度（调用方错误消息可能携带长响应体） */
+    private static final int ROOT_MESSAGE_MAX_LENGTH = 500;
+    /** MCP 挂载连接超时上限（运行性缺失及时止损，降级跳过不拖死装配） */
+    private static final Duration MCP_CONNECT_TIMEOUT_CAP = Duration.ofSeconds(20);
 
     @Resource
     private AiRuntimeProperties runtimeProperties;
@@ -87,9 +114,13 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     @Resource
     private ChatModelFactory chatModelFactory;
 
-    /** 运行时工具贡献者（测试注入敏感工具/回显工具；生产挂载工单 12/13 经此接线） */
+    /** 运行时工具贡献者（测试注入敏感工具/回显工具的接缝；生产挂载走装配指令翻译） */
     @Resource
     private List<RuntimeToolContributor> runtimeToolContributors = List.of();
+
+    /** 平台工具库注册表（source=PLATFORM 挂载寻址；测试上下文未装配时为 null，挂载降级跳过） */
+    @Autowired(required = false)
+    private PlatformToolRegistry platformToolRegistry;
 
     /** 常驻实例注册表（线程安全；装配一次、常驻复用，版本戳失效重建） */
     private final AgentInstanceManager instanceManager = new AgentInstanceManager();
@@ -236,10 +267,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     /**
      * 按装配指令构建 HarnessAgent（实例管理器回调）。
      * 四层配置逐层翻译：agent 层（模型/系统提示/迭代上限）、模型调用层（GenerateOptions）、
-     * 执行环境层（workspace/沙箱/能力→镜像）、挂载层（敏感名单→permission ASK）。
-     * 模型经 ModelRegistry 按名注册解析（注册一次，重建刷新）。
+     * 执行环境层（workspace/沙箱/能力→镜像）、挂载层（技能目录→文件仓库、敏感名单→permission ASK、
+     * 工具挂载→Toolkit 注册）。模型经 ModelRegistry 按名注册解析（注册一次，重建刷新）。
+     *
+     * @return 装配结果（agent 实例 + 需随实例善后关闭的 MCP client 清单——框架不级联，平台自管）
      */
-    private HarnessAgent assemble(AgentRuntimeConfig config) {
+    private AssembledAgent assemble(AgentRuntimeConfig config) {
         String registryName = registerModel(config);
         HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name(config.getAgentName())
@@ -256,6 +289,21 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         }
         if (config.getGenerateOptions() != null) {
             builder.generateOptions(toAgentscopeOptions(config.getGenerateOptions()));
+        }
+
+        // 技能挂载目录 → 文件仓库 + 名单收敛（工单 12）：仓库按物化基目录读取，
+        // SkillFilter.only 使仅挂载技能对模型可见（目录下其余技能与 workspace/skills 层一并滤除）
+        if (!config.getSkillMounts().isEmpty()) {
+            List<io.agentscope.core.skill.repository.AgentSkillRepository> repositories =
+                    config.getSkillMounts().stream()
+                            .<io.agentscope.core.skill.repository.AgentSkillRepository>map(
+                                    mount -> new FileSystemSkillRepository(
+                                            Path.of(mount.getBaseDir()), false))
+                            .toList();
+            builder.skillRepositories(repositories);
+            List<String> mountedNames = config.getSkillMounts().stream()
+                    .flatMap(mount -> mount.getSkillNames().stream()).distinct().toList();
+            builder.skillFilter(SkillFilter.only(mountedNames.toArray(String[]::new)));
         }
 
         // 敏感工具 → permission ASK（HITL 触发源，工单 09）：名单内工具调用前挂起等人工审批
@@ -300,11 +348,107 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                 log.debug("移除内置工具 {} 失败（可能未注册）：{}", tool, ex.getMessage());
             }
         }
-        // 运行时工具贡献者：装配时注册一次（敏感工具经 permission ASK 规则挂起，HITL 触发源）
+        // 挂载层工具注册（工单 13）：MCP 三传输（白名单收敛）+ 平台工具库条目
+        List<McpClientWrapper> mcpClients = registerMountedTools(agent.getToolkit(), config);
+        // 运行时工具贡献者：装配时注册一次（测试接缝——敏感工具经 permission ASK 规则挂起）
         for (RuntimeToolContributor contributor : runtimeToolContributors) {
             contributor.contribute(agent.getToolkit());
         }
-        return agent;
+        return new AssembledAgent(agent, mcpClients);
+    }
+
+    /**
+     * 工具挂载 → Toolkit 注册（工单 13）：
+     * MCP 挂载经 {@code McpClientBuilder} 三传输建连 + {@code enableTools} 白名单收敛
+     * （挂载白名单优先，空则 server 级白名单，再空 = 全部）；平台工具库挂载经注册表寻条目注册 +
+     * 白名单外工具移除。<b>运行性缺失（MCP 不可达/超时）降级跳过该挂载（warn 日志），装配不阻断；
+     * 返回的 MCP client 清单由实例条目持有，随实例善后关闭。</b>
+     */
+    private List<McpClientWrapper> registerMountedTools(Toolkit toolkit, AgentRuntimeConfig config) {
+        List<McpClientWrapper> mcpClients = new ArrayList<>();
+        for (ToolMount mount : config.getTools()) {
+            if (mount.getSource() == ToolSource.MCP) {
+                registerMcpMount(toolkit, config, mount, mcpClients);
+            } else if (mount.getSource() == ToolSource.PLATFORM) {
+                registerPlatformMount(toolkit, mount);
+            }
+        }
+        return mcpClients;
+    }
+
+    /** MCP 挂载注册：建连失败/超时（运行性缺失）降级跳过 */
+    private void registerMcpMount(Toolkit toolkit, AgentRuntimeConfig config, ToolMount mount,
+                                  List<McpClientWrapper> mcpClients) {
+        McpServer server = config.getMcpServers().stream()
+                .filter(candidate -> candidate.getId().equals(mount.getSourceId()))
+                .findFirst().orElse(null);
+        if (server == null) {
+            // 应用层已做配置性校验，此处防御性跳过（不阻断装配）
+            log.warn("MCP 挂载 {} 未在装配指令中解析出 Server，跳过", mount.getSourceId());
+            return;
+        }
+        McpClientWrapper client = null;
+        try {
+            Duration timeout = connectTimeout(server);
+            client = AgentscopeMcpServerGateway.buildClient(server, timeout).buildSync();
+            // 白名单收敛：挂载白名单优先；空则 server 级白名单；再空（= null）= 该 server 全部工具
+            List<String> enableTools = !mount.getAllowedTools().isEmpty()
+                    ? mount.getAllowedTools()
+                    : !server.getAllowedTools().isEmpty() ? server.getAllowedTools() : null;
+            // registration().apply() 内部完成 initialize + listTools + 过滤注册（阻塞到完成）
+            toolkit.registration().mcpClient(client).enableTools(enableTools).apply();
+            mcpClients.add(client);
+        } catch (Exception ex) {
+            log.warn("MCP 工具挂载不可用，降级跳过（server={}, sourceId={}）：{}",
+                    server.getName(), mount.getSourceId(), rootMessage(ex), ex);
+            closeMcpQuietly(client);
+        }
+    }
+
+    /**
+     * 平台工具库挂载注册：注册表寻条目 → @Tool 注册 → 白名单外工具移除；条目缺失降级跳过。
+     *
+     * <p><b>已知边界</b>：白名单收敛按全局工具名 removeTool——若其他挂载（MCP/另一平台条目）
+     * 提供同名工具且恰在本条目白名单外，会被一并移除。MVP 以 snake_case 工具名的命名空间
+     * 实践规避；彻底隔离（每挂载独立工具组）随 ToolGroupManager 组化收敛后置。</p>
+     */
+    private void registerPlatformMount(Toolkit toolkit, ToolMount mount) {
+        if (platformToolRegistry == null) {
+            log.warn("平台工具库注册表未装配（测试上下文？），挂载 {} 跳过", mount.getSourceId());
+            return;
+        }
+        PlatformToolEntry entry = platformToolRegistry.findById(mount.getSourceId());
+        if (entry == null) {
+            log.warn("平台工具库条目 {} 不存在（部署版本间条目增删？），挂载跳过", mount.getSourceId());
+            return;
+        }
+        toolkit.registerTool(entry.getToolInstance());
+        if (!mount.getAllowedTools().isEmpty()) {
+            for (String toolName : entry.getToolNames()) {
+                if (!mount.getAllowedTools().contains(toolName)) {
+                    try {
+                        toolkit.removeTool(toolName);
+                    } catch (Exception ex) {
+                        log.debug("移除白名单外工具 {} 失败（可能未注册）：{}", toolName, ex.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /** MCP 连接超时：server 自配超时与上限取小（运行性缺失及时止损） */
+    private static Duration connectTimeout(McpServer server) {
+        return RootCauses.minTimeout(server.getTimeoutSeconds(), MCP_CONNECT_TIMEOUT_CAP);
+    }
+
+    private static void closeMcpQuietly(McpClientWrapper client) {
+        if (client != null) {
+            try {
+                client.close();
+            } catch (Exception ex) {
+                log.debug("关闭 MCP client 失败（忽略）：{}", ex.getMessage());
+            }
+        }
     }
 
     /** 渠道/模型 → ModelRegistry 命名注册（租户:渠道:模型），返回注册名 */
@@ -506,14 +650,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     }
 
     private static String rootMessage(Throwable ex) {
-        Throwable current = ex;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        String message = current.getMessage();
-        return message == null || message.isBlank()
-                ? current.getClass().getSimpleName()
-                : current.getClass().getSimpleName() + ": " + message;
+        return RootCauses.rootMessage(ex, ROOT_MESSAGE_MAX_LENGTH);
     }
 
     // ------------------------------------------------------------------
@@ -526,19 +663,22 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     }
 
     /**
-     * 常驻实例条目：agent 实例 + 引用计数 + 版本戳。acquire 递增计数（活动流持有），release
-     * 递减；引用归零且已失效（版本戳变化被替换）时善后 close。close 释放后台资源
-     * （转录镜像排空/TaskRepository/workspace 索引，HarnessAgent#close）。
+     * 常驻实例条目：agent 实例 + 挂载建连的 MCP client + 引用计数 + 版本戳。acquire 递增计数
+     * （活动流持有），release 递减；引用归零且已失效（版本戳变化被替换）时善后 close。
+     * close 释放后台资源（转录镜像排空/TaskRepository/workspace 索引，HarnessAgent#close），
+     * MCP client 框架不级联关闭，由本条目一并善后（工单 13）。
      */
     private static final class InstanceEntry {
         private final HarnessAgent agent;
+        private final List<McpClientWrapper> mcpClients;
         private final String key;
         private final AtomicInteger refs = new AtomicInteger();
         private volatile String stamp;
         private volatile boolean stale;
 
-        InstanceEntry(HarnessAgent agent, String key, String stamp) {
-            this.agent = agent;
+        InstanceEntry(AssembledAgent assembled, String key, String stamp) {
+            this.agent = assembled.agent();
+            this.mcpClients = assembled.mcpClients();
             this.key = key;
             this.stamp = stamp;
         }
@@ -546,6 +686,10 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         HarnessAgent agent() {
             return agent;
         }
+    }
+
+    /** 装配结果：agent 实例 + 需随实例善后关闭的 MCP client 清单 */
+    private record AssembledAgent(HarnessAgent agent, List<McpClientWrapper> mcpClients) {
     }
 
     /**
@@ -556,21 +700,28 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
      * 执行环境不符）由应用层构造不同 specReference，自然回落 per-spec 装配——本管理器
      * 不感知分流细节，只按 specReference 缓存并做版本戳失效。</p>
      *
-     * <p>版本戳 = 渠道更新时间 + 模型更新时间 + 规格当前版本号（三源任一变化即失效）；
-     * 装配指令携带的版本戳与缓存条目比对，不一致时重建新实例（新会话即用新配置），
-     * 旧实例引用归零后 close。</p>
+     * <p>版本戳 = 渠道/模型/MCP Server 更新时间 + 技能挂载指纹（skillId@versionNo）+
+     * 规格引用（任一变化即失效）：渠道/模型配置热更、MCP Server 配置变更、技能推新版本、
+     * 规格发布/切版本，都使下一次调用重建实例（新会话即用新配置，工单 08/12/13）。</p>
      */
     private final class AgentInstanceManager {
 
         private final Map<String, InstanceEntry> instances = new ConcurrentHashMap<>();
 
-        /** 装配指令 → 版本戳（渠道更新时间 + 模型更新时间 + 规格引用），三源任一变化即失效 */
+        /** 装配指令 → 版本戳（渠道/模型/MCP 更新时间 + 技能指纹 + 规格引用），任一变化即失效 */
         private String versionStamp(AgentRuntimeConfig config) {
             long channelStamp = config.getChannel().getUpdateTime() == null
                     ? 0L : config.getChannel().getUpdateTime().hashCode();
             long modelStamp = config.getModel().getUpdateTime() == null
                     ? 0L : config.getModel().getUpdateTime().hashCode();
-            return config.specReference() + ":" + channelStamp + ":" + modelStamp;
+            long mcpStamp = config.getMcpServers().stream()
+                    .mapToLong(server -> server.getUpdateTime() == null
+                            ? 0L : server.getUpdateTime().hashCode()).sum();
+            String skillStamp = config.getSkillMounts().stream()
+                    .map(SkillMountDirectory::getFingerprint)
+                    .reduce("", String::concat);
+            return config.specReference() + ":" + channelStamp + ":" + modelStamp
+                    + ":" + mcpStamp + ":" + skillStamp.hashCode();
         }
 
         /** 获取（或构建）实例并持有引用；调用方必须配对 release */
@@ -627,6 +778,8 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         } catch (Exception ex) {
             log.warn("关闭常驻实例失败：{}", entry.agent.getName(), ex);
         }
+        // MCP client 不随 agent.close 级联关闭（框架边界），平台自管善后
+        entry.mcpClients.forEach(AgentscopeRuntimeGateway::closeMcpQuietly);
     }
 
     private DistributedStore distributedStore() {

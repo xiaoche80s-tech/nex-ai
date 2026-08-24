@@ -7,6 +7,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import com.gkht.ai.nexai.module.ai.channel.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.channel.domain.model.Model;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
 
 import java.util.List;
 
@@ -16,9 +17,14 @@ import java.util.List;
  * 调用参数。由应用层从持久化数据组装，基础设施层消费。
  *
  * <p>快路径/回退分流（工单 08）：常驻实例按 {@code specReference()}（规格 + 版本号）缓存；
- * 版本戳 = 渠道更新时间 + 模型更新时间 + specReference，三源任一变化即失效重建（新会话
- * 即用新配置）。命中缓存的调用复用常驻实例（快路径）；版本号不同自然回落 per-spec 装配
- * （回退）。参数覆盖通道 MVP 未开放，随挂载/技能物化完备后扩展。</p>
+ * 版本戳 = 渠道/模型/MCP Server 更新时间 + 技能挂载指纹 + specReference，任一变化即失效
+ * 重建（新会话即用新配置）。命中缓存的调用复用常驻实例（快路径）；版本号不同自然回落
+ * per-spec 装配（回退）。</p>
+ *
+ * <p>挂载解析（工单 12/13）：应用层把挂载引用解析为「装配就绪」形态传入——技能经
+ * {@link SkillMountDirectory}（幂等物化后的基目录 + 名单 + 版本指纹），MCP Server 经
+ * {@link McpServer} 聚合本体（连接配置直接可用，对齐 Channel/Model 模式）；平台工具库
+ * 条目（source=PLATFORM）由基础设施层经注册表按 sourceId 寻址（代码内声明，无 DB）。</p>
  */
 public final class AgentRuntimeConfig {
 
@@ -52,6 +58,12 @@ public final class AgentRuntimeConfig {
     /** 挂载层：工具挂载列表（MCP/平台工具库，含敏感名单 → permission ASK 翻译源） */
     private final List<ToolMount> tools;
 
+    /** 挂载层：技能挂载目录（物化基目录 + 名单 + 版本指纹），空 = 无技能挂载 */
+    private final List<SkillMountDirectory> skillMounts;
+
+    /** 挂载层：MCP Server 聚合本体（source=MCP 挂载的解析结果，连接配置直接可用），空 = 无 MCP 挂载 */
+    private final List<McpServer> mcpServers;
+
     /** 模型来源：渠道（端点/密钥/提供商）与模型标识 */
     private final Channel channel;
     private final Model model;
@@ -61,6 +73,7 @@ public final class AgentRuntimeConfig {
                                OwnerLevel ownerLevel, Long ownerUserId, String systemPrompt,
                                Integer maxIters, GenerateOptions generateOptions,
                                ExecutionEnvConfig executionEnv, List<ToolMount> tools,
+                               List<SkillMountDirectory> skillMounts, List<McpServer> mcpServers,
                                Channel channel, Model model) {
         this.userId = userId;
         this.sessionKey = sessionKey;
@@ -76,6 +89,8 @@ public final class AgentRuntimeConfig {
         this.generateOptions = generateOptions;
         this.executionEnv = executionEnv;
         this.tools = tools == null ? List.of() : List.copyOf(tools);
+        this.skillMounts = skillMounts == null ? List.of() : List.copyOf(skillMounts);
+        this.mcpServers = mcpServers == null ? List.of() : List.copyOf(mcpServers);
         this.channel = channel;
         this.model = model;
     }
@@ -95,6 +110,9 @@ public final class AgentRuntimeConfig {
      * @param maxIters    迭代上限，可空
      * @param generateOptions 调用参数，可空
      * @param executionEnv 执行环境，可空 = 全关
+     * @param tools       工具挂载列表，可空
+     * @param skillMounts 技能挂载目录列表，可空
+     * @param mcpServers  MCP Server 聚合列表（source=MCP 挂载解析结果），可空
      * @param channel     渠道，不能为 null
      * @param model       模型，不能为 null
      */
@@ -105,6 +123,8 @@ public final class AgentRuntimeConfig {
                                         GenerateOptions generateOptions,
                                         ExecutionEnvConfig executionEnv,
                                         List<ToolMount> tools,
+                                        List<SkillMountDirectory> skillMounts,
+                                        List<McpServer> mcpServers,
                                         Channel channel, Model model) {
         if (userId == null || sessionKey == null || tenantId == null || agentId == null
                 || agentName == null || specId == null || ownerLevel == null
@@ -113,7 +133,7 @@ public final class AgentRuntimeConfig {
         }
         return new AgentRuntimeConfig(userId, sessionKey, tenantId, agentId, agentName, specId,
                 versionNo, ownerLevel, ownerUserId, systemPrompt, maxIters, generateOptions,
-                executionEnv, tools, channel, model);
+                executionEnv, tools, skillMounts, mcpServers, channel, model);
     }
 
     public String getUserId() {
@@ -173,6 +193,16 @@ public final class AgentRuntimeConfig {
     /** 工具挂载列表（含敏感名单），空 = 无挂载 */
     public List<ToolMount> getTools() {
         return tools;
+    }
+
+    /** 技能挂载目录列表，空 = 无技能挂载 */
+    public List<SkillMountDirectory> getSkillMounts() {
+        return skillMounts;
+    }
+
+    /** MCP Server 聚合列表（source=MCP 挂载解析结果），空 = 无 MCP 挂载 */
+    public List<McpServer> getMcpServers() {
+        return mcpServers;
     }
 
     public Channel getChannel() {

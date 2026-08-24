@@ -44,4 +44,10 @@ public interface ErrorCodeConstants {
     ErrorCode SKILL_CONFIG_INVALID = new ErrorCode(1_022_006_003, "Skill 配置校验失败：{}");
     ErrorCode SKILL_TENANT_CONTEXT_MISSING = new ErrorCode(1_022_006_004, "租户上下文缺失，无法物化 Skill");
 
+    // ========== MCP Server 1-022-007-000 ==========
+    ErrorCode MCP_SERVER_NOT_EXISTS = new ErrorCode(1_022_007_000, "MCP Server 不存在");
+    ErrorCode MCP_SERVER_CONFIG_INVALID = new ErrorCode(1_022_007_002, "MCP Server 配置校验失败：{}");
+    ErrorCode MCP_SERVER_TOOLS_WHITELIST_INVALID = new ErrorCode(1_022_007_004, "工具白名单中的工具不在该 Server 最近拉取的工具清单内：{}");
+    ErrorCode MCP_MOUNT_UNAVAILABLE = new ErrorCode(1_022_007_005, "MCP 工具挂载不可用：{}（装配已降级跳过，该来源工具暂不可调用）");
+
 }

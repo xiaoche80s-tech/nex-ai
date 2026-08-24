@@ -43,10 +43,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 运行时网关契约测试（PG 直连，接缝 = ChatModelFactory stub + FakeChatModel）：
  * 覆盖工单 05 的 Mock 模型事件流契约、PG 会话状态持久化（跨轮次上下文恢复）、
- * 以及「无 per-请求实例创建」——同一装配指令的多次调用复用常驻实例（由装配次数断言证明）。
+ * 以及「无 per-请求实例创建」——同一装配指令的多次调用复用常驻实例（由装配次数断言证明）；
+ * 工单 12/13 的挂载翻译（技能物化目录注入 / MCP 降级 / 平台工具库白名单收敛）。
  */
 @Import({AgentscopeRuntimeGateway.class, AiRuntimeProperties.class,
         com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory.class,
+        com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry.class,
+        com.gkht.ai.nexai.module.ai.shared.tool.builtin.SampleEchoTool.class,
         AgentscopeRuntimeGatewayTest.HitlToolConfiguration.class})
 public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
 
@@ -92,6 +95,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
                 ExecutionEnvConfig.disabled(),
                 List.of(),
+                null, null,
                 channel(), model());
     }
 
@@ -102,6 +106,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
                 ExecutionEnvConfig.disabled(),
                 List.of(),
+                null, null,
                 channel(), model());
     }
 
@@ -243,7 +248,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 1L,
                 "contract-agent", "contract-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
-                ExecutionEnvConfig.disabled(), List.of(),
+                ExecutionEnvConfig.disabled(), List.of(), null, null,
                 channelWithTime(LocalDateTime.now()), model());
         runtimeGateway.chat(updated, "q2").collectList().block();
         assertEquals(2, creates.get(), "渠道 updateTime 变化应触发重建（新实例）");
@@ -270,7 +275,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 1L,
                 "contract-agent", "contract-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
-                ExecutionEnvConfig.disabled(), List.of(),
+                ExecutionEnvConfig.disabled(), List.of(), null, null,
                 channel(), modelWithTime(LocalDateTime.now()));
         runtimeGateway.chat(updated, "q2").collectList().block();
         assertEquals(2, creates.get(), "模型 updateTime 变化应触发重建（新实例）");
@@ -300,6 +305,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "你是测试智能体 v2", 5, GenerateOptions.of(0.5, null, null),
                 ExecutionEnvConfig.disabled(),
                 List.of(),
+                null, null,
                 channel(), model());
         runtimeGateway.chat(v2, "q2").collectList().block();
         assertEquals(2, creates.get(), "版本号变化应触发重建（新实例）");
@@ -323,6 +329,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "这是 workspace 智能体的系统提示", 5, null,
                 ExecutionEnvConfig.of(true, false, null),
                 List.of(),
+                null, null,
                 channel(), model());
 
         runtimeGateway.chat(wsConfig, "你好").collectList().block();
@@ -359,6 +366,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "系统提示", 5, null,
                 ExecutionEnvConfig.of(true, false, null),
                 List.of(),
+                null, null,
                 channel(), model());
         runtimeGateway.chat(wsConfig, "你好").collectList().block();
 
@@ -389,6 +397,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
                         1L, List.of("sensitive_op"), List.of("sensitive_op"))),
+                null, null,
                 channel(), model());
 
         // 第一轮：敏感工具被调用 → 事件流应含 REQUIRE_USER_CONFIRM 挂起
@@ -437,6 +446,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
                         1L, List.of("sensitive_op"), List.of("sensitive_op"))),
+                null, null,
                 channel(), model());
 
         List<RuntimeEvent> first = runtimeGateway.chat(hitlConfig, "执行敏感操作").collectList().block();
@@ -458,6 +468,165 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
     private String extractToolCallId(String payload) {
         var node = com.gkht.ai.nexai.framework.common.util.json.JsonUtils.parseTree(payload);
         return node.path("toolCalls").path(0).path("id").asText();
+    }
+
+    // ------------------------------------------------------------------
+    //  工单 12：技能挂载接线（物化目录注入 + 版本指纹失效）
+    // ------------------------------------------------------------------
+
+    /** 构造物化就绪的技能目录（SKILL.md 契约），返回其挂载目录值对象 */
+    private static com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory
+    materializedSkillMount(String skillName, String fingerprint) throws Exception {
+        Path baseDir = Files.createTempDirectory("nexai-skill-test");
+        Path skillDir = baseDir.resolve(skillName);
+        Files.createDirectories(skillDir);
+        Files.writeString(skillDir.resolve("SKILL.md"), """
+                ---
+                name: %s
+                description: %s 处理技能
+                ---
+                # %s
+
+                处理与 %s 相关的请求。
+                """.formatted(skillName, skillName, skillName, skillName));
+        return com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory.of(
+                baseDir.toString(), List.of(skillName), fingerprint);
+    }
+
+    @Test
+    public void testSkillMountContentVisibleToModel() throws Exception {
+        FakeChatModel fake = FakeChatModel.script().reply("收到").build();
+        stubModel(fake);
+        var mount = materializedSkillMount("order-helper", "5@1");
+
+        AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
+                "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(), List.of(mount), null, channel(), model());
+        List<RuntimeEvent> events = runtimeGateway.chat(config, "帮我处理订单").collectList().block();
+
+        assertNotNull(events);
+        assertTrue(events.stream().noneMatch(e -> e.type() == RuntimeEventType.SESSION_ERROR),
+                "技能挂载不应产生错误："
+                        + events.stream().map(RuntimeEvent::type).toList());
+        // 技能内容可被智能体引用：DynamicSkillMiddleware 注入的 available_skills 提示块
+        // 携带挂载技能名与描述（模型可见 = 技能生效）
+        String allText = fake.getReceivedMessages().stream()
+                .flatMap(List::stream)
+                .map(m -> m.getContentBlocks(io.agentscope.core.message.TextBlock.class))
+                .flatMap(List::stream)
+                .map(io.agentscope.core.message.TextBlock::getText)
+                .reduce("", String::concat);
+        assertTrue(allText.contains("order-helper"),
+                "模型上下文应包含挂载技能名（available_skills 注入），实际消息文本：\n" + allText);
+    }
+
+    @Test
+    public void testSkillVersionFingerprintInvalidatesInstance() throws Exception {
+        FakeChatModel fake = FakeChatModel.script().reply("v1").reply("v2").build();
+        AtomicInteger creates = new AtomicInteger();
+        Mockito.when(chatModelFactory.create(Mockito.any(), Mockito.anyString()))
+                .thenAnswer(inv -> {
+                    creates.incrementAndGet();
+                    return fake;
+                });
+
+        // 同 specReference：技能指纹 5@1 → 装配一次
+        String fixedKey = "dbg-skill-fp-" + System.nanoTime();
+        runtimeGateway.chat(AgentRuntimeConfig.of(USER_ID, fixedKey, 1L,
+                "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(), List.of(materializedSkillMount("order-helper", "5@1")), null,
+                channel(), model()), "q1").collectList().block();
+        assertEquals(1, creates.get());
+
+        // 技能推新版本（指纹 5@2）→ 版本戳变化 → 失效重建（新会话即用新技能内容）
+        runtimeGateway.chat(AgentRuntimeConfig.of(USER_ID, fixedKey, 1L,
+                "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(), List.of(materializedSkillMount("order-helper", "5@2")), null,
+                channel(), model()), "q2").collectList().block();
+        assertEquals(2, creates.get(), "技能版本指纹变化应触发重建");
+    }
+
+    // ------------------------------------------------------------------
+    //  工单 13：MCP 挂载（运行性缺失降级）+ 平台工具库（白名单收敛 + 调用生命周期）
+    // ------------------------------------------------------------------
+
+    @Test
+    public void testMcpMountUnavailableDegradesWithoutBreakingSession() {
+        FakeChatModel fake = FakeChatModel.script().reply("降级下仍可对话").build();
+        stubModel(fake);
+        // 指向必然拒绝连接的端点（端口 9 discard 协议，本地连接快速失败）
+        com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer deadServer =
+                com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer.reconstitute(
+                        999L, "dead-mcp",
+                        com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpTransport.STREAMABLE_HTTP,
+                        "http://127.0.0.1:9/mcp", null, List.of(), Map.of(), Map.of(), null,
+                        List.of(), List.of(), true,
+                        com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpOwnerType.TENANT,
+                        null, null);
+
+        AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
+                "mcp-agent", "mcp-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
+                        com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.MCP,
+                        999L, List.of(), List.of())),
+                null, List.of(deadServer), channel(), model());
+
+        List<RuntimeEvent> events = runtimeGateway.chat(config, "你好").collectList().block();
+
+        // 降级语义：MCP 不可达跳过该挂载（warn 日志），会话照常——无 SESSION_ERROR、正常收尾
+        assertNotNull(events);
+        assertTrue(events.stream().noneMatch(e -> e.type() == RuntimeEventType.SESSION_ERROR),
+                "MCP 不可达应降级跳过而非报错："
+                        + events.stream().map(RuntimeEvent::type).toList());
+        assertEquals(RuntimeEventType.AGENT_END, events.get(events.size() - 1).type());
+        assertTrue(events.stream().anyMatch(e -> e.type() == RuntimeEventType.TEXT_BLOCK_DELTA));
+    }
+
+    @Test
+    public void testPlatformToolMountRegistersEchoWithWhitelist() {
+        // 脚本：调用平台工具 echo → 收到回显结果后收尾回复
+        FakeChatModel fake = FakeChatModel.script()
+                .callTool("echo", Map.of("text", "平台回显内容"))
+                .reply("工具调用完成")
+                .build();
+        stubModel(fake);
+        AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
+                "platform-agent", "platform-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
+                        com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
+                        1L, List.of("echo"), List.of())),
+                null, null, channel(), model());
+
+        List<RuntimeEvent> events = runtimeGateway.chat(config, "请调用回显工具").collectList().block();
+
+        // 平台工具经 @Tool 注册进智能体：事件流可见工具调用生命周期（TOOL_CALL_START/END + 结果）
+        assertNotNull(events);
+        assertTrue(events.stream().anyMatch(e -> e.type() == RuntimeEventType.TOOL_CALL_START),
+                "应出现 TOOL_CALL_START");
+        // 工具结果文本经 delta 分片下发（TOOL_RESULT_TEXT_DELTA.delta），聚合后断言回显内容
+        String aggregatedResult = events.stream()
+                .filter(e -> e.type() == RuntimeEventType.TOOL_RESULT_TEXT_DELTA)
+                .map(e -> com.gkht.ai.nexai.framework.common.util.json.JsonUtils
+                        .parseTree(e.payload()).path("delta").asText())
+                .reduce("", String::concat);
+        assertTrue(aggregatedResult.contains("平台回显内容"),
+                "工具结果 delta 聚合应携带回显内容，实际：'" + aggregatedResult + "'，事件流："
+                        + events.stream().map(RuntimeEvent::type).toList());
+
+        // 白名单收敛：allowedTools=[echo] → 模型可见工具面含 echo、不含 echo_upper
+        boolean echoVisible = fake.getReceivedToolSchemas().stream()
+                .flatMap(List::stream)
+                .anyMatch(schema -> "echo".equals(schema.getName()));
+        boolean echoUpperVisible = fake.getReceivedToolSchemas().stream()
+                .flatMap(List::stream)
+                .anyMatch(schema -> "echo_upper".equals(schema.getName()));
+        assertTrue(echoVisible, "白名单内工具 echo 应对模型可见");
+        assertFalse(echoUpperVisible, "白名单外工具 echo_upper 应被收敛移除");
     }
 
     /** 渠道（带 updateTime） */

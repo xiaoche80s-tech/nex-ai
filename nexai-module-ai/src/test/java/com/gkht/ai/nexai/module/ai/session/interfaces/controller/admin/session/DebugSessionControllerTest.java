@@ -3,6 +3,8 @@ package com.gkht.ai.nexai.module.ai.session.interfaces.controller.admin.session;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverterImpl;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
@@ -12,6 +14,10 @@ import com.gkht.ai.nexai.module.ai.channel.domain.model.Model;
 import com.gkht.ai.nexai.module.ai.channel.domain.repository.ChannelRepository;
 import com.gkht.ai.nexai.module.ai.channel.domain.valueobject.ChannelOwnerType;
 import com.gkht.ai.nexai.module.ai.channel.domain.valueobject.ChannelProvider;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.repository.McpServerRepository;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpOwnerType;
+import com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpTransport;
 import com.gkht.ai.nexai.module.ai.session.application.service.SessionService;
 import com.gkht.ai.nexai.module.ai.session.application.service.SessionServiceImpl;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
@@ -22,6 +28,12 @@ import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.converter.SessionConverterImpl;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.mapper.SessionMapper;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.repository.SessionRepositoryImpl;
+import com.gkht.ai.nexai.module.ai.skill.domain.gateway.SkillMaterializationGateway;
+import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
+import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillContent;
+import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillOwnerLevel;
+import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillVersion;
+import com.gkht.ai.nexai.module.ai.skill.domain.repository.SkillRepository;
 import com.gkht.ai.nexai.framework.test.core.ut.BaseDbUnitTest;
 import com.gkht.ai.nexai.module.ai.support.TenantDbTestConfiguration;
 import jakarta.annotation.Resource;
@@ -40,6 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServiceException;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASSEMBLE_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -67,6 +80,9 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
 
     @Resource
     private AgentRuntimeGateway runtimeGateway;
+
+    /** 捕获最近一次 chat 的装配指令（挂载解析断言用，工单 12/13） */
+    static final AtomicReference<AgentRuntimeConfig> LAST_CONFIG = new AtomicReference<>();
 
     @BeforeEach
     public void setUp() {
@@ -132,6 +148,42 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
         assertEquals("DEBUG", dto.getType());
     }
 
+    @Test
+    @DisplayName("挂载解析（工单 12/13）：技能引用物化为目录分组，MCP 挂载解析为聚合本体")
+    public void assembleRuntimeResolvesMounts() {
+        Long id = sessionService.createDebugSession(createCommand(), 1L);
+        var message = new com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand();
+        message.setContent("你好");
+        sessionService.sendDebugMessage(id, message, 1L).collectList().block();
+
+        AgentRuntimeConfig config = LAST_CONFIG.get();
+        assertNotNull(config);
+        // 技能引用 → 物化目录分组（stub 网关返回 /tmp/fake-skills/t1/skills/{name}，父目录分组）
+        assertEquals(1, config.getSkillMounts().size());
+        assertEquals("order-helper", config.getSkillMounts().get(0).getSkillNames().get(0));
+        assertTrue(config.getSkillMounts().get(0).getBaseDir().endsWith("skills"));
+        assertEquals("5@1", config.getSkillMounts().get(0).getFingerprint());
+        // MCP 挂载 → 聚合本体（连接配置直接可用）
+        assertEquals(1, config.getMcpServers().size());
+        assertEquals(7L, config.getMcpServers().get(0).getId());
+        assertEquals("file-tools", config.getMcpServers().get(0).getName());
+    }
+
+    @Test
+    @DisplayName("挂载解析：MCP Server 停用为配置性缺失，装配显式报错（不静默降级）")
+    public void assembleRuntimeRejectsDisabledMcpServer() {
+        try {
+            StubRepositoryConfiguration.MCP_ENABLED.set(Boolean.FALSE);
+            Long id = sessionService.createDebugSession(createCommand(), 1L);
+            var message = new com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand();
+            message.setContent("你好");
+            assertServiceException(() -> sessionService.sendDebugMessage(id, message, 1L)
+                    .collectList().block(), SESSION_ASSEMBLE_INVALID, "挂载的 MCP Server 已停用（file-tools）");
+        } finally {
+            StubRepositoryConfiguration.MCP_ENABLED.set(Boolean.TRUE);
+        }
+    }
+
     /** 创建命令（绑定 stub 规格） */
     private com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand createCommand() {
         var command = new com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand();
@@ -151,9 +203,17 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
         }
     }
 
-    /** 规格/渠道仓储桩（TestConfiguration bean）：返回固定规格与渠道模型，不外呼 DB 业务 */
+    /** 规格/渠道/技能/MCP 仓储桩（TestConfiguration bean）：返回固定聚合与模型，不外呼 DB 业务。
+     *  规格版本快照携带挂载（skillIds=[5] + ToolMount(MCP, 7)），供挂载解析断言。 */
     @TestConfiguration
     static class StubRepositoryConfiguration {
+
+        /** 挂载解析用固定配置：技能引用 5 + MCP Server 挂载 7 */
+        static AgentSpecConfig mountedConfig() {
+            return AgentSpecConfig.of(1L, null, "系统提示", null,
+                    null, List.of(5L),
+                    List.of(ToolMount.of(ToolSource.MCP, 7L, List.of(), List.of())), null);
+        }
 
         @Bean
         public AgentSpecRepository agentSpecRepository() {
@@ -168,10 +228,8 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                     if (!Long.valueOf(1L).equals(id)) {
                         return null;
                     }
-                    AgentSpecConfig config = AgentSpecConfig.of(1L, null, "系统提示", null,
-                            null, List.of(), List.of(), null);
                     return AgentSpec.reconstitute(1L, "测试规格", "test-spec", null,
-                            OwnerLevel.TENANT, null, config, 1, null);
+                            OwnerLevel.TENANT, null, mountedConfig(), 1, null);
                 }
 
                 @Override
@@ -186,10 +244,8 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
 
                 @Override
                 public List<com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion> listVersions(Long specId) {
-                    AgentSpecConfig config = AgentSpecConfig.of(1L, null, "系统提示", null,
-                            null, List.of(), List.of(), null);
                     return List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion
-                            .reconstitute(1L, 1L, 1, config, null, null));
+                            .reconstitute(1L, 1L, 1, mountedConfig(), null, null));
                 }
 
                 @Override
@@ -236,6 +292,91 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 }
             };
         }
+
+        /** 技能仓储桩：编号 5 返回带当前版本（v1）的技能，其余 null */
+        @Bean
+        public SkillRepository skillRepository() {
+            return new SkillRepository() {
+                @Override
+                public Skill findById(Long id) {
+                    return Long.valueOf(5L).equals(id)
+                            ? Skill.reconstitute(5L, "order-helper", "订单技能",
+                                    SkillOwnerLevel.TENANT, null, 1, null)
+                            : null;
+                }
+
+                @Override
+                public List<SkillVersion> listVersions(Long skillId) {
+                    return List.of(SkillVersion.reconstitute(1L, 5L, 1,
+                            SkillContent.of("---\nname: order-helper\ndescription: 订单技能\n---\n# 订单技能",
+                                    null), null, null));
+                }
+
+                // —— 以下桩无关本测试路径 ——
+
+                @Override
+                public Long save(Skill skill) {
+                    return 5L;
+                }
+
+                @Override
+                public Skill findByNameAndOwner(SkillOwnerLevel ownerLevel, Long ownerUserId, String name) {
+                    return null;
+                }
+
+                @Override
+                public void deleteByIdCascade(Long id) {
+                }
+
+                @Override
+                public Long saveVersion(SkillVersion version) {
+                    return 1L;
+                }
+
+                @Override
+                public Integer findMaxVersionNo(Long skillId) {
+                    return 1;
+                }
+
+                @Override
+                public void update(Skill skill) {
+                }
+            };
+        }
+
+        /** 物化网关桩：返回固定物化目录（真实落盘契约由物化网关测试保障） */
+        @Bean
+        public SkillMaterializationGateway skillMaterializationGateway() {
+            return (skill, tenantId, content) -> "/tmp/fake-skills/t" + tenantId + "/skills/" + skill.getName();
+        }
+
+        /** MCP Server 仓储桩：编号 7 返回启用中的 Server（停用态由用例内 flag 切换） */
+        static final AtomicReference<Boolean> MCP_ENABLED = new AtomicReference<>(Boolean.TRUE);
+
+        @Bean
+        public McpServerRepository mcpServerRepository() {
+            return new McpServerRepository() {
+                @Override
+                public McpServer findById(Long id) {
+                    if (!Long.valueOf(7L).equals(id)) {
+                        return null;
+                    }
+                    return McpServer.reconstitute(7L, "file-tools", McpTransport.STREAMABLE_HTTP,
+                            "http://mcp.test.local/mcp", null, List.of(), java.util.Map.of(),
+                            java.util.Map.of(), null, List.of(), List.of(),
+                            Boolean.TRUE.equals(MCP_ENABLED.get()), McpOwnerType.TENANT, null, null);
+                }
+
+                @Override
+                public Long save(McpServer server) {
+                    return 7L;
+                }
+
+                @Override
+                public void deleteById(Long id) {
+                }
+            };
+        }
     }
 
     /** 运行时网关桩：记录 chat 调用参数并返回固定事件流（不外呼 agentscope） */
@@ -250,6 +391,7 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 @Override
                 public Flux<RuntimeEvent> chat(AgentRuntimeConfig config, String content) {
                     lastContent.set(content);
+                    LAST_CONFIG.set(config);
                     return Flux.just(RuntimeEvent.of(RuntimeEventType.AGENT_START,
                                     "{\"type\":\"AGENT_START\"}"),
                             RuntimeEvent.of(RuntimeEventType.TEXT_BLOCK_DELTA,

@@ -11,3 +11,5 @@ DELETE FROM "ai_session";
 
 DELETE FROM "ai_skill_version";
 DELETE FROM "ai_skill";
+
+DELETE FROM "ai_mcp_server";

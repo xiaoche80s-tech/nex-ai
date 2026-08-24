@@ -30,6 +30,8 @@ public class FakeChatModel implements Model {
     /** 收到的消息（断言用） */
     private final List<List<io.agentscope.core.message.Msg>> receivedMessages =
             new CopyOnWriteArrayList<>();
+    /** 每次调用可见的工具 schema（断言白名单收敛用） */
+    private final List<List<ToolSchema>> receivedToolSchemas = new CopyOnWriteArrayList<>();
     private final String modelName;
 
     private FakeChatModel(String modelName, List<Step> script) {
@@ -45,6 +47,7 @@ public class FakeChatModel implements Model {
     public Flux<ChatResponse> stream(List<io.agentscope.core.message.Msg> messages,
                                      List<ToolSchema> tools, GenerateOptions options) {
         receivedMessages.add(List.copyOf(messages));
+        receivedToolSchemas.add(tools == null ? List.of() : List.copyOf(tools));
         int index = scriptIndex();
         if (index >= script.size()) {
             // 脚本耗尽：返回空收尾响应（ReAct 循环的收尾模型调用——工具执行后需再次确认是否结束，
@@ -76,6 +79,11 @@ public class FakeChatModel implements Model {
         return receivedMessages;
     }
 
+    /** 每次调用可见的工具 schema（断言白名单收敛：挂载翻译后模型可见的工具面） */
+    public List<List<ToolSchema>> getReceivedToolSchemas() {
+        return receivedToolSchemas;
+    }
+
     /** 脚本步骤：回复文本（可携带工具调用块） */
     public interface Step {
         ChatResponse toResponse();
@@ -103,6 +111,11 @@ public class FakeChatModel implements Model {
                             .id("call-" + System.nanoTime())
                             .name(toolName)
                             .input(args == null ? Map.of() : args)
+                            // 真实模型的流式 tool call 会携带原始参数 JSON（content），
+                            // ToolValidator 按 content 做 schema 校验——替身需对齐此契约
+                            .content(args == null || args.isEmpty() ? "{}"
+                                    : com.gkht.ai.nexai.framework.common.util.json.JsonUtils
+                                            .toJsonString(args))
                             .build();
             List<ContentBlock> blocks = new ArrayList<>();
             if (text != null && !text.isBlank()) {

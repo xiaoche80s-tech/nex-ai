@@ -3528,6 +3528,13 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6428, 'Skill 创建', 'ai:skill:create', 3, 2, 6426, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6429, 'Skill 更新', 'ai:skill:update', 3, 3, 6426, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6430, 'Skill 删除', 'ai:skill:delete', 3, 4, 6426, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+-- 工单 11：MCP Server 注册管理（BYO-MCP）
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6431, 'MCP Server', '', 2, 4, 6400, 'mcp-server', 'ep:connection', 'ai/mcpserver/index', 'AiMcpServer', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6432, 'MCP Server 查询', 'ai:mcp-server:query', 3, 1, 6431, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6433, 'MCP Server 创建', 'ai:mcp-server:create', 3, 2, 6431, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6434, 'MCP Server 更新', 'ai:mcp-server:update', 3, 3, 6431, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6435, 'MCP Server 删除', 'ai:mcp-server:delete', 3, 4, 6431, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (6436, 'MCP Server 探测', 'ai:mcp-server:probe', 3, 5, 6431, '', '', '', '', 0, '1', '1', '1', '1', '2026-08-23 00:00:00', '1', '2026-08-23 00:00:00', '0');
 COMMIT;
 -- @formatter:on
 
@@ -6148,4 +6155,52 @@ CREATE SEQUENCE ai_channel_seq
 
 DROP SEQUENCE IF EXISTS ai_model_seq;
 CREATE SEQUENCE ai_model_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_mcp_server（NexAI 智能体平台：MCP Server 注册管理 BYO-MCP，工单 11）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_mcp_server_seq;
+DROP TABLE IF EXISTS ai_mcp_server;
+CREATE TABLE ai_mcp_server (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    transport varchar(32) NOT NULL,
+    endpoint varchar(512) NULL DEFAULT NULL,
+    command varchar(255) NULL DEFAULT NULL,
+    args text NULL DEFAULT NULL,
+    env text NULL DEFAULT NULL,
+    headers text NULL DEFAULT NULL,
+    timeout_seconds int4 NULL DEFAULT NULL,
+    allowed_tools text NULL DEFAULT NULL,
+    available_tools text NULL DEFAULT NULL,
+    enabled bool NOT NULL DEFAULT true,
+    owner_type varchar(16) NOT NULL DEFAULT 'tenant',
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_mcp_server ADD CONSTRAINT pk_ai_mcp_server PRIMARY KEY (id);
+
+COMMENT ON COLUMN ai_mcp_server.id IS 'MCP Server 编号';
+COMMENT ON COLUMN ai_mcp_server.name IS '名称（同一租户内区分多个 MCP Server）';
+COMMENT ON COLUMN ai_mcp_server.transport IS '传输类型（STDIO/SSE/STREAMABLE_HTTP，agentscope McpClientBuilder 三传输直用）';
+COMMENT ON COLUMN ai_mcp_server.endpoint IS '端点地址（SSE/STREAMABLE_HTTP 必填 http/https；stdio 为 NULL）';
+COMMENT ON COLUMN ai_mcp_server.command IS '启动命令（STDIO 必填；HTTP 系传输为 NULL）';
+COMMENT ON COLUMN ai_mcp_server.args IS 'stdio 启动参数（JSON 数组）';
+COMMENT ON COLUMN ai_mcp_server.env IS 'stdio 环境变量，凭证走此处（JSON 对象）';
+COMMENT ON COLUMN ai_mcp_server.headers IS '认证头（JSON 对象序列化后 AES 密文落库，EncryptTypeHandler；仅 HTTP 系传输）';
+COMMENT ON COLUMN ai_mcp_server.timeout_seconds IS '请求超时（秒），NULL = 运行时默认';
+COMMENT ON COLUMN ai_mcp_server.allowed_tools IS '工具白名单（JSON 数组，server 级放行面），空 = 全部工具；挂载级 ToolMount.allowedTools 在其上再收敛';
+COMMENT ON COLUMN ai_mcp_server.available_tools IS '最近探测拉取的工具名清单（JSON 数组，信息性缓存；探测成功时回写）';
+COMMENT ON COLUMN ai_mcp_server.enabled IS '是否启用（停用的 Server 被挂载时装配显式报错）';
+COMMENT ON COLUMN ai_mcp_server.owner_type IS '归属维度（platform/tenant，双归属与 Channel 同构），MVP 固定 tenant（BYO-MCP）';
+COMMENT ON TABLE ai_mcp_server IS 'AI 平台 MCP Server 表（租户注册外部工具服务：三传输/认证/工具白名单）';
+
+DROP SEQUENCE IF EXISTS ai_mcp_server_seq;
+CREATE SEQUENCE ai_mcp_server_seq
     START 1;
