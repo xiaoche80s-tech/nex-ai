@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "NexAI Server (local)",
+            "request": "launch",
+            "mainClass": "com.gkht.ai.nexai.server.NexaiServerApplication",
+            "projectName": "nexai-server",
+            "springBootLaunch": true,
+            "vmArgs": "-Dspring.profiles.active=local",
+            "env": {
+                "JAVA_HOME": "/Users/jerry/.sdkman/candidates/java/25.0.3-ms"
+            }
+        }
+    ]
+}

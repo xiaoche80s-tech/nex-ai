@@ -93,4 +93,26 @@ class AgentSpecTest {
         assertEquals("新规格必须携带初始草稿", ex.getMessage());
     }
 
+    @Test
+    @DisplayName("编辑主体元数据：名称去空白、图标空白归 null；空白/超长名称被拒")
+    void updatesProfileWithNormalization() {
+        AgentSpec spec = AgentSpec.create("客服助手", "customer-service", null,
+                OwnerLevel.TENANT, null, draft());
+
+        spec.updateProfile("  翻译助手  ", " ep:chat ");
+        assertEquals("翻译助手", spec.getName());
+        assertEquals("ep:chat", spec.getIcon());
+
+        spec.updateProfile("翻译助手", "   ");
+        assertNull(spec.getIcon(), "空白图标应归 null");
+
+        IllegalArgumentException blankName = assertThrows(IllegalArgumentException.class,
+                () -> spec.updateProfile("  ", null));
+        assertEquals("规格名称不能为空", blankName.getMessage());
+
+        IllegalArgumentException longName = assertThrows(IllegalArgumentException.class,
+                () -> spec.updateProfile("长".repeat(65), null));
+        assertEquals("规格名称不能超过 64 个字符", longName.getMessage());
+    }
+
 }

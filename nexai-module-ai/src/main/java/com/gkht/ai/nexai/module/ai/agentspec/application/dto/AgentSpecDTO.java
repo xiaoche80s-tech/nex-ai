@@ -33,8 +33,11 @@ public class AgentSpecDTO {
     @Schema(description = "图标标识", example = "ep:service")
     private String icon;
 
-    @Schema(description = "是否有未发布草稿（当前无发布能力时恒为草稿态）")
+    @Schema(description = "是否有草稿（发布后草稿保留为编辑底稿，不因发布而清除）")
     private Boolean hasDraft;
+
+    @Schema(description = "当前生效版本号（null 表示从未发布，列表状态列渲染依据）", example = "3")
+    private Integer currentVersionNo;
 
     @Schema(description = "创建时间")
     private LocalDateTime createTime;

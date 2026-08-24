@@ -2,30 +2,32 @@ package com.gkht.ai.nexai.module.ai.agentspec.application.command;
 
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
 
 /**
- * 智能体规格创建命令（携带首个草稿）。调用参数平铺（与领域四层结构解耦），
- * 由应用服务组装为分层配置值对象；跨字段的联动校验（执行环境链）在领域层完成。
+ * 智能体规格更新命令（编辑面）：整体替换主体元数据与草稿，只动草稿不触碰已发布快照。
+ * spec_code 与归属层级创建后不可变，不在本命令；字段语义与校验口径同创建命令。
  */
-@Schema(description = "管理后台 - 智能体规格创建命令（携带首个草稿）")
+@Schema(description = "管理后台 - 智能体规格更新命令（编辑草稿）")
 @Data
-public class AgentSpecCreateCommand implements AgentSpecDraftFields {
+public class AgentSpecUpdateCommand implements AgentSpecDraftFields {
 
-    // —— 主体元数据（spec_code 与归属创建后不可变） ——
+    @Schema(description = "规格编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    @NotNull(message = "规格编号不能为空")
+    private Long id;
 
     @Schema(description = "规格名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "客服助手")
     @NotBlank(message = "规格名称不能为空")
@@ -33,22 +35,12 @@ public class AgentSpecCreateCommand implements AgentSpecDraftFields {
             message = "规格名称不能超过 " + AgentSpec.NAME_MAX_LENGTH + " 个字符")
     private String name;
 
-    @Schema(description = "业务编码（slug，创建后不可变）", requiredMode = Schema.RequiredMode.REQUIRED, example = "customer-service")
-    @NotBlank(message = "业务编码不能为空")
-    @Pattern(regexp = AgentSpec.SPEC_CODE_REGEX,
-            message = "业务编码须为小写字母开头的小写字母/数字/连字符组合（2~64 位）")
-    private String specCode;
-
-    @Schema(description = "归属层级（MVP 开放 TENANT/USER，平台级后置；不填默认租户级）", example = "TENANT")
-    @Pattern(regexp = "TENANT|USER", message = "MVP 仅支持租户级（TENANT）与用户级（USER）归属")
-    private String ownerLevel;
-
     @Schema(description = "图标标识", example = "ep:service")
     @Size(max = AgentSpec.ICON_MAX_LENGTH,
             message = "图标标识不能超过 " + AgentSpec.ICON_MAX_LENGTH + " 个字符")
     private String icon;
 
-    // —— agent 层（模型管理落地前 modelId 可空，发布时校验补齐） ——
+    // —— agent 层（草稿态 modelId 可空，发布时校验补齐） ——
 
     @Schema(description = "模型引用编号（ai_model.id），草稿态可空", example = "1")
     private Long modelId;
@@ -83,15 +75,15 @@ public class AgentSpecCreateCommand implements AgentSpecDraftFields {
     @Min(value = 1, message = "最大 tokens 不能小于 1")
     private Integer maxTokens;
 
-    // —— 挂载层（MVP 仅建模，编辑面后置） ——
+    // —— 挂载层 ——
 
-    @Schema(description = "技能引用列表（编辑面后置）", example = "[1]")
+    @Schema(description = "技能引用列表", example = "[1]")
     private List<Long> skillIds;
 
-    @Schema(description = "工具挂载列表（来源 + 引用 + 可选白名单，编辑面后置）")
+    @Schema(description = "工具挂载列表（来源 + 引用 + 可选白名单）")
     private List<ToolMountCommand> tools;
 
-    @Schema(description = "规格私有文件夹挂载列表（ASSET 资料文件夹 / TOOLSET 工具集文件夹，工单 18）")
+    @Schema(description = "规格私有文件夹挂载列表（ASSET 资料文件夹 / TOOLSET 工具集文件夹）")
     private List<FolderMountCommand> folders;
 
     // —— 执行环境层 ——

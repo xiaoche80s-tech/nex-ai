@@ -4,10 +4,13 @@ import com.gkht.ai.nexai.framework.common.pojo.CommonResult;
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.security.core.util.SecurityFrameworkUtils;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecUpdateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -15,8 +18,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import static com.gkht.ai.nexai.framework.common.pojo.CommonResult.success;
@@ -45,6 +50,22 @@ public class AgentSpecController {
     @PreAuthorize("@ss.hasPermission('ai:spec:query')")
     public CommonResult<PageResult<AgentSpecDTO>> getSpecPage(@Validated AgentSpecPageQuery query) {
         return success(agentSpecService.getSpecPage(query, SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/get")
+    @Operation(summary = "获得规格详情", description = "编辑面回填用：主体元数据 + 全量草稿配置平铺")
+    @Parameter(name = "id", description = "规格编号", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('ai:spec:query')")
+    public CommonResult<AgentSpecDetailDTO> getSpec(@RequestParam("id") Long id) {
+        return success(agentSpecService.getSpec(id));
+    }
+
+    @PutMapping("/update")
+    @Operation(summary = "更新规格", description = "编辑面：整体替换主体元数据与草稿，只动草稿不触碰已发布快照")
+    @PreAuthorize("@ss.hasPermission('ai:spec:update')")
+    public CommonResult<Boolean> updateSpec(@Valid @RequestBody AgentSpecUpdateCommand command) {
+        agentSpecService.updateSpec(command);
+        return success(true);
     }
 
 }

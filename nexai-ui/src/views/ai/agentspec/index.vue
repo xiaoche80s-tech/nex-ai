@@ -99,8 +99,16 @@
         width="180"
         :formatter="dateFormatter"
       />
-      <el-table-column :label="t('table.action')" align="center" width="90" fixed="right">
+      <el-table-column :label="t('table.action')" align="center" width="140" fixed="right">
         <template #default="scope">
+          <el-button
+            link
+            type="primary"
+            v-hasPermi="['ai:spec:update']"
+            @click="openForm(scope.row.id)"
+          >
+            {{ t('ai.spec.edit') }}
+          </el-button>
           <el-button
             link
             type="primary"
@@ -171,10 +179,10 @@ const resetQuery = () => {
   handleQuery()
 }
 
-/** 打开创建表单 */
+/** 打开创建/编辑表单 */
 const formRef = ref()
-const openForm = () => {
-  formRef.value.open()
+const openForm = (id?: number) => {
+  formRef.value.open(id)
 }
 
 /** 打开版本管理弹窗 */

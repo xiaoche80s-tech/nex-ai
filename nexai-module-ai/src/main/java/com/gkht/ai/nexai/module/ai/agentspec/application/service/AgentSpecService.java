@@ -4,7 +4,9 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecUpdateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
@@ -25,6 +27,20 @@ public interface AgentSpecService {
      * @return 规格编号
      */
     Long createSpec(AgentSpecCreateCommand command, Long userId);
+
+    /**
+     * 更新规格（编辑面）：整体替换主体元数据与草稿，只动草稿不触碰已发布快照。
+     *
+     * @param command 更新命令
+     */
+    void updateSpec(AgentSpecUpdateCommand command);
+
+    /**
+     * 查询规格详情（编辑面回填用，含全量草稿配置平铺）
+     *
+     * @param id 规格编号
+     */
+    AgentSpecDetailDTO getSpec(Long id);
 
     /**
      * 分页查询规格（轻量读写分离：经 Mapper 直查转 DTO，用户级仅归属用户可见）

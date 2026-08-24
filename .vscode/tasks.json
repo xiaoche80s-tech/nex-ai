@@ -1,0 +1,76 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Maven: 全量构建 (skipTests)",
+            "type": "shell",
+            "command": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn clean package -DskipTests",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "Maven: 构建 nexai-server (含依赖)",
+            "type": "shell",
+            "command": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn -pl nexai-server -am package -DskipTests",
+            "group": "build",
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "Maven: 构建 nexai-module-ai (含依赖)",
+            "type": "shell",
+            "command": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn -pl nexai-module-ai -am package -DskipTests",
+            "group": "build",
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "Maven: 单模块测试",
+            "type": "shell",
+            "command": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn test -pl ${input:module}",
+            "group": "test",
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "Maven: clean 全量",
+            "type": "shell",
+            "command": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn clean",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "前端: pnpm install",
+            "type": "shell",
+            "command": "pnpm i",
+            "options": {
+                "cwd": "${workspaceFolder}/nexai-ui"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "前端: pnpm dev",
+            "type": "shell",
+            "command": "pnpm dev",
+            "options": {
+                "cwd": "${workspaceFolder}/nexai-ui"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "module",
+            "type": "pickString",
+            "description": "选择要测试的模块",
+            "options": [
+                "nexai-module-ai",
+                "nexai-module-system",
+                "nexai-module-infra",
+                "nexai-server"
+            ],
+            "default": "nexai-module-ai"
+        }
+    ]
+}

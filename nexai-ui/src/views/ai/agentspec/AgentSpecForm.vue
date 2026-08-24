@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="dialogVisible" :title="t('ai.spec.formTitle')" width="680">
+  <Dialog v-model="dialogVisible" :title="formData.id ? t('ai.spec.formTitleEdit') : t('ai.spec.formTitle')" width="680">
     <el-form
       ref="formRef"
       :model="formData"
@@ -19,6 +19,7 @@
         <el-input
           v-model="formData.specCode"
           :maxlength="64"
+          :disabled="!!formData.id"
           :placeholder="t('ai.spec.formSpecCodePlaceholder')"
         />
         <div class="text-12px text-gray-400 leading-20px mt-2px">{{
@@ -26,7 +27,7 @@
         }}</div>
       </el-form-item>
       <el-form-item :label="t('ai.spec.formOwnerLevel')" prop="ownerLevel">
-        <el-radio-group v-model="formData.ownerLevel">
+        <el-radio-group v-model="formData.ownerLevel" :disabled="!!formData.id">
           <el-radio value="TENANT">{{ t('ai.spec.formOwnerTenant') }}</el-radio>
           <el-radio value="USER">{{ t('ai.spec.formOwnerUser') }}</el-radio>
         </el-radio-group>
@@ -50,6 +51,29 @@
       </el-form-item>
 
       <el-divider content-position="left">{{ t('ai.spec.sectionModel') }}</el-divider>
+      <el-form-item :label="t('ai.spec.formModel')" prop="modelId">
+        <el-select
+          v-model="formData.modelId"
+          filterable
+          clearable
+          :loading="modelsLoading"
+          :placeholder="t('ai.spec.formModelPlaceholder')"
+          class="!w-full"
+        >
+          <el-option
+            v-for="model in modelOptions"
+            :key="model.id"
+            :label="model.name"
+            :value="model.id"
+          >
+            <span class="mr-8px">{{ model.name }}</span>
+            <span class="text-12px text-gray-400">{{ model.modelId }}</span>
+          </el-option>
+        </el-select>
+        <div class="text-12px text-gray-400 leading-20px mt-2px">{{
+          t('ai.spec.formModelTip')
+        }}</div>
+      </el-form-item>
       <el-form-item :label="t('ai.spec.formSystemPrompt')" prop="systemPrompt">
         <el-input
           v-model="formData.systemPrompt"
@@ -360,6 +384,7 @@ import * as SpecApi from '@/api/ai/spec'
 import * as SkillApi from '@/api/ai/skill'
 import * as McpServerApi from '@/api/ai/mcpserver'
 import * as PlatformToolApi from '@/api/ai/platformTool'
+import * as ChannelApi from '@/api/ai/channel'
 
 defineOptions({ name: 'AiAgentSpecForm' })
 
@@ -369,12 +394,16 @@ const message = useMessage() // 消息弹窗
 const dialogVisible = ref(false) // 弹窗的是否展示
 const formLoading = ref(false) // 表单的加载中
 const formRef = ref() // 表单 Ref
-const formData = ref<SpecApi.AgentSpecCreateForm>({
+
+/** 表单初始值（创建）；id 存在即编辑模式 */
+const defaultForm = (): SpecApi.AgentSpecCreateForm & { id?: number } => ({
+  id: undefined,
   name: '',
   specCode: '',
   ownerLevel: 'TENANT',
   description: '',
   icon: '',
+  modelId: undefined,
   systemPrompt: '',
   maxIters: undefined,
   temperature: undefined,
@@ -387,6 +416,7 @@ const formData = ref<SpecApi.AgentSpecCreateForm>({
   sandboxEnabled: false,
   capabilities: []
 })
+const formData = ref(defaultForm())
 const formRules = reactive({
   name: [{ required: true, message: t('ai.spec.nameRequired'), trigger: 'blur' }],
   specCode: [
@@ -401,6 +431,8 @@ const skillsLoading = ref(false)
 const skillOptions = ref<SkillApi.SkillVO[]>([])
 const mcpServerOptions = ref<McpServerApi.McpServerVO[]>([])
 const platformToolOptions = ref<PlatformToolApi.PlatformToolVO[]>([])
+const modelsLoading = ref(false)
+const modelOptions = ref<ChannelApi.ModelVO[]>([])
 
 /** 挂载目标候选项（按来源） */
 const mountTargetOptions = (source: string): { id: number; name: string }[] =>
@@ -465,33 +497,62 @@ const formatSize = (size: number): string => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-/** 打开弹窗（仅创建） */
-const open = () => {
+/** 打开弹窗（创建或编辑：编辑时拉详情平铺回填） */
+const open = async (id?: number) => {
+  formData.value = defaultForm()
   dialogVisible.value = true
   formRef.value?.resetFields()
   loadMountOptions()
+  if (id != null) {
+    const detail = await SpecApi.getSpec(id)
+    formData.value = {
+      id: detail.id,
+      name: detail.name,
+      specCode: detail.specCode,
+      ownerLevel: detail.ownerLevel as SpecApi.OwnerLevel,
+      description: detail.description ?? '',
+      icon: detail.icon ?? '',
+      modelId: detail.modelId ?? undefined,
+      systemPrompt: detail.systemPrompt ?? '',
+      maxIters: detail.maxIters ?? undefined,
+      temperature: detail.temperature ?? undefined,
+      topP: detail.topP ?? undefined,
+      maxTokens: detail.maxTokens ?? undefined,
+      skillIds: detail.skillIds ?? [],
+      tools: (detail.tools ?? []).map((tool) => ({ ...tool })),
+      folders: (detail.folders ?? []).map((folder) => ({ ...folder, files: [...folder.files] })),
+      workspaceEnabled: detail.workspaceEnabled ?? false,
+      sandboxEnabled: detail.sandboxEnabled ?? false,
+      capabilities: detail.capabilities ?? []
+    }
+  }
 }
 defineExpose({ open })
 
-/** 挂载区候选加载（技能分页 + MCP Server 分页 + 平台工具列表）。
+/** 挂载区候选加载（技能分页 + MCP Server 分页 + 平台工具列表 + 启用模型分页）。
  *  任一失败时降级为空候选（表单其余部分照常可用），不冒泡为全局错误 */
 const loadMountOptions = async () => {
   skillsLoading.value = true
+  modelsLoading.value = true
   try {
-    const [skillPage, mcpPage, platformTools] = await Promise.all([
+    const [skillPage, mcpPage, platformTools, modelPage] = await Promise.all([
       SkillApi.getSkillPage({ pageNo: 1, pageSize: 100 }),
       McpServerApi.getMcpServerPage({ pageNo: 1, pageSize: 100 }),
-      PlatformToolApi.getPlatformToolList()
+      PlatformToolApi.getPlatformToolList(),
+      ChannelApi.getModelPage({ pageNo: 1, pageSize: 100, enabled: true })
     ])
     skillOptions.value = skillPage.list
     mcpServerOptions.value = mcpPage.list
     platformToolOptions.value = platformTools
+    modelOptions.value = modelPage.list
   } catch {
     skillOptions.value = []
     mcpServerOptions.value = []
     platformToolOptions.value = []
+    modelOptions.value = []
   } finally {
     skillsLoading.value = false
+    modelsLoading.value = false
   }
 }
 
@@ -525,9 +586,14 @@ const submitForm = async () => {
   }
   formLoading.value = true
   try {
-    await SpecApi.createSpec({ ...formData.value, tools, folders })
+    if (formData.value.id) {
+      await SpecApi.updateSpec({ ...formData.value, id: formData.value.id, tools, folders })
+      message.success(t('ai.spec.updated'))
+    } else {
+      await SpecApi.createSpec({ ...formData.value, tools, folders })
+      message.success(t('ai.spec.created'))
+    }
     dialogVisible.value = false
-    message.success(t('ai.spec.created'))
     emit('success')
   } finally {
     formLoading.value = false

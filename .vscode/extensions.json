@@ -1,0 +1,22 @@
+{
+    "recommendations": [
+        // ── Java ──
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-spring-initializr",
+        "vscjava.vscode-maven",
+
+        // ── 前端 ──
+        "Vue.volar",
+        "dbaeumer.vscode-eslint",
+        "stylelint.vscode-stylelint",
+        "esbenp.prettier-vscode",
+        "antfu.iconify",
+        "antfu.unocss",
+
+        // ── 通用 ──
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "redhat.vscode-yaml"
+    ]
+}

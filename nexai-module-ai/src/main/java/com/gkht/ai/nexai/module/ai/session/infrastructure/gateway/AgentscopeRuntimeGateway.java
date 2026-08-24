@@ -120,8 +120,8 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     @Resource
     private McpClientFactory mcpClientFactory;
 
-    /** 运行时工具贡献者（测试注入敏感工具/回显工具的接缝；生产挂载走装配指令翻译） */
-    @Resource
+    /** 运行时工具贡献者（测试注入敏感工具/回显工具的接缝；生产挂载走装配指令翻译，无实现时空集合默认值） */
+    @Autowired(required = false)
     private List<RuntimeToolContributor> runtimeToolContributors = List.of();
 
     /** 平台工具库注册表（source=PLATFORM 挂载寻址；测试上下文未装配时为 null，挂载降级跳过） */

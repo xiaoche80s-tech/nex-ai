@@ -82,11 +82,11 @@ public class DefaultController {
                 "[支付模块 nexai-module-pay - 已禁用][参考 https://doc.iocoder.cn/pay/build/ 开启]");
     }
 
-    @RequestMapping(value = { "/admin-api/ai/**"})
-    public CommonResult<Boolean> ai404() {
-        return CommonResult.error(NOT_IMPLEMENTED.getCode(),
-                "[AI 大模型 nexai-module-ai - 已禁用][参考 https://doc.iocoder.cn/ai/build/ 开启]");
-    }
+    // @RequestMapping(value = { "/admin-api/ai/**"})
+    // public CommonResult<Boolean> ai404() {
+    //     return CommonResult.error(NOT_IMPLEMENTED.getCode(),
+    //             "[AI 大模型 nexai-module-ai - 已禁用][参考 https://doc.iocoder.cn/ai/build/ 开启]");
+    // }
 
     @RequestMapping(value = { "/admin-api/iot/**"})
     public CommonResult<Boolean> iot404() {

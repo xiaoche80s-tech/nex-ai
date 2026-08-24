@@ -14,6 +14,14 @@ _Avoid_: 智能体配置、agent 定义、prompt 模板
 AgentSpec 声明的外部能力引用，sealed 家族（ToolMount/FolderMount/SkillMount…），共享校验/判等骨架，各挂载为薄 record。
 _Avoid_: 挂载项、mount 实体
 
+**草稿（Draft）**:
+规格唯一的可编辑配置槽位；发布时被固化并清空，编辑保存后重建。有草稿即草稿态（可发布），无草稿且已发布过即已发布态（稳定）。
+_Avoid_: 工作副本、未发布版本
+
+**发布（Publish）**:
+把草稿固化为不可变版本快照、推进当前版本指针并清空草稿的动作，仅草稿态可执行。
+_Avoid_: 上线、保存版本
+
 **生效快照（Effective Snapshot）**:
 当前版本指针指向的不可变版本快照；由 agentspec 的 resolveCurrentVersion 单一入口解析，运行侧各入口（调试台/OpenAI 出口/终端页面）统一消费，不自行筛选版本。
 _Avoid_: 当前配置、运行配置

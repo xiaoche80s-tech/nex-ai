@@ -562,6 +562,7 @@ export default {
       statusDraft: 'Draft',
       statusPublished: 'Published',
       version: 'Versions',
+      edit: 'Edit',
       // Version management
       versionDialogTitle: 'Version Management',
       versionPublish: 'Publish Version',
@@ -576,6 +577,7 @@ export default {
       versionEmpty: 'No published versions yet. Publish the current draft to see it here',
       // Form
       formTitle: 'Create Agent Spec',
+      formTitleEdit: 'Edit Agent Spec',
       sectionBasic: 'Basic Info',
       formName: 'Name',
       formNamePlaceholder: 'Enter spec name',
@@ -590,6 +592,9 @@ export default {
       formIcon: 'Icon',
       formIconPlaceholder: 'Icon id, e.g. ep:service (optional)',
       sectionModel: 'Model & Reasoning',
+      formModel: 'Model',
+      formModelPlaceholder: 'Select a model (registered on the Model page)',
+      formModelTip: 'Draft may omit the model; a model is required before publishing',
       formSystemPrompt: 'System Prompt',
       formSystemPromptPlaceholder: "Define the agent's role, capability boundary and reply style",
       formMaxIters: 'Max Iterations',
@@ -650,7 +655,8 @@ export default {
       specCodeRequired: 'Spec code is required',
       specCodePattern: '2~64 chars: lowercase letter first, then lowercase/digits/hyphens',
       descriptionMax: 'Description must be at most 1024 characters',
-      created: 'Created successfully'
+      created: 'Created successfully',
+      updated: 'Updated successfully'
     },
     session: {
       create: 'Create Debug Session',

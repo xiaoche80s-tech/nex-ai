@@ -557,6 +557,7 @@ export default {
       statusDraft: '草稿',
       statusPublished: '已发布',
       version: '版本',
+      edit: '编辑',
       // 版本管理
       versionDialogTitle: '版本管理',
       versionPublish: '发布版本',
@@ -571,6 +572,7 @@ export default {
       versionEmpty: '暂无已发布版本，发布当前草稿后将在此显示',
       // 表单
       formTitle: '创建智能体规格',
+      formTitleEdit: '编辑智能体规格',
       sectionBasic: '基本信息',
       formName: '规格名称',
       formNamePlaceholder: '请输入规格名称',
@@ -585,6 +587,9 @@ export default {
       formIcon: '图标',
       formIconPlaceholder: '图标标识，如 ep:service（可选）',
       sectionModel: '模型与推理',
+      formModel: '模型',
+      formModelPlaceholder: '请选择模型（模型管理页登记）',
+      formModelTip: '草稿可不选模型；发布版本前必须配置模型',
       formSystemPrompt: '系统提示',
       formSystemPromptPlaceholder: '告诉智能体它的角色、能力边界与回复风格',
       formMaxIters: '最大迭代轮数',
@@ -642,7 +647,8 @@ export default {
       specCodeRequired: '业务编码不能为空',
       specCodePattern: '须为小写字母开头的小写字母/数字/连字符组合（2~64 位）',
       descriptionMax: '描述不能超过 1024 个字符',
-      created: '创建成功'
+      created: '创建成功',
+      updated: '更新成功'
     },
     session: {
       create: '发起调试会话',

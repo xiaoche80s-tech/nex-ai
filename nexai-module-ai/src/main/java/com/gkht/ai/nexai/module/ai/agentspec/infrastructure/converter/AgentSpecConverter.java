@@ -3,6 +3,7 @@ package com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter;
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
@@ -51,6 +52,68 @@ public interface AgentSpecConverter {
      * 版本快照 → 列表 DTO（不含全量配置；current 当前版本标识由应用服务按版本指针设置）
      */
     AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
+
+    /**
+     * 聚合 → 详情 DTO（编辑面回填）：分层草稿配置平铺为与命令同构的表单形态；无草稿时配置项为 null。
+     */
+    default AgentSpecDetailDTO toDetailDTO(AgentSpec spec) {
+        AgentSpecDetailDTO dto = new AgentSpecDetailDTO();
+        dto.setId(spec.getId());
+        dto.setName(spec.getName());
+        dto.setSpecCode(spec.getSpecCode());
+        dto.setOwnerLevel(ownerLevelToString(spec.getOwnerLevel()));
+        dto.setOwnerUserId(spec.getOwnerUserId());
+        dto.setIcon(spec.getIcon());
+        dto.setHasDraft(spec.hasDraft());
+        dto.setCurrentVersionNo(spec.getCurrentVersionNo());
+        dto.setCreateTime(spec.getCreateTime());
+        AgentSpecConfig draft = spec.getDraft();
+        if (draft != null) {
+            dto.setModelId(draft.getModelId());
+            dto.setDescription(draft.getDescription());
+            dto.setSystemPrompt(draft.getSystemPrompt());
+            dto.setMaxIters(draft.getMaxIters());
+            if (draft.getGenerateOptions() != null) {
+                dto.setTemperature(draft.getGenerateOptions().getTemperature());
+                dto.setTopP(draft.getGenerateOptions().getTopP());
+                dto.setMaxTokens(draft.getGenerateOptions().getMaxTokens());
+            }
+            dto.setSkillIds(draft.getSkillIds());
+            if (draft.getTools() != null) {
+                dto.setTools(draft.getTools().stream().map(mount -> {
+                    AgentSpecDetailDTO.ToolMountDTO mountDTO = new AgentSpecDetailDTO.ToolMountDTO();
+                    mountDTO.setSource(mount.source().name());
+                    mountDTO.setSourceId(mount.sourceId());
+                    mountDTO.setAllowedTools(mount.allowedTools());
+                    mountDTO.setSensitiveTools(mount.sensitiveTools());
+                    return mountDTO;
+                }).toList());
+            }
+            if (draft.getFolders() != null) {
+                dto.setFolders(draft.getFolders().stream().map(folder -> {
+                    AgentSpecDetailDTO.FolderMountDTO folderDTO = new AgentSpecDetailDTO.FolderMountDTO();
+                    folderDTO.setType(folder.type().name());
+                    folderDTO.setName(folder.name());
+                    folderDTO.setFiles(folder.files().stream().map(file -> {
+                        AgentSpecDetailDTO.FolderFileDTO fileDTO = new AgentSpecDetailDTO.FolderFileDTO();
+                        fileDTO.setPath(file.path());
+                        fileDTO.setUrl(file.url());
+                        fileDTO.setContentHash(file.contentHash());
+                        fileDTO.setSize(file.size());
+                        return fileDTO;
+                    }).toList());
+                    return folderDTO;
+                }).toList());
+            }
+            if (draft.getExecutionEnv() != null) {
+                dto.setWorkspaceEnabled(draft.getExecutionEnv().isWorkspaceEnabled());
+                dto.setSandboxEnabled(draft.getExecutionEnv().isSandboxEnabled());
+                dto.setCapabilities(draft.getExecutionEnv().getCapabilities().stream()
+                        .map(Enum::name).toList());
+            }
+        }
+        return dto;
+    }
 
     default PageResult<AgentSpecDTO> toDTOPage(PageResult<AgentSpecDO> page) {
         return new PageResult<>(toDTOList(page.getList()), page.getTotal());

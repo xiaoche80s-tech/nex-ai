@@ -147,6 +147,15 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- 本地开发热部署：监视 classpath 目录变化自动重启加载（打包时被
+             spring-boot-maven-plugin 默认排除，不进生产 fat jar；本地启用见 application-local.yaml） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
         <!-- 服务保障相关 -->
         <dependency>
             <groupId>com.gkht.ai</groupId>

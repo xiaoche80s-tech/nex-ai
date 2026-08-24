@@ -1,4 +1,64 @@
 {
+    // ── Java 运行时 & 编译 ──
+    "java.jdt.ls.java.home": "/Users/jerry/.sdkman/candidates/java/25.0.3-ms",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-25",
+            "path": "/Users/jerry/.sdkman/candidates/java/25.0.3-ms",
+            "default": true
+        }
+    ],
+    "java.compile.nullAnalysis.mode": "automatic",
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.compile.nullAnalysis.mode": "automatic"
+
+    // ── Maven ──
+    "maven.executable.path": "/Users/jerry/.sdkman/candidates/maven/current/bin/mvn",
+    "maven.terminal.customEnv": [
+        {
+            "environmentVariable": "JAVA_HOME",
+            "value": "/Users/jerry/.sdkman/candidates/java/25.0.3-ms"
+        }
+    ],
+
+    // ── 编辑器 ──
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.encoding": "utf8",
+
+    // ── 文件排除（减少干扰） ──
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/target": true,
+        "**/.flattened-pom.xml": true,
+        "**/.mimosa": true
+    },
+    "files.watcherExclude": {
+        "**/target/**": true,
+        "**/.git/**": true,
+        "**/node_modules/**": true
+    },
+    "search.exclude": {
+        "**/target": true,
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/.flattened-pom.xml": true
+    },
+
+    // ── 资源管理器文件嵌套 ──
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.expand": false,
+    "explorer.fileNesting.patterns": {
+        "pom.xml": ".flattened-pom.xml",
+        "*.java": "${capture}.class"
+    },
+
+    // ── 终端 ──
+    "terminal.integrated.scrollback": 10000,
+    "terminal.integrated.env.osx": {
+        "JAVA_HOME": "/Users/jerry/.sdkman/candidates/java/25.0.3-ms"
+    },
+
+    // ── JSON 校验 ──
+    "json.schemas": []
 }

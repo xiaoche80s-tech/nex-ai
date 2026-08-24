@@ -3545,7 +3545,7 @@ COMMIT;
 
 DROP SEQUENCE IF EXISTS system_menu_seq;
 CREATE SEQUENCE system_menu_seq
-    START 6433;
+    START 6441;
 
 -- ----------------------------
 -- Table structure for system_notice
@@ -6160,6 +6160,142 @@ CREATE SEQUENCE ai_channel_seq
 
 DROP SEQUENCE IF EXISTS ai_model_seq;
 CREATE SEQUENCE ai_model_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_session（NexAI 智能体平台：调试会话，工单 05/06）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_session_seq;
+DROP TABLE IF EXISTS ai_session;
+CREATE TABLE ai_session (
+    id int8 NOT NULL,
+    session_key varchar(64) NOT NULL,
+    title varchar(128) NOT NULL,
+    type varchar(16) NOT NULL DEFAULT 'DEBUG',
+    user_id int8 NULL DEFAULT NULL,
+    spec_id int8 NOT NULL,
+    version_no int4 NULL DEFAULT NULL,
+    status varchar(16) NOT NULL DEFAULT 'READY',
+    rounds text NOT NULL DEFAULT '[]',
+    pending_confirmations text NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_session ADD CONSTRAINT pk_ai_session PRIMARY KEY (id);
+
+-- 会话业务键按租户唯一（仅存活行）
+CREATE UNIQUE INDEX uk_ai_session_key ON ai_session (tenant_id, session_key) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_session.id IS '会话编号';
+COMMENT ON COLUMN ai_session.session_key IS '会话业务键（UUID），租户内唯一（uk_ai_session_key），运行时寻址用';
+COMMENT ON COLUMN ai_session.title IS '会话标题（默认取首条消息摘要）';
+COMMENT ON COLUMN ai_session.type IS '会话类型（DEBUG 调试台）';
+COMMENT ON COLUMN ai_session.user_id IS '发起用户编号';
+COMMENT ON COLUMN ai_session.spec_id IS '绑定的规格编号（ai_agent_spec.id）';
+COMMENT ON COLUMN ai_session.version_no IS '生效版本号（创建时定格于规格当前版本）';
+COMMENT ON COLUMN ai_session.status IS '会话运行状态（READY/RUNNING/WAITING_CONFIRM 等）';
+COMMENT ON COLUMN ai_session.rounds IS '消息轮次 JSON 数组（会话历史持久化，含用户/助手/工具消息）';
+COMMENT ON COLUMN ai_session.pending_confirmations IS '待确认的 HITL 卡片 JSON（人工审批挂起队列），无待确认为 NULL';
+COMMENT ON COLUMN ai_session.creator IS '创建者';
+COMMENT ON COLUMN ai_session.create_time IS '创建时间';
+COMMENT ON COLUMN ai_session.updater IS '更新者';
+COMMENT ON COLUMN ai_session.update_time IS '更新时间';
+COMMENT ON COLUMN ai_session.deleted IS '是否删除';
+COMMENT ON COLUMN ai_session.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_session IS 'AI 平台调试会话表（会话历史与 HITL 挂起状态随轮次落库）';
+
+DROP SEQUENCE IF EXISTS ai_session_seq;
+CREATE SEQUENCE ai_session_seq
+    START 1;
+
+-- ----------------------------
+-- Table structure for ai_skill（NexAI 智能体平台：Skill 资产，工单 10）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_skill_seq;
+DROP TABLE IF EXISTS ai_skill;
+CREATE TABLE ai_skill (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    description varchar(512) NOT NULL,
+    owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
+    owner_user_id int8 NULL DEFAULT NULL,
+    current_version_no int4 NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill ADD CONSTRAINT pk_ai_skill PRIMARY KEY (id);
+
+-- 同归属下技能名称唯一（部分唯一索引：仅存活行）
+CREATE UNIQUE INDEX uk_ai_skill_name ON ai_skill (
+    owner_level, tenant_id, COALESCE(owner_user_id, 0), name) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_skill.id IS '技能编号';
+COMMENT ON COLUMN ai_skill.name IS '技能名称（同一归属层级内唯一，uk_ai_skill_name）';
+COMMENT ON COLUMN ai_skill.description IS '技能描述';
+COMMENT ON COLUMN ai_skill.owner_level IS '归属层级（TENANT/USER）';
+COMMENT ON COLUMN ai_skill.owner_user_id IS '归属用户编号（用户级 = 创建者），非用户级为 NULL';
+COMMENT ON COLUMN ai_skill.current_version_no IS '当前生效版本号（NULL 表示从未发布）';
+COMMENT ON COLUMN ai_skill.creator IS '创建者';
+COMMENT ON COLUMN ai_skill.create_time IS '创建时间';
+COMMENT ON COLUMN ai_skill.updater IS '更新者';
+COMMENT ON COLUMN ai_skill.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill IS 'AI 平台技能资产表（版本化内容在 ai_skill_version）';
+
+-- ----------------------------
+-- Table structure for ai_skill_version（NexAI 智能体平台：Skill 版本快照，工单 10）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_skill_version_seq;
+DROP TABLE IF EXISTS ai_skill_version;
+CREATE TABLE ai_skill_version (
+    id int8 NOT NULL,
+    skill_id int8 NOT NULL,
+    version_no int4 NOT NULL,
+    content text NOT NULL,
+    note varchar(255) NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill_version ADD CONSTRAINT pk_ai_skill_version PRIMARY KEY (id);
+
+-- 同一 skill 内版本号唯一（并发兜底）
+CREATE UNIQUE INDEX uk_ai_skill_version ON ai_skill_version (tenant_id, skill_id, version_no) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_skill_version.id IS '技能版本编号';
+COMMENT ON COLUMN ai_skill_version.skill_id IS '所属技能编号（ai_skill.id，聚合根引用）';
+COMMENT ON COLUMN ai_skill_version.version_no IS '版本号（技能内严格递增，1 起；发布后不可变）';
+COMMENT ON COLUMN ai_skill_version.content IS '技能版本内容 JSON（文档与挂载件随版本快照固化）';
+COMMENT ON COLUMN ai_skill_version.note IS '发布备注';
+COMMENT ON COLUMN ai_skill_version.creator IS '创建者';
+COMMENT ON COLUMN ai_skill_version.create_time IS '创建时间';
+COMMENT ON COLUMN ai_skill_version.updater IS '更新者';
+COMMENT ON COLUMN ai_skill_version.update_time IS '更新时间';
+COMMENT ON COLUMN ai_skill_version.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill_version.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill_version IS 'AI 平台技能版本快照表（不可变：只插不改不删）';
+
+DROP SEQUENCE IF EXISTS ai_skill_seq;
+CREATE SEQUENCE ai_skill_seq
+    START 1;
+
+DROP SEQUENCE IF EXISTS ai_skill_version_seq;
+CREATE SEQUENCE ai_skill_version_seq
     START 1;
 
 -- ----------------------------

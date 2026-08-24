@@ -2,11 +2,14 @@ package com.gkht.ai.nexai.module.ai.agentspec.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecDraftFields;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecUpdateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
@@ -112,6 +115,26 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void updateSpec(AgentSpecUpdateCommand command) {
+        AgentSpec spec = requireSpec(command.getId());
+        try {
+            // 编辑面：只动主体元数据与草稿，不触碰已发布快照（replaceDraft 领域语义保证）
+            spec.updateProfile(command.getName(), command.getIcon());
+            spec.replaceDraft(toConfig(command));
+        } catch (IllegalArgumentException ex) {
+            // 领域校验（执行环境链、文本边界等跨字段规则）转业务异常渲染
+            throw exception(AGENT_SPEC_CONFIG_INVALID, ex.getMessage());
+        }
+        agentSpecRepository.save(spec);
+    }
+
+    @Override
+    public AgentSpecDetailDTO getSpec(Long id) {
+        return agentSpecConverter.toDetailDTO(requireSpec(id));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public Integer publishSpec(AgentSpecPublishCommand command) {
         AgentSpec spec = requireSpec(command.getId());
         try {
@@ -194,7 +217,7 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     /** 平铺命令 → 四层配置值对象（模型引用/自描述草稿态可空，发布时校验补齐） */
-    private AgentSpecConfig toConfig(AgentSpecCreateCommand command) {
+    private AgentSpecConfig toConfig(AgentSpecDraftFields command) {
         GenerateOptions generateOptions = command.getTemperature() == null && command.getTopP() == null
                 && command.getMaxTokens() == null ? null
                 : GenerateOptions.of(command.getTemperature(), command.getTopP(), command.getMaxTokens());

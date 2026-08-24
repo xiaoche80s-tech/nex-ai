@@ -130,6 +130,40 @@ export interface AgentSpecSwitchVersionForm {
   versionNo: number
 }
 
+/** 规格详情（编辑面回填，对应后端 AgentSpecDetailDTO：主体元数据 + 草稿配置平铺） */
+export interface AgentSpecDetailVO {
+  id: number
+  name: string
+  /** 业务编码（创建后不可变） */
+  specCode: string
+  ownerLevel: string
+  ownerUserId: number | null
+  icon: string | null
+  hasDraft: boolean
+  /** 当前生效版本号（当前版本指针），null = 从未发布 */
+  currentVersionNo: number | null
+  createTime: Date
+  // —— 草稿配置平铺（与创建/更新表单同构） ——
+  modelId: number | null
+  description: string | null
+  systemPrompt: string | null
+  maxIters: number | null
+  temperature: number | null
+  topP: number | null
+  maxTokens: number | null
+  skillIds: number[] | null
+  tools: ToolMount[] | null
+  folders: FolderMount[] | null
+  workspaceEnabled: boolean | null
+  sandboxEnabled: boolean | null
+  capabilities: ExecutionCapability[] | null
+}
+
+/** 规格更新表单（编辑面；specCode/ownerLevel 创建后不可变，不在其中） */
+export interface AgentSpecUpdateForm extends Omit<AgentSpecCreateForm, 'specCode' | 'ownerLevel'> {
+  id: number
+}
+
 /** 规格分页查询参数 */
 export interface AgentSpecPageParams extends PageParam {
   name?: string
@@ -170,6 +204,16 @@ export const uploadFolderFile = (data: { file: File }) => {
 // 创建规格（携带首个草稿）
 export const createSpec = (data: AgentSpecCreateForm) => {
   return request.post({ url: '/ai/spec/create', data })
+}
+
+// 获得规格详情（编辑面回填）
+export const getSpec = (id: number) => {
+  return request.get<AgentSpecDetailVO>({ url: '/ai/spec/get?id=' + id })
+}
+
+// 更新规格（编辑草稿：只动草稿不触碰已发布快照）
+export const updateSpec = (data: AgentSpecUpdateForm) => {
+  return request.put({ url: '/ai/spec/update', data })
 }
 
 // 查询规格分页

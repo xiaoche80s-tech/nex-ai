@@ -125,6 +125,18 @@ public class AgentSpec {
     }
 
     /**
+     * 更新主体元数据（名称/图标，编辑面）：spec_code 与归属创建后不可变，不在此面。
+     *
+     * @param newName 新名称，不能为空白
+     * @param newIcon 新图标标识，可空
+     */
+    public void updateProfile(String newName, String newIcon) {
+        validateProfile(newName, newIcon);
+        this.name = newName.strip();
+        this.icon = normalizeNullable(newIcon);
+    }
+
+    /**
      * 切换当前生效版本（回退指针）：以传入的目标版本对象为准——存在性由调用方
      * 解析出对象即证明（悬空指针在解析处报错），本方法只校验目标确实归属本聚合。
      *
