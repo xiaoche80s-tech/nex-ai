@@ -27,7 +27,7 @@ public class AiOpenApiConfiguration {
 
             @Override
             public void customize(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
-                registry.requestMatchers(buildAppApi("/ai/openai/**")).permitAll();
+                registry.requestMatchers(buildAppApi(ApiKeyAuthFilter.OPENAI_PATH + "/**")).permitAll();
             }
         };
     }
@@ -58,7 +58,7 @@ public class AiOpenApiConfiguration {
         registration.setFilter(filter);
         // 租户上下文过滤器（-104）之后执行：覆盖请求头 tenant-id，以 Key 归属租户为准
         registration.setOrder(WebFilterOrderEnum.TENANT_CONTEXT_FILTER + 1);
-        registration.addUrlPatterns("/app-api/ai/openai/*");
+        registration.addUrlPatterns(ApiKeyAuthFilter.OPENAI_FULL_PREFIX + "/*");
         return registration;
     }
 

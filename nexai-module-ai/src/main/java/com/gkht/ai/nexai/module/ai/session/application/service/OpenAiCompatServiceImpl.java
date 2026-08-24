@@ -1,8 +1,8 @@
 package com.gkht.ai.nexai.module.ai.session.application.service;
 
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
+import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecService;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput;
@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASSEMBLE_INVALID;
 
 /**
@@ -36,7 +35,7 @@ public class OpenAiCompatServiceImpl implements OpenAiCompatService {
     static final String OPENAI_USER = "openai-client";
 
     @Resource
-    private AgentSpecRepository agentSpecRepository;
+    private AgentSpecService agentSpecService;
 
     @Resource
     private AgentRuntimeAssembler runtimeAssembler;
@@ -48,24 +47,16 @@ public class OpenAiCompatServiceImpl implements OpenAiCompatService {
     public Flux<RuntimeEvent> streamChatCompletions(String specCode, List<ChatMessageInput> messages,
                                                     String requestId) {
         try {
-            AgentSpec spec = agentSpecRepository.findBySpecCode(specCode);
-            if (spec == null) {
-                return Flux.error(exception(AGENT_SPEC_NOT_EXISTS));
-            }
+            // 生效快照单一入口解析（specCode 路由；不存在/未发布/快照缺失由入口报错）
+            EffectiveSpecSnapshot snapshot = agentSpecService.resolveCurrentVersionByCode(specCode);
+            AgentSpec spec = snapshot.spec();
             // 用户级规格不对外出口：API Key 为租户凭证，放行用户级规格等于跨用户越权
             if (spec.getOwnerLevel()
                     == com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel.USER) {
                 return Flux.error(exception(SESSION_ASSEMBLE_INVALID, "用户级规格不对外部出口开放"));
             }
-            if (!spec.hasPublishedVersion()) {
-                return Flux.error(exception(SESSION_ASSEMBLE_INVALID, "规格尚未发布版本"));
-            }
-            AgentSpecVersion version = agentSpecRepository.listVersions(spec.getId()).stream()
-                    .filter(v -> v.getVersionNo() == spec.getCurrentVersionNo())
-                    .findFirst()
-                    .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失"));
             // 出口调用方为 API Key（租户凭证），槽位用户固定标识；会话槽位按请求隔离
-            AgentRuntimeConfig config = runtimeAssembler.assemble(spec, version,
+            AgentRuntimeConfig config = runtimeAssembler.assemble(spec, snapshot.version(),
                     OPENAI_USER, OPENAI_SESSION_PREFIX + effectiveRequestId(requestId));
             return runtimeGateway.chatOpenAi(config, messages,
                     effectiveRequestId(requestId));

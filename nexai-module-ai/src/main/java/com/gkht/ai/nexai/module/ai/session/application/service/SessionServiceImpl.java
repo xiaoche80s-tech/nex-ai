@@ -1,6 +1,8 @@
 package com.gkht.ai.nexai.module.ai.session.application.service;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
+import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecService;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
@@ -62,6 +64,9 @@ public class SessionServiceImpl implements SessionService {
     private SessionConverter sessionConverter;
 
     @Resource
+    private AgentSpecService agentSpecService;
+
+    @Resource
     private AgentSpecRepository agentSpecRepository;
 
     @Resource
@@ -104,10 +109,7 @@ public class SessionServiceImpl implements SessionService {
                                                 DebugSessionConfirmCommand command, Long userId) {
         Session session = requireSession(sessionId);
         if (session.getStatus() != SessionStatus.ASKING) {
-            return Flux.just(RuntimeEvent.of(
-                    com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType.SESSION_ERROR,
-                    JsonUtils.toJsonString(java.util.Map.of("type", "SESSION_ERROR",
-                            "message", "当前会话没有挂起的审批"))));
+            return Flux.just(RuntimeEvent.sessionError("当前会话没有挂起的审批"));
         }
         AgentRuntimeConfig config = assembleRuntime(session, userId);
         List<ToolCallDecision> decisions = command.getDecisions().stream()
@@ -184,20 +186,16 @@ public class SessionServiceImpl implements SessionService {
         if (session.getStatus() != SessionStatus.ASKING || !session.hasPendingConfirmations()) {
             return List.of();
         }
-        // 挂起的 payload 为 RequireUserConfirmEvent JSON（含 toolCalls 数组），
-        // 按事件结构解析出工具调用列表 → 审批卡片 DTO（恢复渲染，工单 09）
-        List<ToolCallJSON> toolCalls = JsonUtils.parseArray(
-                session.getPendingConfirmations(), "toolCalls", ToolCallJSON.class);
-        if (toolCalls == null) {
-            return List.of();
-        }
-        return toolCalls.stream()
-                .map(tc -> {
+        // 挂起的 payload 为 RequireUserConfirmEvent JSON，经事件读侧 codec 解析出工具调用
+        // 列表 → 审批卡片 DTO（恢复渲染，工单 09；schema 知识单点在 codec）
+        return AgentscopeEventCodec.parsePendingToolCalls(session.getPendingConfirmations())
+                .stream()
+                .map(toolCall -> {
                     PendingConfirmationDTO dto = new PendingConfirmationDTO();
-                    dto.setToolCallId(tc.getId());
-                    dto.setToolName(tc.getName());
-                    dto.setArgumentsJson(tc.getInput() == null ? null
-                            : JsonUtils.toJsonString(tc.getInput()));
+                    dto.setToolCallId(toolCall.toolCallId());
+                    dto.setToolName(toolCall.toolName());
+                    dto.setArgumentsJson(toolCall.arguments() == null || toolCall.arguments().isEmpty()
+                            ? null : JsonUtils.toJsonString(toolCall.arguments()));
                     return dto;
                 })
                 .toList();
@@ -224,49 +222,39 @@ public class SessionServiceImpl implements SessionService {
         return runtimeGateway.readWorkspaceFile(config, relativePath);
     }
 
-    /** RequireUserConfirmEvent.toolCalls 数组元素（与 agentscope ToolUseBlock 序列化同构） */
-    @lombok.Data
-    private static class ToolCallJSON {
-        private String id;
-        private String name;
-        private java.util.Map<String, Object> input;
-    }
-
     // ------------------------------------------------------------------
     //  装配指令组装（快路径/回退分流）
     // ------------------------------------------------------------------
 
     /**
      * 会话 → 装配指令：读规格（当前版本或指定版本快照）后经共享组装器装配
-     * （与 OpenAI 兼容出口同一装配链，工单 16）。快路径：指定版本为空 → 用规格当前版本
-     * （常驻缓存命中复用）；非默认版本 → specReference 不同，自然回落 per-spec 装配。
+     * （与 OpenAI 兼容出口同一装配链，工单 16）。快路径：指定版本为空 → 经生效快照
+     * 单一入口解析（常驻缓存命中复用）；非默认版本 → specReference 不同，自然回落
+     * per-spec 装配。
      */
     private AgentRuntimeConfig assembleRuntime(Session session, Long userId) {
-        AgentSpec spec = requireSpec(session.getSpecId());
-        AgentSpecVersion version = resolveVersion(spec, session.getVersionNo());
+        AgentSpec spec;
+        AgentSpecVersion version;
+        if (session.getVersionNo() != null) {
+            spec = requireSpec(session.getSpecId());
+            version = resolveSpecifiedVersion(spec, session.getVersionNo());
+        } else {
+            EffectiveSpecSnapshot snapshot = agentSpecService.resolveCurrentVersion(session.getSpecId());
+            spec = snapshot.spec();
+            version = snapshot.version();
+        }
         String runtimeUserId = userId == null ? AgentRuntimeAssembler.ANONYMOUS_USER
                 : String.valueOf(userId);
         return runtimeAssembler.assemble(spec, version, runtimeUserId, session.getSessionKey());
     }
 
-    /** 解析装配版本快照：会话指定版本优先，否则规格当前版本 */
-    private AgentSpecVersion resolveVersion(AgentSpec spec, Integer requestedVersionNo) {
-        if (requestedVersionNo != null) {
-            List<AgentSpecVersion> versions = agentSpecRepository.listVersions(spec.getId());
-            return versions.stream()
-                    .filter(v -> v.getVersionNo().equals(requestedVersionNo))
-                    .findFirst()
-                    .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID,
-                            "版本 " + requestedVersionNo + " 不存在"));
-        }
-        if (!spec.hasPublishedVersion()) {
-            throw exception(SESSION_ASSEMBLE_INVALID, "规格尚未发布版本");
-        }
-        List<AgentSpecVersion> versions = agentSpecRepository.listVersions(spec.getId());
-        return versions.stream()
-                .filter(v -> v.getVersionNo().equals(spec.getCurrentVersionNo()))
+    /** 解析指定版本快照（会话绑定的历史版本；默认版本走生效快照单一入口） */
+    private AgentSpecVersion resolveSpecifiedVersion(AgentSpec spec, Integer requestedVersionNo) {
+        return agentSpecRepository.listVersions(spec.getId()).stream()
+                .filter(v -> v.getVersionNo().equals(requestedVersionNo))
                 .findFirst()
-                .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失"));
+                .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID,
+                        "版本 " + requestedVersionNo + " 不存在"));
     }
 
     private Session requireSession(Long id) {

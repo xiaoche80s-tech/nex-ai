@@ -11,18 +11,20 @@ import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import org.springframework.stereotype.Component;
 
 /**
- * 按渠道提供商构造 agentscope ChatModel 的共用工厂（ADR-0001：模型构造直用 agentscope）。
+ * 按渠道提供商构造 agentscope ChatModel 的共用工厂（{@link ChatModelProvider} 端口实现，
+ * ADR-0001：模型构造直用 agentscope）。
  *
  * <p>渠道连通性探测（本聚合）与运行时装配（session 聚合，工单 05）共用同一条
  * 模型构造路径——探测通过即等价于装配可用。渠道未配置 baseUrl 时各提供商用自身默认端点。</p>
  */
 @Component
-public class ChatModelFactory {
+public class ChatModelFactory implements ChatModelProvider {
 
     /**
      * 构造指定渠道下某模型的 ChatModel 实例。
      * 每次调用新建实例（agentscope 线程模型：单 agent 单 session 串行，实例不跨会话复用）。
      */
+    @Override
     public Model create(Channel channel, String modelId) {
         ChannelProvider provider = channel.getProvider();
         String baseUrl = channel.getBaseUrl();

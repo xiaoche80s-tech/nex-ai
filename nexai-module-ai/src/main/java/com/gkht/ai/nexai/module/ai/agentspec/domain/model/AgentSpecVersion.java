@@ -88,12 +88,9 @@ public class AgentSpecVersion {
         return new AgentSpecVersion(id, specId, versionNo, config, note, createTime);
     }
 
-    /** 可空文本规范化：空白归 null，其余去首尾空白 */
+    /** 可空文本规范化：空白归 null，其余去首尾空白（收敛于 {@link NullableTexts}） */
     private static String normalizeNullable(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.strip();
+        return NullableTexts.normalizeNullable(value);
     }
 
     public Long getId() {

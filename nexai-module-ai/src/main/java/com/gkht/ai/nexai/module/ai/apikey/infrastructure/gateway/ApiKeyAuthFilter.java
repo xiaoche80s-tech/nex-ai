@@ -24,8 +24,10 @@ import java.nio.charset.StandardCharsets;
  */
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
-    /** 拦截的请求路径前缀（OpenAI 兼容出口） */
-    public static final String OPENAI_PATH_PREFIX = "/app-api/ai/openai/";
+    /** OpenAI 兼容出口路径（不含 /app-api 前缀，web starter 包通配符挂载前缀后的路径段） */
+    public static final String OPENAI_PATH = "/ai/openai";
+    /** 完整出口前缀（含 /app-api）：过滤器拦截判断、URL pattern 与 permitAll 共用此唯一拼写 */
+    public static final String OPENAI_FULL_PREFIX = "/app-api" + OPENAI_PATH;
     /** 请求 attribute 名：认证通过的 Key 聚合（出口 controller 校验规格范围用） */
     public static final String ATTRIBUTE_AUTHENTICATED_KEY = "nexaiAuthenticatedApiKey";
 
@@ -36,7 +38,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith(OPENAI_PATH_PREFIX);
+        return !request.getRequestURI().startsWith(OPENAI_FULL_PREFIX + "/");
     }
 
     @Override

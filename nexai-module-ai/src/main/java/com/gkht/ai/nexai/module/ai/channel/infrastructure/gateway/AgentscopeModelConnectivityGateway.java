@@ -3,6 +3,7 @@ package com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway;
 import com.gkht.ai.nexai.module.ai.channel.domain.gateway.ModelConnectivityGateway;
 import com.gkht.ai.nexai.module.ai.channel.domain.model.Channel;
 import com.gkht.ai.nexai.module.ai.channel.domain.valueobject.ConnectivityResult;
+import com.gkht.ai.nexai.module.ai.shared.util.RootCauses;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.GenerateOptions;
@@ -30,13 +31,13 @@ public class AgentscopeModelConnectivityGateway implements ModelConnectivityGate
     private static final String PROBE_USER_ID = "nexai-connectivity-probe";
 
     @Resource
-    private ChatModelFactory chatModelFactory;
+    private ChatModelProvider chatModelProvider;
 
     @Override
     public ConnectivityResult probe(Channel channel, String modelId) {
         long startNanos = System.nanoTime();
         try {
-            ChatResponse response = chatModelFactory.create(channel, modelId)
+            ChatResponse response = chatModelProvider.create(channel, modelId)
                     .stream(List.of(new UserMessage(PROBE_USER_ID, "ping")), null,
                             new GenerateOptions.Builder().maxTokens(PROBE_MAX_TOKENS).build())
                     .next()
@@ -49,31 +50,13 @@ public class AgentscopeModelConnectivityGateway implements ModelConnectivityGate
             return ConnectivityResult.success(elapsedMs,
                     String.format("连通正常（响应 ID：%s）", response.getId()));
         } catch (Exception ex) {
-            return ConnectivityResult.failure(elapsedMs(startNanos), rootMessage(ex));
+            return ConnectivityResult.failure(elapsedMs(startNanos),
+                    RootCauses.rootMessage(ex, MAX_MESSAGE_LENGTH));
         }
     }
 
     private long elapsedMs(long startNanos) {
         return Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
-    }
-
-    /**
-     * 逐层解包取根因消息（Reactor 会用 RuntimeException 包装底层 HTTP 异常），
-     * 带异常类型名便于分辨鉴权/超时/模型名错误，并截断到展示上限。
-     */
-    private String rootMessage(Throwable ex) {
-        Throwable current = ex;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        String message = current.getMessage();
-        if (message == null || message.isBlank()) {
-            message = current.getClass().getSimpleName();
-        } else {
-            message = current.getClass().getSimpleName() + ": " + message;
-        }
-        return message.length() > MAX_MESSAGE_LENGTH
-                ? message.substring(0, MAX_MESSAGE_LENGTH) + "…" : message;
     }
 
 }

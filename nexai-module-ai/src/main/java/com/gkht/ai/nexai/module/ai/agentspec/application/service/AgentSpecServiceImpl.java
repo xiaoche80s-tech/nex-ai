@@ -8,6 +8,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMou
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
@@ -41,6 +42,7 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PU
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_USER_OWNER_LOGIN_REQUIRED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_CONFLICT;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASSEMBLE_INVALID;
 
 /**
  * 智能体规格应用服务实现。写走聚合（Repository 端口），读按轻量读写分离经 Mapper 直查转 DTO。
@@ -112,22 +114,15 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Transactional(rollbackFor = Exception.class)
     public Integer publishSpec(AgentSpecPublishCommand command) {
         AgentSpec spec = requireSpec(command.getId());
-        Integer maxVersionNo = agentSpecRepository.findMaxVersionNo(command.getId());
-        int nextVersionNo = maxVersionNo == null ? 1 : maxVersionNo + 1;
-        AgentSpecVersion version;
         try {
-            version = spec.publish(nextVersionNo, command.getNote());
+            // 版本簿记（max+1、快照插入、指针推进）收拢在端口单方法内，事务内原子
+            return agentSpecRepository.persistPublication(spec, command.getNote());
         } catch (IllegalStateException ex) {
             throw exception(AGENT_SPEC_PUBLISH_INVALID, ex.getMessage());
-        }
-        try {
-            agentSpecRepository.saveVersion(version);
-            agentSpecRepository.update(spec);
         } catch (DuplicateKeyException ex) {
             // 并发发布由版本唯一索引兜底（版本号重复），转业务错误码而非 500
             throw exception(AGENT_SPEC_VERSION_CONFLICT);
         }
-        return version.getVersionNo();
     }
 
     @Override
@@ -147,13 +142,46 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Transactional(rollbackFor = Exception.class)
     public void switchSpecVersion(AgentSpecSwitchVersionCommand command) {
         AgentSpec spec = requireSpec(command.getId());
+        // 解析出目标版本对象即证明其存在（存在性不再以布尔旗标喂给聚合）
+        AgentSpecVersion target = agentSpecRepository.listVersions(command.getId()).stream()
+                .filter(v -> v.getVersionNo().equals(command.getVersionNo()))
+                .findFirst()
+                .orElseThrow(() -> exception(AGENT_SPEC_VERSION_NOT_EXISTS, command.getId()));
         try {
-            spec.switchToVersion(command.getVersionNo(),
-                    agentSpecRepository.existsVersion(command.getId(), command.getVersionNo()));
+            spec.switchToVersion(target);
         } catch (IllegalStateException ex) {
             throw exception(AGENT_SPEC_VERSION_NOT_EXISTS, command.getId());
         }
-        agentSpecRepository.update(spec);
+        agentSpecRepository.save(spec);
+    }
+
+    @Override
+    public EffectiveSpecSnapshot resolveCurrentVersion(Long specId) {
+        return resolveCurrent(requireSpec(specId));
+    }
+
+    @Override
+    public EffectiveSpecSnapshot resolveCurrentVersionByCode(String specCode) {
+        AgentSpec spec = agentSpecRepository.findBySpecCode(specCode);
+        if (spec == null) {
+            throw exception(AGENT_SPEC_NOT_EXISTS);
+        }
+        return resolveCurrent(spec);
+    }
+
+    /**
+     * 生效快照解析（单一真相）：当前版本指针指向的版本快照，缺失即数据一致性问题，
+     * 显式报错（错误码/消息与原两处入口内联实现逐字一致）。
+     */
+    private EffectiveSpecSnapshot resolveCurrent(AgentSpec spec) {
+        if (!spec.hasPublishedVersion()) {
+            throw exception(SESSION_ASSEMBLE_INVALID, "规格尚未发布版本");
+        }
+        AgentSpecVersion version = agentSpecRepository.listVersions(spec.getId()).stream()
+                .filter(v -> v.getVersionNo() == spec.getCurrentVersionNo())
+                .findFirst()
+                .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失"));
+        return new EffectiveSpecSnapshot(spec, version);
     }
 
     /** 读取规格，不存在报业务异常（不存在/跨租户/已删除均归此） */

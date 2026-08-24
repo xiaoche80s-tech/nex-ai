@@ -1,8 +1,9 @@
-package com.gkht.ai.nexai.module.ai.session.domain.valueobject;
+package com.gkht.ai.nexai.module.ai.shared.runtime;
 
 /**
- * RuntimeContext extra 维度键常量（工单 14）：装配网关注入、审计/用量 middleware 读取，
- * 两端共用同一口径，防字符串键漂移。tenantId/sessionKey/agentId/specId/versionNo 五维。
+ * RuntimeContext extra 维度键常量（工单 14，工单 21 上移 shared——事实上的
+ * shared kernel：session 装配网关注入、audit/usage 采集 middleware 读取，
+ * 三聚合共用同一口径，防字符串键漂移）。tenantId/sessionKey/agentId/specId/versionNo 五维。
  */
 public interface RuntimeContextKeys {
 

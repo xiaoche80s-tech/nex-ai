@@ -67,6 +67,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Import({DebugSessionController.class, SessionServiceImpl.class, SessionRepositoryImpl.class,
         SessionConverterImpl.class, SessionMapper.class,
         com.gkht.ai.nexai.module.ai.session.application.service.AgentRuntimeAssembler.class,
+        com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecServiceImpl.class,
+        com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverterImpl.class,
         TenantDbTestConfiguration.class, DebugSessionControllerTest.StubRepositoryConfiguration.class,
         DebugSessionControllerTest.FakeRuntimeGatewayConfiguration.class})
 public class DebugSessionControllerTest extends BaseDbUnitTest {
@@ -221,7 +223,7 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
             return new AgentSpecRepository() {
                 @Override
                 public Long save(AgentSpec spec) {
-                    return 1L;
+                    return spec.getId() == null ? 1L : spec.getId();
                 }
 
                 @Override
@@ -239,28 +241,14 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 }
 
                 @Override
-                public Integer findMaxVersionNo(Long specId) {
-                    return 1;
-                }
-
-                @Override
-                public Long saveVersion(com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion version) {
-                    return 1L;
-                }
-
-                @Override
                 public List<com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion> listVersions(Long specId) {
                     return List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion
                             .reconstitute(1L, 1L, 1, mountedConfig(), null, null));
                 }
 
                 @Override
-                public boolean existsVersion(Long specId, int versionNo) {
-                    return versionNo == 1;
-                }
-
-                @Override
-                public void update(AgentSpec spec) {
+                public Integer persistPublication(AgentSpec spec, String note) {
+                    return 1;
                 }
             };
         }
@@ -323,11 +311,6 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 @Override
                 public Long save(Skill skill) {
                     return 5L;
-                }
-
-                @Override
-                public Skill findByNameAndOwner(SkillOwnerLevel ownerLevel, Long ownerUserId, String name) {
-                    return null;
                 }
 
                 @Override

@@ -15,6 +15,9 @@ public enum ExecutionCapability {
     PYTHON,
 
     /** Node.js 代码执行 */
-    NODE
+    NODE;
+
+    /** 能力字面量（Command 校验注解共用，一条规则一处真相） */
+    public static final String REGEX = "SHELL|PYTHON|NODE";
 
 }

@@ -20,6 +20,9 @@ public enum FolderType {
     ASSET,
 
     /** 工具集文件夹：物化到 workspace toolsets/&lt;name&gt;/，脚本执行受沙箱校验链约束 */
-    TOOLSET
+    TOOLSET;
+
+    /** 类型字面量（Command 校验注解共用，一条规则一处真相） */
+    public static final String REGEX = "ASSET|TOOLSET";
 
 }

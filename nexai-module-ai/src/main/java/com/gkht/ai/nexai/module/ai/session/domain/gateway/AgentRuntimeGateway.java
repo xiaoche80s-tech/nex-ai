@@ -3,7 +3,6 @@ package com.gkht.ai.nexai.module.ai.session.domain.gateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallContext;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
 import reactor.core.publisher.Flux;
 
@@ -63,7 +62,7 @@ public interface AgentRuntimeGateway {
      *
      * @param config    装配指令
      * @param decisions 每个挂起工具调用的三态决定（toolCallId 与 {@code RequireUserConfirmEvent}
-     *                  推送的 {@link ToolCallContext} 一一对应）
+     *                  推送的挂起上下文一一对应）
      */
     Flux<RuntimeEvent> confirmToolCalls(AgentRuntimeConfig config, List<ToolCallDecision> decisions);
 

@@ -6,6 +6,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublis
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 
 import java.util.List;
@@ -55,5 +56,21 @@ public interface AgentSpecService {
      * @param command 切换命令
      */
     void switchSpecVersion(AgentSpecSwitchVersionCommand command);
+
+    /**
+     * 解析生效快照（规格 + 当前版本指针指向的版本快照），运行侧入口的统一寻址方式
+     *
+     * @throws com.gkht.ai.nexai.framework.common.exception.ServiceException 规格不存在、
+     *         尚未发布版本或当前版本快照缺失
+     */
+    EffectiveSpecSnapshot resolveCurrentVersion(Long specId);
+
+    /**
+     * 按业务编码解析生效快照（OpenAI 兼容出口的 model 路由寻址方式）
+     *
+     * @throws com.gkht.ai.nexai.framework.common.exception.ServiceException 规格不存在、
+     *         尚未发布版本或当前版本快照缺失
+     */
+    EffectiveSpecSnapshot resolveCurrentVersionByCode(String specCode);
 
 }

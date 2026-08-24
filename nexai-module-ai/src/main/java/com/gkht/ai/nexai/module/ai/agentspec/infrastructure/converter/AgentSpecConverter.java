@@ -125,7 +125,8 @@ public interface AgentSpecConverter {
         }
 
         AgentSpecConfig toDomain() {
-            return AgentSpecConfig.of(modelId, description, systemPrompt, maxIters,
+            // 快照读走信任构造：写时已经 of() 校验，历史快照按固化时规则成立（不重跑当前校验）
+            return AgentSpecConfig.reconstitute(modelId, description, systemPrompt, maxIters,
                     generateOptions == null ? null : generateOptions.toDomain(),
                     skillIds,
                     tools == null ? null : tools.stream().map(ToolMountJSON::toDomain).toList(),
@@ -193,15 +194,15 @@ public interface AgentSpecConverter {
 
         static ToolMountJSON from(ToolMount mount) {
             ToolMountJSON json = new ToolMountJSON();
-            json.setSource(mount.getSource().name());
-            json.setSourceId(mount.getSourceId());
-            json.setAllowedTools(mount.getAllowedTools());
-            json.setSensitiveTools(mount.getSensitiveTools());
+            json.setSource(mount.source().name());
+            json.setSourceId(mount.sourceId());
+            json.setAllowedTools(mount.allowedTools());
+            json.setSensitiveTools(mount.sensitiveTools());
             return json;
         }
 
         ToolMount toDomain() {
-            return ToolMount.of(source == null ? null : ToolSource.valueOf(source),
+            return new ToolMount(source == null ? null : ToolSource.valueOf(source),
                     sourceId, allowedTools, sensitiveTools);
         }
 
@@ -217,14 +218,14 @@ public interface AgentSpecConverter {
 
         static FolderMountJSON from(FolderMount mount) {
             FolderMountJSON json = new FolderMountJSON();
-            json.setType(mount.getType().name());
-            json.setName(mount.getName());
-            json.setFiles(mount.getFiles().stream().map(FolderFileJSON::from).toList());
+            json.setType(mount.type().name());
+            json.setName(mount.name());
+            json.setFiles(mount.files().stream().map(FolderFileJSON::from).toList());
             return json;
         }
 
         FolderMount toDomain() {
-            return FolderMount.of(type == null ? null : FolderType.valueOf(type), name,
+            return new FolderMount(type == null ? null : FolderType.valueOf(type), name,
                     files == null ? null : files.stream().map(FolderFileJSON::toDomain).toList());
         }
 

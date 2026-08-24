@@ -1,7 +1,6 @@
 package com.gkht.ai.nexai.module.ai.usage.infrastructure.gateway;
 
-import com.gkht.ai.nexai.module.ai.framework.config.AiObservabilityProperties;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeContextKeys;
+import com.gkht.ai.nexai.module.ai.shared.runtime.RuntimeContextKeys;
 import com.gkht.ai.nexai.module.ai.shared.util.TenantExecution;
 import com.gkht.ai.nexai.module.ai.usage.domain.model.ModelUsage;
 import com.gkht.ai.nexai.module.ai.usage.domain.repository.ModelUsageRepository;
@@ -37,9 +36,6 @@ public class UsageCollectorMiddleware implements MiddlewareBase {
 
     @Resource
     private ModelUsageRepository modelUsageRepository;
-
-    @Resource
-    private AiObservabilityProperties observabilityProperties;
 
     @Override
     public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input,

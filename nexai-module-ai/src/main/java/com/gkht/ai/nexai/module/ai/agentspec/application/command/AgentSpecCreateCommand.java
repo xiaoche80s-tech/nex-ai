@@ -10,6 +10,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import lombok.Data;
 
 import java.util.List;
@@ -26,12 +29,14 @@ public class AgentSpecCreateCommand {
 
     @Schema(description = "规格名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "客服助手")
     @NotBlank(message = "规格名称不能为空")
-    @Size(max = 64, message = "规格名称不能超过 64 个字符")
+    @Size(max = AgentSpec.NAME_MAX_LENGTH,
+            message = "规格名称不能超过 " + AgentSpec.NAME_MAX_LENGTH + " 个字符")
     private String name;
 
     @Schema(description = "业务编码（slug，创建后不可变）", requiredMode = Schema.RequiredMode.REQUIRED, example = "customer-service")
     @NotBlank(message = "业务编码不能为空")
-    @Pattern(regexp = "^[a-z][a-z0-9-]{1,63}$", message = "业务编码须为小写字母开头的小写字母/数字/连字符组合（2~64 位）")
+    @Pattern(regexp = AgentSpec.SPEC_CODE_REGEX,
+            message = "业务编码须为小写字母开头的小写字母/数字/连字符组合（2~64 位）")
     private String specCode;
 
     @Schema(description = "归属层级（MVP 开放 TENANT/USER，平台级后置；不填默认租户级）", example = "TENANT")
@@ -39,7 +44,8 @@ public class AgentSpecCreateCommand {
     private String ownerLevel;
 
     @Schema(description = "图标标识", example = "ep:service")
-    @Size(max = 128, message = "图标标识不能超过 128 个字符")
+    @Size(max = AgentSpec.ICON_MAX_LENGTH,
+            message = "图标标识不能超过 " + AgentSpec.ICON_MAX_LENGTH + " 个字符")
     private String icon;
 
     // —— agent 层（模型管理落地前 modelId 可空，发布时校验补齐） ——
@@ -48,11 +54,13 @@ public class AgentSpecCreateCommand {
     private Long modelId;
 
     @Schema(description = "自描述（列表展示用）", example = "企业智能客服，处理售前与售后咨询")
-    @Size(max = 1024, message = "规格自描述不能超过 1024 个字符")
+    @Size(max = AgentSpecConfig.DESCRIPTION_MAX_LENGTH,
+            message = "规格自描述不能超过 " + AgentSpecConfig.DESCRIPTION_MAX_LENGTH + " 个字符")
     private String description;
 
     @Schema(description = "系统提示", example = "你是企业的智能客服")
-    @Size(max = 16384, message = "系统提示不能超过 16384 个字符")
+    @Size(max = AgentSpecConfig.SYSTEM_PROMPT_MAX_LENGTH,
+            message = "系统提示不能超过 " + AgentSpecConfig.SYSTEM_PROMPT_MAX_LENGTH + " 个字符")
     private String systemPrompt;
 
     @Schema(description = "推理参数：最大迭代轮数，不填运行时取默认", example = "10")
@@ -95,6 +103,7 @@ public class AgentSpecCreateCommand {
     private Boolean sandboxEnabled;
 
     @Schema(description = "沙箱内开放的执行能力（SHELL/PYTHON/NODE，仅沙箱模式可选）", example = "[\"PYTHON\"]")
-    private List<@Pattern(regexp = "SHELL|PYTHON|NODE", message = "执行能力仅支持 SHELL/PYTHON/NODE") String> capabilities;
+    private List<@Pattern(regexp = ExecutionCapability.REGEX,
+                    message = "执行能力仅支持 SHELL/PYTHON/NODE") String> capabilities;
 
 }

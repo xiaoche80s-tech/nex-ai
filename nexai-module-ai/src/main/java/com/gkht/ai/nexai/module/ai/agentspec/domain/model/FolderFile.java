@@ -18,13 +18,13 @@ import java.util.regex.Pattern;
  */
 public record FolderFile(String path, String url, String contentHash, long size) {
 
-    /** 相对路径长度上限 */
-    static final int PATH_MAX_LENGTH = 512;
-    /** 存储地址长度上限 */
-    static final int URL_MAX_LENGTH = 1024;
-    /** SHA-256 hex 长度 */
-    private static final int SHA256_HEX_LENGTH = 64;
-    private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
+    /** 相对路径长度上限（Command 校验注解共用） */
+    public static final int PATH_MAX_LENGTH = 512;
+    /** 存储地址长度上限（Command 校验注解共用） */
+    public static final int URL_MAX_LENGTH = 1024;
+    /** 内容 SHA-256 hex 格式（Command 校验注解共用，一条规则一处真相） */
+    public static final String CONTENT_HASH_REGEX = "^[0-9a-f]{64}$";
+    private static final Pattern HEX_PATTERN = Pattern.compile(CONTENT_HASH_REGEX);
 
     public FolderFile {
         if (path == null || path.isBlank()) {

@@ -8,25 +8,26 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
-import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory;
 import com.gkht.ai.nexai.module.ai.framework.config.AiRuntimeProperties;
+import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelProvider;
 import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
-import com.gkht.ai.nexai.module.ai.mcpserver.infrastructure.gateway.AgentscopeMcpServerGateway;
+import com.gkht.ai.nexai.module.ai.mcpserver.infrastructure.gateway.McpClientFactory;
 import com.gkht.ai.nexai.module.infra.api.file.FileApi;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeContextKeys;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory;
+import com.gkht.ai.nexai.module.ai.shared.runtime.RuntimeContextKeys;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
+import com.gkht.ai.nexai.module.ai.session.infrastructure.runtime.AgentInstanceManager;
+import com.gkht.ai.nexai.module.ai.session.infrastructure.runtime.AgentInstanceManager.InstanceEntry;
+import com.gkht.ai.nexai.module.ai.session.infrastructure.runtime.AssembledAgent;
+import com.gkht.ai.nexai.module.ai.session.infrastructure.runtime.EventTranslator;
 import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolEntry;
 import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry;
 import com.gkht.ai.nexai.module.ai.shared.util.Hashes;
 import com.gkht.ai.nexai.module.ai.shared.util.RootCauses;
 import io.agentscope.core.agent.RuntimeContext;
-import io.agentscope.core.event.AgentEvent;
-import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.ToolUseBlock;
@@ -66,9 +67,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * agentscope 运行时网关实现（ADR-0001 直用，零子类翻译）：把 {@link HarnessAgent} 的调用面
@@ -82,7 +80,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * （工单 08/12/13），旧实例按引用计数善后 close（MCP client 一并关闭——框架不级联，平台自管）。
  * 同 (userId, sessionId) 的并发调用由框架槽位门排队（FIFO），不同会话并行。</p>
  *
- * <p><b>模型注册</b>：{@code ModelRegistry} 为 JVM 级静态表，实例构建时按「租户:渠道:模型」注册
+ * <p><b>模型注册</b>：agentscope {@code ModelRegistry} 为 JVM 级静态表，实例构建时按「租户:渠道:模型」注册
  * 一次；模型/密钥变更经版本戳失效重建时重新注册覆盖（进程内全局生效，重建即刷新）。</p>
  *
  * <p><b>挂载翻译（工单 12/13 语义定案）</b>：技能挂载目录 → {@code FileSystemSkillRepository}
@@ -97,8 +95,6 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
 
     private static final Logger log = LoggerFactory.getLogger(AgentscopeRuntimeGateway.class);
 
-    /** 事件 JSON 载荷的错误类型（非 agentscope 类型，平台侧收尾语义） */
-    private static final String ERROR_EVENT_TYPE = "SESSION_ERROR";
     /** 沙箱容器内 workspace 根（框架约定） */
     private static final String SANDBOX_WORKSPACE_ROOT = "/workspace";
     /** 平台内置工具移除清单（web 工具对租户智能体无配置即无意义，且 key 泄漏面大） */
@@ -116,8 +112,13 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     @Resource
     private DataSource dataSource;
 
+    /** 模型装配端口（channel infrastructure，探测与装配共用的模型构造路径） */
     @Resource
-    private ChatModelFactory chatModelFactory;
+    private ChatModelProvider chatModelProvider;
+
+    /** MCP client 建连工厂（mcpserver infrastructure，跨聚合经 domain 连接配置协作） */
+    @Resource
+    private McpClientFactory mcpClientFactory;
 
     /** 运行时工具贡献者（测试注入敏感工具/回显工具的接缝；生产挂载走装配指令翻译） */
     @Resource
@@ -135,8 +136,8 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     @Autowired(required = false)
     private List<io.agentscope.core.middleware.MiddlewareBase> runtimeCollectorMiddlewares = List.of();
 
-    /** 常驻实例注册表（线程安全；装配一次、常驻复用，版本戳失效重建） */
-    private final AgentInstanceManager instanceManager = new AgentInstanceManager();
+    /** 常驻实例注册表（线程安全；装配一次、常驻复用，版本戳失效重建；装配经回调注入） */
+    private final AgentInstanceManager instanceManager = new AgentInstanceManager(this::assemble);
 
     @Override
     public Flux<RuntimeEvent> chat(AgentRuntimeConfig config, String content) {
@@ -149,7 +150,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                 RuntimeContext context = runtimeContext(config);
                 Msg userMsg = new UserMessage(content);
                 return entry.agent().streamEvents(List.of(userMsg), context)
-                        .map(this::toRuntimeEvent)
+                        .map(EventTranslator::toRuntimeEvent)
                         .onErrorResume(ex -> Flux.just(errorEvent(rootMessage(ex))))
                         .doFinally(signal -> instanceManager.release(entry));
             } catch (Exception ex) {
@@ -213,7 +214,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                         .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, results))
                         .build();
                 return entry.agent().streamEvents(List.of(confirmMsg), context)
-                        .map(this::toRuntimeEvent)
+                        .map(EventTranslator::toRuntimeEvent)
                         .onErrorResume(ex -> Flux.just(errorEvent(rootMessage(ex))))
                         .doFinally(signal -> instanceManager.release(entry));
             } catch (Exception ex) {
@@ -317,7 +318,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
      * 按装配指令构建 HarnessAgent（实例管理器回调）。
      * 四层配置逐层翻译：agent 层（模型/系统提示/迭代上限）、模型调用层（GenerateOptions）、
      * 执行环境层（workspace/沙箱/能力→镜像）、挂载层（技能目录→文件仓库、敏感名单→permission ASK、
-     * 工具挂载→Toolkit 注册）。模型经 ModelRegistry 按名注册解析（注册一次，重建刷新）。
+     * 工具挂载→Toolkit 注册）。模型经 agentscope ModelRegistry 按名注册解析（注册一次，重建刷新）。
      *
      * @return 装配结果（agent 实例 + 需随实例善后关闭的 MCP client 清单——框架不级联，平台自管）
      */
@@ -423,9 +424,9 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     private List<McpClientWrapper> registerMountedTools(Toolkit toolkit, AgentRuntimeConfig config) {
         List<McpClientWrapper> mcpClients = new ArrayList<>();
         for (ToolMount mount : config.getTools()) {
-            if (mount.getSource() == ToolSource.MCP) {
+            if (mount.source() == ToolSource.MCP) {
                 registerMcpMount(toolkit, config, mount, mcpClients);
-            } else if (mount.getSource() == ToolSource.PLATFORM) {
+            } else if (mount.source() == ToolSource.PLATFORM) {
                 registerPlatformMount(toolkit, mount);
             }
         }
@@ -436,28 +437,29 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     private void registerMcpMount(Toolkit toolkit, AgentRuntimeConfig config, ToolMount mount,
                                   List<McpClientWrapper> mcpClients) {
         McpServer server = config.getMcpServers().stream()
-                .filter(candidate -> candidate.getId().equals(mount.getSourceId()))
+                .filter(candidate -> candidate.getId().equals(mount.sourceId()))
                 .findFirst().orElse(null);
         if (server == null) {
             // 应用层已做配置性校验，此处防御性跳过（不阻断装配）
-            log.warn("MCP 挂载 {} 未在装配指令中解析出 Server，跳过", mount.getSourceId());
+            log.warn("MCP 挂载 {} 未在装配指令中解析出 Server，跳过", mount.sourceId());
             return;
         }
         McpClientWrapper client = null;
         try {
-            Duration timeout = connectTimeout(server);
-            client = AgentscopeMcpServerGateway.buildClient(server, timeout).buildSync();
+            // 连接知识在 McpServer 聚合（toConnectionConfig），SDK 组装在建连工厂（跨聚合无 agentscope 类型）
+            client = mcpClientFactory.buildSync(
+                    server.toConnectionConfig(connectTimeout(server)));
             // 白名单收敛：挂载白名单优先；空则 server 级白名单；再空（= null）= 该 server 全部工具
-            List<String> enableTools = !mount.getAllowedTools().isEmpty()
-                    ? mount.getAllowedTools()
+            List<String> enableTools = !mount.allowedTools().isEmpty()
+                    ? mount.allowedTools()
                     : !server.getAllowedTools().isEmpty() ? server.getAllowedTools() : null;
             // registration().apply() 内部完成 initialize + listTools + 过滤注册（阻塞到完成）
             toolkit.registration().mcpClient(client).enableTools(enableTools).apply();
             mcpClients.add(client);
         } catch (Exception ex) {
             log.warn("MCP 工具挂载不可用，降级跳过（server={}, sourceId={}）：{}",
-                    server.getName(), mount.getSourceId(), rootMessage(ex), ex);
-            closeMcpQuietly(client);
+                    server.getName(), mount.sourceId(), rootMessage(ex), ex);
+            AssembledAgent.closeClientQuietly(client);
         }
     }
 
@@ -470,18 +472,18 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
      */
     private void registerPlatformMount(Toolkit toolkit, ToolMount mount) {
         if (platformToolRegistry == null) {
-            log.warn("平台工具库注册表未装配（测试上下文？），挂载 {} 跳过", mount.getSourceId());
+            log.warn("平台工具库注册表未装配（测试上下文？），挂载 {} 跳过", mount.sourceId());
             return;
         }
-        PlatformToolEntry entry = platformToolRegistry.findById(mount.getSourceId());
+        PlatformToolEntry entry = platformToolRegistry.findById(mount.sourceId());
         if (entry == null) {
-            log.warn("平台工具库条目 {} 不存在（部署版本间条目增删？），挂载跳过", mount.getSourceId());
+            log.warn("平台工具库条目 {} 不存在（部署版本间条目增删？），挂载跳过", mount.sourceId());
             return;
         }
         toolkit.registerTool(entry.getToolInstance());
-        if (!mount.getAllowedTools().isEmpty()) {
+        if (!mount.allowedTools().isEmpty()) {
             for (String toolName : entry.getToolNames()) {
-                if (!mount.getAllowedTools().contains(toolName)) {
+                if (!mount.allowedTools().contains(toolName)) {
                     try {
                         toolkit.removeTool(toolName);
                     } catch (Exception ex) {
@@ -497,22 +499,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         return RootCauses.minTimeout(server.getTimeoutSeconds(), MCP_CONNECT_TIMEOUT_CAP);
     }
 
-    private static void closeMcpQuietly(McpClientWrapper client) {
-        if (client != null) {
-            try {
-                client.close();
-            } catch (Exception ex) {
-                log.debug("关闭 MCP client 失败（忽略）：{}", ex.getMessage());
-            }
-        }
-    }
-
-    /** 渠道/模型 → ModelRegistry 命名注册（租户:渠道:模型），返回注册名 */
+    /** 渠道/模型 → agentscope ModelRegistry 命名注册（租户:渠道:模型），返回注册名 */
     private String registerModel(AgentRuntimeConfig config) {
         String registryName = String.format("nexai:t%s:m%s",
                 config.getChannel().getId(), config.getModel().getId());
         ModelRegistry.register(registryName,
-                chatModelFactory.create(config.getChannel(), config.getModel().getModelId()));
+                chatModelProvider.create(config.getChannel(), config.getModel().getModelId()));
         return registryName;
     }
 
@@ -538,7 +530,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
      *  白名单非空时名单为其子集（ToolMount 已校验）。 */
     private static List<PermissionRule> sensitiveRules(AgentRuntimeConfig config) {
         return config.getTools().stream()
-                .flatMap(mount -> mount.getSensitiveTools().stream())
+                .flatMap(mount -> mount.sensitiveTools().stream())
                 .distinct()
                 .map(tool -> new PermissionRule(tool, null, PermissionBehavior.ASK, "nexai"))
                 .toList();
@@ -602,12 +594,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
      */
     private void materializeFolders(Path workspace, AgentRuntimeConfig config) {
         for (FolderMount folder : config.getFolders()) {
-            Path dir = workspace.resolve(folder.targetSegment()).resolve(folder.getName());
-            for (FolderFile file : folder.getFiles()) {
+            Path dir = workspace.resolve(folder.targetSegment()).resolve(folder.name());
+            for (FolderFile file : folder.files()) {
                 Path target = resolveWithin(dir, file.path());
                 if (target == null) {
                     throw new IllegalStateException(
-                            "文件夹挂载路径逃逸：" + folder.getName() + "/" + file.path());
+                            "文件夹挂载路径逃逸：" + folder.name() + "/" + file.path());
                 }
                 try {
                     if (Files.exists(target)
@@ -616,7 +608,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                     }
                     if (fileApi == null) {
                         throw new IllegalStateException(
-                                "文件存储 API 未装配，无法物化文件夹：" + folder.getName());
+                                "文件存储 API 未装配，无法物化文件夹：" + folder.name());
                     }
                     byte[] content = fileApi.getFileContent(file.url());
                     if (content == null) {
@@ -625,7 +617,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                     }
                     if (!file.contentHash().equals(sha256Hex(content))) {
                         throw new IllegalStateException("文件夹挂载内容哈希不匹配（存储对象已被覆盖？）："
-                                + folder.getName() + "/" + file.path());
+                                + folder.name() + "/" + file.path());
                     }
                     Files.createDirectories(target.getParent());
                     Files.write(target, content);
@@ -684,51 +676,9 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     //  事件流翻译
     // ------------------------------------------------------------------
 
-    private RuntimeEvent toRuntimeEvent(AgentEvent event) {
-        RuntimeEventType type = toRuntimeType(event.getType());
-        String payload = JsonUtils.getJsonCodec().toJson(event);
-        return RuntimeEvent.of(type, payload);
-    }
-
-    private static RuntimeEventType toRuntimeType(AgentEventType type) {
-        return switch (type) {
-            case AGENT_START -> RuntimeEventType.AGENT_START;
-            case AGENT_END -> RuntimeEventType.AGENT_END;
-            case AGENT_RESULT -> RuntimeEventType.AGENT_RESULT;
-            case MODEL_CALL_START -> RuntimeEventType.MODEL_CALL_START;
-            case MODEL_CALL_END -> RuntimeEventType.MODEL_CALL_END;
-            case TEXT_BLOCK_START -> RuntimeEventType.TEXT_BLOCK_START;
-            case TEXT_BLOCK_DELTA -> RuntimeEventType.TEXT_BLOCK_DELTA;
-            case TEXT_BLOCK_END -> RuntimeEventType.TEXT_BLOCK_END;
-            case THINKING_BLOCK_START -> RuntimeEventType.THINKING_BLOCK_START;
-            case THINKING_BLOCK_DELTA -> RuntimeEventType.THINKING_BLOCK_DELTA;
-            case THINKING_BLOCK_END -> RuntimeEventType.THINKING_BLOCK_END;
-            case DATA_BLOCK_START -> RuntimeEventType.DATA_BLOCK_START;
-            case DATA_BLOCK_DELTA -> RuntimeEventType.DATA_BLOCK_DELTA;
-            case DATA_BLOCK_END -> RuntimeEventType.DATA_BLOCK_END;
-            case TOOL_CALL_START -> RuntimeEventType.TOOL_CALL_START;
-            case TOOL_CALL_DELTA -> RuntimeEventType.TOOL_CALL_DELTA;
-            case TOOL_CALL_END -> RuntimeEventType.TOOL_CALL_END;
-            case TOOL_RESULT_START -> RuntimeEventType.TOOL_RESULT_START;
-            case TOOL_RESULT_TEXT_DELTA -> RuntimeEventType.TOOL_RESULT_TEXT_DELTA;
-            case TOOL_RESULT_DATA_DELTA -> RuntimeEventType.TOOL_RESULT_DATA_DELTA;
-            case TOOL_RESULT_END -> RuntimeEventType.TOOL_RESULT_END;
-            case REQUIRE_USER_CONFIRM -> RuntimeEventType.REQUIRE_USER_CONFIRM;
-            case USER_CONFIRM_RESULT -> RuntimeEventType.USER_CONFIRM_RESULT;
-            case EXCEED_MAX_ITERS -> RuntimeEventType.EXCEED_MAX_ITERS;
-            case REQUEST_STOP -> RuntimeEventType.REQUEST_STOP;
-            case ALL_TOOLS_DENIED -> RuntimeEventType.ALL_TOOLS_DENIED;
-            case CUSTOM -> RuntimeEventType.CUSTOM;
-            // 平台暂不消费的框架事件类型：外部执行/子代理暴露/提示块统一透传为 CUSTOM
-            case REQUIRE_EXTERNAL_EXECUTION, EXTERNAL_EXECUTION_RESULT,
-                    SUBAGENT_EXPOSED, HINT_BLOCK -> RuntimeEventType.CUSTOM;
-        };
-    }
-
     private static RuntimeEvent errorEvent(String message) {
-        String payload = JsonUtils.getJsonCodec().toJson(Map.of(
-                "type", ERROR_EVENT_TYPE, "message", message));
-        return RuntimeEvent.of(RuntimeEventType.SESSION_ERROR, payload);
+        // 平台错误帧统一经值对象工厂构造（JSON 转义与 null 兜底单点处理）
+        return RuntimeEvent.sessionError(message);
     }
 
     // ------------------------------------------------------------------
@@ -761,136 +711,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     }
 
     // ------------------------------------------------------------------
-    //  常驻实例注册表（工单 05 基座 + 工单 08 版本戳失效）
+    //  常驻实例（生命周期与版本戳失效在 infrastructure/runtime/AgentInstanceManager）
     // ------------------------------------------------------------------
 
     /** agentscope 槽位状态键（与框架约定一致） */
     private interface AgentStateKeys {
         String CONTEXT_KEY = "agent_state";
-    }
-
-    /**
-     * 常驻实例条目：agent 实例 + 挂载建连的 MCP client + 引用计数 + 版本戳。acquire 递增计数
-     * （活动流持有），release 递减；引用归零且已失效（版本戳变化被替换）时善后 close。
-     * close 释放后台资源（转录镜像排空/TaskRepository/workspace 索引，HarnessAgent#close），
-     * MCP client 框架不级联关闭，由本条目一并善后（工单 13）。
-     */
-    private static final class InstanceEntry {
-        private final HarnessAgent agent;
-        private final List<McpClientWrapper> mcpClients;
-        private final String key;
-        private final AtomicInteger refs = new AtomicInteger();
-        private volatile String stamp;
-        private volatile boolean stale;
-
-        InstanceEntry(AssembledAgent assembled, String key, String stamp) {
-            this.agent = assembled.agent();
-            this.mcpClients = assembled.mcpClients();
-            this.key = key;
-            this.stamp = stamp;
-        }
-
-        HarnessAgent agent() {
-            return agent;
-        }
-    }
-
-    /** 装配结果：agent 实例 + 需随实例善后关闭的 MCP client 清单 */
-    private record AssembledAgent(HarnessAgent agent, List<McpClientWrapper> mcpClients) {
-    }
-
-    /**
-     * 常驻实例管理器：按「规格 + 版本号」（specReference）缓存，版本戳变化时失效重建。
-     *
-     * <p>快路径/回退分流（工单 08）：MVP 调试会话一律按「默认版本 + 无覆盖」构造装配指令，
-     * 命中 {@code specId:versionNo} 缓存即快路径复用常驻实例；装配参数覆盖（非默认版本/
-     * 执行环境不符）由应用层构造不同 specReference，自然回落 per-spec 装配——本管理器
-     * 不感知分流细节，只按 specReference 缓存并做版本戳失效。</p>
-     *
-     * <p>版本戳 = 渠道/模型/MCP Server 更新时间 + 技能挂载指纹（skillId@versionNo）+
-     * 规格引用（任一变化即失效）：渠道/模型配置热更、MCP Server 配置变更、技能推新版本、
-     * 规格发布/切版本，都使下一次调用重建实例（新会话即用新配置，工单 08/12/13）。</p>
-     */
-    private final class AgentInstanceManager {
-
-        private final Map<String, InstanceEntry> instances = new ConcurrentHashMap<>();
-
-        /** 装配指令 → 版本戳（渠道/模型/MCP 更新时间 + 技能/文件夹指纹 + 规格引用），任一变化即失效 */
-        private String versionStamp(AgentRuntimeConfig config) {
-            long channelStamp = config.getChannel().getUpdateTime() == null
-                    ? 0L : config.getChannel().getUpdateTime().hashCode();
-            long modelStamp = config.getModel().getUpdateTime() == null
-                    ? 0L : config.getModel().getUpdateTime().hashCode();
-            long mcpStamp = config.getMcpServers().stream()
-                    .mapToLong(server -> server.getUpdateTime() == null
-                            ? 0L : server.getUpdateTime().hashCode()).sum();
-            String skillStamp = config.getSkillMounts().stream()
-                    .map(SkillMountDirectory::getFingerprint)
-                    .reduce("", String::concat);
-            // 文件夹挂载经版本发布自然纳入失效（清单固化进版本快照），指纹兜底同版本号下的清单比对
-            String folderStamp = config.getFolders().stream()
-                    .map(FolderMount::fingerprint)
-                    .reduce("", String::concat);
-            return config.specReference() + ":" + channelStamp + ":" + modelStamp
-                    + ":" + mcpStamp + ":" + skillStamp.hashCode() + ":" + folderStamp.hashCode();
-        }
-
-        /** 获取（或构建）实例并持有引用；调用方必须配对 release */
-        InstanceEntry acquire(AgentRuntimeConfig config) {
-            String key = config.specReference();
-            String stamp = versionStamp(config);
-            InstanceEntry existing = instances.get(key);
-            if (existing != null && !existing.stale && Objects.equals(existing.stamp, stamp)) {
-                existing.refs.incrementAndGet();
-                return existing;
-            }
-            // 无实例、已失效（stale）或版本戳不一致：构建新实例（版本戳失效重建），
-            // put 无条件替换——旧条目标记失效，引用归零后善后 close
-            InstanceEntry fresh = new InstanceEntry(assemble(config), key, stamp);
-            InstanceEntry replaced = instances.put(key, fresh);
-            fresh.refs.incrementAndGet();
-            if (replaced != null) {
-                replaced.stale = true;
-                closeIfIdle(replaced);
-            }
-            return fresh;
-        }
-
-        /** 仅查看（不持有引用）：中断定位用，实例不存在返回 null */
-        InstanceEntry peek(AgentRuntimeConfig config) {
-            return instances.get(config.specReference());
-        }
-
-        /** 释放引用；已失效（版本戳变化被替换）且引用归零时善后 close */
-        void release(InstanceEntry entry) {
-            if (entry.refs.decrementAndGet() == 0 && entry.stale) {
-                instances.remove(entry.key, entry);
-                closeQuietly(entry);
-            }
-        }
-
-        /** 被替换的旧实例若已无引用，立即善后 close（幂等：release 路径也会处理） */
-        private void closeIfIdle(InstanceEntry entry) {
-            if (entry.refs.get() == 0) {
-                instances.remove(entry.key, entry);
-                closeQuietly(entry);
-            }
-        }
-
-        void closeAll() {
-            instances.values().forEach(AgentscopeRuntimeGateway.this::closeQuietly);
-            instances.clear();
-        }
-    }
-
-    private void closeQuietly(InstanceEntry entry) {
-        try {
-            entry.agent.close();
-        } catch (Exception ex) {
-            log.warn("关闭常驻实例失败：{}", entry.agent.getName(), ex);
-        }
-        // MCP client 不随 agent.close 级联关闭（框架边界），平台自管善后
-        entry.mcpClients.forEach(AgentscopeRuntimeGateway::closeMcpQuietly);
     }
 
     private DistributedStore distributedStore() {

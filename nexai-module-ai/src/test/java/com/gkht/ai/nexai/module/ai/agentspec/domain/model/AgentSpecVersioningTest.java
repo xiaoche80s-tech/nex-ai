@@ -81,19 +81,20 @@ class AgentSpecVersioningTest {
     }
 
     @Test
-    @DisplayName("切换当前版本：目标版本存在则回退指针，不存在则拒绝且指针不变")
+    @DisplayName("切换当前版本：目标版本归属本规格则回退指针，缺失或不归属则拒绝且指针不变")
     void switchVersionChecksExistence() {
         AgentSpec spec = specWithDraft(1L);
-        spec.publish(1, null);
+        AgentSpecVersion v1 = spec.publish(1, null);
         spec.replaceDraft(AgentSpecConfig.of(1L, null, null, null, null, null, null, null, null));
         spec.publish(2, null);
         assertEquals(2, spec.getCurrentVersionNo());
 
-        spec.switchToVersion(1, true);
+        spec.switchToVersion(v1);
         assertEquals(1, spec.getCurrentVersionNo(), "回退到已发布版本应只移动当前版本指针");
 
+        // 归属其他规格的版本对象 = 悬空目标，拒绝且指针不动
         IllegalStateException missing = assertThrows(IllegalStateException.class,
-                () -> spec.switchToVersion(99, false));
+                () -> spec.switchToVersion(AgentSpecVersion.reconstitute(99L, 8L, 99, null, null, null)));
         assertEquals("版本 99 不存在", missing.getMessage());
         assertEquals(1, spec.getCurrentVersionNo(), "切换失败不得改变当前版本指针");
     }

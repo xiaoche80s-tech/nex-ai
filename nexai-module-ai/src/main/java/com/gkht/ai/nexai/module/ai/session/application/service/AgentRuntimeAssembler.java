@@ -85,16 +85,20 @@ public class AgentRuntimeAssembler {
             throw exception(SESSION_ASSEMBLE_INVALID, "租户上下文缺失");
         }
         String agentName = spec.getSpecCode() + "-v" + version.getVersionNo();
-        return AgentRuntimeConfig.of(userId, sessionKey, tenantId,
-                spec.getSpecCode(), agentName, spec.getId(), version.getVersionNo(),
-                spec.getOwnerLevel(), spec.getOwnerUserId(),
-                config.getSystemPrompt(), config.getMaxIters(),
-                config.getGenerateOptions(), config.getExecutionEnv(),
-                config.getTools(),
-                resolveSkillMounts(config, tenantId),
-                resolveMcpServers(config),
-                config.getFolders(),
-                channel, model);
+        return AgentRuntimeConfig.builder()
+                .userId(userId).sessionKey(sessionKey).tenantId(tenantId)
+                .agentId(spec.getSpecCode()).agentName(agentName)
+                .specId(spec.getId()).versionNo(version.getVersionNo())
+                .ownerLevel(spec.getOwnerLevel()).ownerUserId(spec.getOwnerUserId())
+                .systemPrompt(config.getSystemPrompt()).maxIters(config.getMaxIters())
+                .generateOptions(config.getGenerateOptions())
+                .executionEnv(config.getExecutionEnv())
+                .tools(config.getTools())
+                .skillMounts(resolveSkillMounts(config, tenantId))
+                .mcpServers(resolveMcpServers(config))
+                .folders(config.getFolders())
+                .channel(channel).model(model)
+                .build();
     }
 
     /**
@@ -141,13 +145,13 @@ public class AgentRuntimeAssembler {
     private List<McpServer> resolveMcpServers(AgentSpecConfig config) {
         List<McpServer> servers = new ArrayList<>();
         for (var mount : config.getTools()) {
-            if (mount.getSource() != ToolSource.MCP) {
+            if (mount.source() != ToolSource.MCP) {
                 continue;
             }
-            McpServer server = mcpServerRepository.findById(mount.getSourceId());
+            McpServer server = mcpServerRepository.findById(mount.sourceId());
             if (server == null) {
                 throw exception(SESSION_ASSEMBLE_INVALID,
-                        "挂载的 MCP Server 不存在（编号 " + mount.getSourceId() + "）");
+                        "挂载的 MCP Server 不存在（编号 " + mount.sourceId() + "）");
             }
             if (!server.isEnabled()) {
                 throw exception(SESSION_ASSEMBLE_INVALID,

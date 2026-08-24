@@ -56,15 +56,4 @@ public class AuditEventRepositoryImpl implements AuditEventRepository {
         return dataObject;
     }
 
-    /** DO → 领域模型（查询面第三波使用，先保口径完整） */
-    AuditEvent toDomain(AuditEventDO dataObject) {
-        return AuditEvent.record(dataObject.getTenantId(), dataObject.getSessionKey(),
-                dataObject.getSpecId(), dataObject.getVersionNo(), dataObject.getAgentId(),
-                dataObject.getUserId(), dataObject.getToolCallId(), dataObject.getToolName(),
-                ToolOutcome.fromStateName(dataObject.getOutcome()),
-                dataObject.getArgumentsDigest(), dataObject.getResultDigest(),
-                dataObject.getDurationMs(), dataObject.getOccurredAt())
-                .withId(dataObject.getId());
-    }
-
 }

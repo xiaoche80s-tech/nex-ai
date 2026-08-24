@@ -296,6 +296,24 @@ public class McpServer {
         return availableTools;
     }
 
+    /**
+     * 翻译为连接配置（工单 21 候选 6）：聚合自身的连接知识（传输/端点或命令/认证头）
+     * 收敛为纯 domain 值对象；SDK 侧组装由 infrastructure 建连工厂消费本配置完成，
+     * agentscope 类型不再跨聚合裸奔。
+     *
+     * @param requestTimeout 请求超时（探测/装配各自的取小结果），null = SDK 默认
+     */
+    public com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpConnectionConfig
+    toConnectionConfig(java.time.Duration requestTimeout) {
+        return new com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpConnectionConfig(
+                "nexai-mcp-" + id, transport, transport == McpTransport.STDIO ? command : null,
+                transport == McpTransport.STDIO ? args : null,
+                transport == McpTransport.STDIO ? env : null,
+                transport == McpTransport.STDIO ? null : endpoint,
+                transport == McpTransport.STDIO ? Map.of() : headers,
+                requestTimeout);
+    }
+
     public boolean isEnabled() {
         return enabled;
     }

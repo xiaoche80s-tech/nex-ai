@@ -11,6 +11,7 @@ import com.gkht.ai.nexai.module.ai.channel.domain.model.Model;
 import com.gkht.ai.nexai.module.ai.channel.domain.valueobject.ChannelOwnerType;
 import com.gkht.ai.nexai.module.ai.channel.domain.valueobject.ChannelProvider;
 import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory;
+import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelProvider;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
@@ -47,13 +48,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 运行时网关契约测试（PG 直连，接缝 = ChatModelFactory stub + FakeChatModel）：
+ * 运行时网关契约测试（PG 直连，接缝 = ChatModelProvider 端口 stub + FakeChatModel）：
  * 覆盖工单 05 的 Mock 模型事件流契约、PG 会话状态持久化（跨轮次上下文恢复）、
  * 以及「无 per-请求实例创建」——同一装配指令的多次调用复用常驻实例（由装配次数断言证明）；
  * 工单 12/13 的挂载翻译（技能物化目录注入 / MCP 降级 / 平台工具库白名单收敛）。
  */
 @Import({AgentscopeRuntimeGateway.class, AiRuntimeProperties.class,
         com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory.class,
+        com.gkht.ai.nexai.module.ai.mcpserver.infrastructure.gateway.McpClientFactory.class,
         com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry.class,
         com.gkht.ai.nexai.module.ai.shared.tool.builtin.SampleEchoTool.class,
         AgentscopeRuntimeGatewayTest.HitlToolConfiguration.class,
@@ -79,9 +81,9 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
     @Resource
     private AgentRuntimeGateway runtimeGateway;
 
-    /** 模型构造接缝：测试中 stub 为 FakeChatModel，装配链其余全真实 */
+    /** 模型构造接缝（端口）：测试中 stub 为 FakeChatModel，装配链其余全真实 */
     @MockitoBean
-    private ChatModelFactory chatModelFactory;
+    private ChatModelProvider chatModelFactory;
 
     private static final String USER_ID = "t1-user";
     private static final String SESSION_KEY = "dbg-contract-test";
@@ -476,10 +478,10 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "拒绝后应正常收尾");
     }
 
-    /** 从 RequireUserConfirmEvent JSON 提取首个 toolCall.id */
+    /** 从 RequireUserConfirmEvent JSON 提取首个 toolCall.id（经事件读侧 codec，schema 知识单点） */
     private String extractToolCallId(String payload) {
-        var node = com.gkht.ai.nexai.framework.common.util.json.JsonUtils.parseTree(payload);
-        return node.path("toolCalls").path(0).path("id").asText();
+        return com.gkht.ai.nexai.module.ai.session.application.service.AgentscopeEventCodec
+                .firstToolCallId(payload);
     }
 
     // ------------------------------------------------------------------

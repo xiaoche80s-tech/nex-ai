@@ -16,10 +16,10 @@ import java.util.Objects;
  */
 public final class AgentSpecConfig {
 
-    /** 自描述长度上限（字符） */
-    static final int DESCRIPTION_MAX_LENGTH = 1024;
-    /** 系统提示长度上限（字符） */
-    static final int SYSTEM_PROMPT_MAX_LENGTH = 16_384;
+    /** 自描述长度上限（字符；Command 校验注解共用） */
+    public static final int DESCRIPTION_MAX_LENGTH = 1024;
+    /** 系统提示长度上限（字符；Command 校验注解共用） */
+    public static final int SYSTEM_PROMPT_MAX_LENGTH = 16_384;
 
     // —— agent 层 ——
     /** 模型引用（ai_model.id，外部聚合引用），草稿态可空，发布时必须非空 */
@@ -79,11 +79,11 @@ public final class AgentSpecConfig {
                                      GenerateOptions generateOptions, List<Long> skillIds,
                                      List<ToolMount> tools, List<FolderMount> folders,
                                      ExecutionEnvConfig executionEnv) {
-        String strippedDescription = normalizeNullable(description);
+        String strippedDescription = NullableTexts.normalizeNullable(description);
         if (strippedDescription != null && strippedDescription.length() > DESCRIPTION_MAX_LENGTH) {
             throw new IllegalArgumentException("规格自描述不能超过 " + DESCRIPTION_MAX_LENGTH + " 个字符");
         }
-        String prompt = normalizeNullable(systemPrompt);
+        String prompt = NullableTexts.normalizeNullable(systemPrompt);
         if (prompt != null && prompt.length() > SYSTEM_PROMPT_MAX_LENGTH) {
             throw new IllegalArgumentException("系统提示不能超过 " + SYSTEM_PROMPT_MAX_LENGTH + " 个字符");
         }
@@ -92,14 +92,14 @@ public final class AgentSpecConfig {
         }
         // 挂载层语义：同一工具来源条目只挂一次（重复挂载的 whitelist 合并语义有歧义，直接拒绝）
         List<ToolMount> mounts = tools == null ? List.of() : List.copyOf(tools);
-        if (mounts.stream().map(tool -> tool.getSource() + ":" + tool.getSourceId()).distinct().count()
+        if (mounts.stream().map(tool -> tool.source() + ":" + tool.sourceId()).distinct().count()
                 != mounts.size()) {
             throw new IllegalArgumentException("同一工具来源条目不能重复挂载");
         }
         // 文件夹挂载语义（工单 18）：同规格文件夹名唯一；文件须落 workspace，须启用 workspace 才可挂载
         List<FolderMount> folderMounts = folders == null ? List.of() : List.copyOf(folders);
         if (!folderMounts.isEmpty()) {
-            if (folderMounts.stream().map(FolderMount::getName).distinct().count()
+            if (folderMounts.stream().map(FolderMount::name).distinct().count()
                     != folderMounts.size()) {
                 throw new IllegalArgumentException("同规格文件夹名不能重复");
             }
@@ -111,17 +111,25 @@ public final class AgentSpecConfig {
                 snapshotIds(skillIds), mounts, folderMounts, executionEnv);
     }
 
+    /**
+     * 快照读路径的信任构造（Repository/Converter 专用，与 {@link AgentSpec#reconstitute}
+     * 同惯例）：写时已经 {@link #of} 校验，历史快照按固化时规则成立——读路径不重跑当前
+     * 校验（校验规则收紧不使既有快照不可读），仅做文本规范化与不可变拷贝。
+     */
+    public static AgentSpecConfig reconstitute(Long modelId, String description, String systemPrompt,
+                                               Integer maxIters, GenerateOptions generateOptions,
+                                               List<Long> skillIds, List<ToolMount> tools,
+                                               List<FolderMount> folders,
+                                               ExecutionEnvConfig executionEnv) {
+        return new AgentSpecConfig(modelId, NullableTexts.normalizeNullable(description),
+                NullableTexts.normalizeNullable(systemPrompt), maxIters, generateOptions,
+                snapshotIds(skillIds), tools == null ? List.of() : List.copyOf(tools),
+                folders == null ? List.of() : List.copyOf(folders), executionEnv);
+    }
+
     /** 引用列表规范化为不可变快照（null 视为空列表） */
     private static List<Long> snapshotIds(List<Long> ids) {
         return ids == null ? List.of() : List.copyOf(ids);
-    }
-
-    /** 可空文本规范化：空白归 null，其余去首尾空白 */
-    private static String normalizeNullable(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.strip();
     }
 
     public Long getModelId() {

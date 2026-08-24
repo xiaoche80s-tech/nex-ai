@@ -5,6 +5,7 @@ import com.gkht.ai.nexai.module.ai.session.application.service.OpenAiCompatServi
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType;
+import com.gkht.ai.nexai.module.ai.session.interfaces.sse.SseBridge;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import io.agentscope.core.chat.completions.model.ChatCompletionsRequest;
 import jakarta.annotation.Resource;
@@ -17,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -87,51 +88,46 @@ public class OpenAiCompatController {
     }
 
     /**
-     * OPENAI_CHUNK → SSE data 帧 + 末尾 [DONE]（OpenAI 流式协议）；
+     * OPENAI_CHUNK → SSE data 帧 + 末尾 [DONE]（OpenAI 流式协议，壳在 {@link SseBridge}）；
      * SESSION_ERROR 事件（装配失败等）转 OpenAI 错误体首帧后收尾。
      */
     private SseEmitter bridge(Flux<RuntimeEvent> events) {
-        SseEmitter emitter = new SseEmitter(0L); // 无超时
-        events.subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        event -> sendChunk(emitter, event),
-                        error -> {
-                            sendErrorChunk(emitter, error.getMessage());
-                            emitter.complete();
-                        },
-                        () -> {
-                            sendRaw(emitter, DONE_MARKER);
-                            emitter.complete();
-                        });
-        return emitter;
+        return SseBridge.bridge(events, new SseBridge.FrameEncoder() {
+
+            @Override
+            public void encode(SseEmitter emitter, RuntimeEvent event) throws IOException {
+                if (event.type() == RuntimeEventType.OPENAI_CHUNK) {
+                    sendRaw(emitter, event.payload());
+                } else if (event.type() == RuntimeEventType.SESSION_ERROR) {
+                    // 装配期错误（规格未发布/模型停用等）转 OpenAI 错误体
+                    String message = String.valueOf(JsonUtils.parseTree(event.payload())
+                            .path("message").asText("服务暂不可用"));
+                    sendRaw(emitter, openAiErrorBody(message));
+                }
+                // 其余事件类型不出现在出口流（adapter 只产 chunk），忽略防御
+            }
+
+            @Override
+            public void encodeError(SseEmitter emitter, String message) throws IOException {
+                sendRaw(emitter, openAiErrorBody(message));
+            }
+
+            @Override
+            public void onComplete(SseEmitter emitter) throws IOException {
+                sendRaw(emitter, DONE_MARKER);
+            }
+        });
     }
 
-    private static void sendChunk(SseEmitter emitter, RuntimeEvent event) {
-        if (event.type() == RuntimeEventType.OPENAI_CHUNK) {
-            sendRaw(emitter, event.payload());
-        } else if (event.type() == RuntimeEventType.SESSION_ERROR) {
-            // 装配期错误（规格未发布/模型停用等）转 OpenAI 错误体
-            String message = String.valueOf(JsonUtils.parseTree(event.payload())
-                    .path("message").asText("服务暂不可用"));
-            sendErrorChunk(emitter, message);
-        }
-        // 其余事件类型不出现在出口流（adapter 只产 chunk），忽略防御
-    }
-
-    private static void sendErrorChunk(SseEmitter emitter, String message) {
-        sendRaw(emitter, JsonUtils.toJsonString(Map.of("error", Map.of(
+    private static String openAiErrorBody(String message) {
+        return JsonUtils.toJsonString(Map.of("error", Map.of(
                 "message", message == null ? "服务暂不可用" : message,
-                "type", "invalid_request_error"))));
+                "type", "invalid_request_error")));
     }
 
-    private static void sendRaw(SseEmitter emitter, String data) {
-        try {
-            // 显式 JSON 媒体类型：SSE 帧以 UTF-8 编码（默认媒体类型会把非 ASCII 写成问号）
-            emitter.send(SseEmitter.event().data(data, SSE_FRAME_MEDIA_TYPE));
-        } catch (Exception ex) {
-            // 客户端断开等 IO 失败：放弃后续帧（emitter 已不可用）
-            emitter.completeWithError(ex);
-        }
+    private static void sendRaw(SseEmitter emitter, String data) throws IOException {
+        // 显式 JSON 媒体类型：SSE 帧以 UTF-8 编码（默认媒体类型会把非 ASCII 写成问号）
+        emitter.send(SseEmitter.event().data(data, SSE_FRAME_MEDIA_TYPE));
     }
 
 }

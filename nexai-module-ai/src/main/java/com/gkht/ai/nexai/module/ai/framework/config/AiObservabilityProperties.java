@@ -30,9 +30,6 @@ public class AiObservabilityProperties {
         /** 是否采集审计事件（onActing 拦截点 → PG） */
         private boolean enabled = true;
 
-        /** 保留期限（天，仅配置承载；清理任务第三波立项） */
-        private int retentionDays = 365;
-
         /** 摘要截断长度（入参/结果摘要超过即截断） */
         private int maxPayloadLength = 512;
 
@@ -46,9 +43,6 @@ public class AiObservabilityProperties {
 
         /** 是否采集模型用量（onModelCall 拦截点 → PG） */
         private boolean enabled = true;
-
-        /** 保留期限（天，仅配置承载；清理任务第三波立项） */
-        private int retentionDays = 365;
     }
 
     /** OpenTelemetry 子配置 */

@@ -10,6 +10,14 @@
 智能体的声明式图纸——模型、系统提示、挂载与执行环境配置，带不可变版本快照；业务编码 spec_code 创建后不可变。
 _Avoid_: 智能体配置、agent 定义、prompt 模板
 
+**挂载（Mount）**:
+AgentSpec 声明的外部能力引用，sealed 家族（ToolMount/FolderMount/SkillMount…），共享校验/判等骨架，各挂载为薄 record。
+_Avoid_: 挂载项、mount 实体
+
+**生效快照（Effective Snapshot）**:
+当前版本指针指向的不可变版本快照；由 agentspec 的 resolveCurrentVersion 单一入口解析，运行侧各入口（调试台/OpenAI 出口/终端页面）统一消费，不自行筛选版本。
+_Avoid_: 当前配置、运行配置
+
 **Channel（渠道）**:
 模型服务接入点（提供商类型/端点/密钥），归属平台级或租户级。
 _Avoid_: 提供商、Provider、模型接入
@@ -47,6 +55,10 @@ _Avoid_: 运行时服务、runtime
 **AgentInstanceManager（智能体实例管理器）**:
 按 AgentSpec 惰性构建并常驻智能体实例、按版本戳失效重建的运行时组件。
 _Avoid_: 实例工厂、实例池
+
+**ChatModelProvider（模型装配端口）**:
+以渠道 + 模型标识换取 agentscope ChatModel 实例的装配端口（channel 侧接口）；连通性探测与运行时装配共用。
+_Avoid_: ChatModelFactory（实现类名）、模型工厂、ModelRegistry（与 agentscope 静态注册表重名）
 
 ### 治理对象
 

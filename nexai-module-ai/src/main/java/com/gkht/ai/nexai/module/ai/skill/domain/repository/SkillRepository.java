@@ -25,11 +25,6 @@ public interface SkillRepository {
     Skill findById(Long id);
 
     /**
-     * 按名称 + 归属读取 skill（创建时唯一性校验）
-     */
-    Skill findByNameAndOwner(SkillOwnerLevel ownerLevel, Long ownerUserId, String name);
-
-    /**
      * 删除 skill 及其版本链（聚合级联）
      */
     void deleteByIdCascade(Long id);

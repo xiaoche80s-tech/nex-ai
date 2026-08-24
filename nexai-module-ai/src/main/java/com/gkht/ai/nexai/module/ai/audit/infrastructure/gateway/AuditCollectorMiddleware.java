@@ -6,7 +6,7 @@ import com.gkht.ai.nexai.module.ai.audit.domain.model.SensitiveMasker;
 import com.gkht.ai.nexai.module.ai.audit.domain.model.ToolOutcome;
 import com.gkht.ai.nexai.module.ai.audit.domain.repository.AuditEventRepository;
 import com.gkht.ai.nexai.module.ai.framework.config.AiObservabilityProperties;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeContextKeys;
+import com.gkht.ai.nexai.module.ai.shared.runtime.RuntimeContextKeys;
 import com.gkht.ai.nexai.module.ai.shared.util.TenantExecution;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;

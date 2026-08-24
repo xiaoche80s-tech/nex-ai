@@ -39,6 +39,7 @@ import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServi
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_PUBLISH_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_VERSION_NOT_EXISTS;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASSEMBLE_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -323,6 +324,38 @@ public class AgentSpecVersionControllerTest extends BaseDbUnitTest {
         TenantContextHolder.setTenantId(2L);
         assertTrue(agentSpecVersionMapper.selectListBySpecId(specId).isEmpty());
         assertFalse(agentSpecVersionMapper.existsBySpecAndVersion(specId, 1));
+    }
+
+    @Test
+    @DisplayName("生效快照单一入口：解析出规格+当前指针版本，未发布/不存在被拒")
+    public void resolveCurrentVersionSingleEntry() {
+        Long specId = createSpec("cs-resolve", 1L, "提示");
+        // 未发布：拒绝（运行侧不得装配未发布规格）
+        assertServiceException(() -> agentSpecService.resolveCurrentVersion(specId),
+                SESSION_ASSEMBLE_INVALID, "规格尚未发布版本");
+
+        // 发布两版后切回 v1：解析到的生效快照随指针走
+        agentSpecService.publishSpec(publishCommand(specId, null));
+        agentSpecService.publishSpec(publishCommand(specId, null));
+        AgentSpecSwitchVersionCommand backToV1 = new AgentSpecSwitchVersionCommand();
+        backToV1.setId(specId);
+        backToV1.setVersionNo(1);
+        agentSpecService.switchSpecVersion(backToV1);
+
+        var byId = agentSpecService.resolveCurrentVersion(specId);
+        assertEquals("cs-resolve", byId.spec().getSpecCode());
+        assertEquals(1, byId.version().getVersionNo(), "生效快照 = 当前版本指针指向的版本");
+
+        // 按业务编码寻址（OpenAI 出口 model 路由）同口径
+        var byCode = agentSpecService.resolveCurrentVersionByCode("cs-resolve");
+        assertEquals(specId, byCode.spec().getId());
+        assertEquals(1, byCode.version().getVersionNo());
+
+        // 寻址失败：规格不存在
+        assertServiceException(() -> agentSpecService.resolveCurrentVersion(9999L),
+                AGENT_SPEC_NOT_EXISTS);
+        assertServiceException(() -> agentSpecService.resolveCurrentVersionByCode("no-such-code"),
+                AGENT_SPEC_NOT_EXISTS);
     }
 
 }

@@ -84,6 +84,9 @@ public class OpenAiCompatContractTest {
             org.springframework.boot.webmvc.autoconfigure.WebMvcAutoConfiguration.class,
             OpenAiCompatController.class,
             com.gkht.ai.nexai.module.ai.session.application.service.OpenAiCompatServiceImpl.class,
+            // 生效快照单一入口：出口服务经 agentspec 应用服务解析（repository 已被 mock）
+            com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecServiceImpl.class,
+            com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverterImpl.class,
             com.gkht.ai.nexai.module.ai.framework.config.AiOpenApiConfiguration.class,
             com.gkht.ai.nexai.module.ai.apikey.infrastructure.repository.TenantApiKeyRepositoryImpl.class,
             OpenAiCompatContractTest.H2DbConfiguration.class,

@@ -4,11 +4,10 @@ import com.gkht.ai.nexai.module.ai.mcpserver.domain.gateway.McpServerGateway;
 import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
 import com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpProbeResult;
 import com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpToolSummary;
-import com.gkht.ai.nexai.module.ai.mcpserver.domain.valueobject.McpTransport;
 import com.gkht.ai.nexai.module.ai.shared.util.RootCauses;
-import io.agentscope.core.tool.mcp.McpClientBuilder;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
 import io.modelcontextprotocol.spec.McpSchema;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,8 +16,8 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * MCP Server 探测网关（agentscope 适配器，ADR-0001 直用）：按注册的传输构造
- * {@link McpClientBuilder}（与运行时装配走同一套构造路径），initialize + listTools
+ * MCP Server 探测网关（agentscope 适配器，ADR-0001 直用）：经聚合翻译的连接配置 +
+ * {@link McpClientFactory} 建连（与运行时装配同一套建连路径），initialize + listTools
  * 拉取工具清单。探测不抛异常——成败与根因一律封装在 {@link McpProbeResult} 中。
  */
 @Component
@@ -31,12 +30,15 @@ public class AgentscopeMcpServerGateway implements McpServerGateway {
     /** 失败信息截断长度 */
     private static final int MAX_MESSAGE_LENGTH = 500;
 
+    @Resource
+    private McpClientFactory mcpClientFactory;
+
     @Override
     public McpProbeResult probe(McpServer server, Long tenantId) {
         long startNanos = System.nanoTime();
         McpClientWrapper client = null;
         try {
-            client = buildClient(server, probeTimeout(server)).buildSync();
+            client = mcpClientFactory.buildSync(server.toConnectionConfig(probeTimeout(server)));
             List<McpSchema.Tool> tools = client.initialize()
                     .then(client.listTools())
                     .block(PROBE_TIMEOUT_CAP);
@@ -52,26 +54,6 @@ public class AgentscopeMcpServerGateway implements McpServerGateway {
         } finally {
             closeQuietly(client);
         }
-    }
-
-    /**
-     * 按聚合配置构造 client builder（探测与运行时装配共用本翻译，三传输 + 认证头）。
-     */
-    public static McpClientBuilder buildClient(McpServer server, Duration requestTimeout) {
-        McpClientBuilder builder = McpClientBuilder.create("nexai-mcp-" + server.getId());
-        switch (server.getTransport()) {
-            case STDIO -> builder.stdioTransport(server.getCommand(), server.getArgs(),
-                    server.getEnv());
-            case SSE -> builder.sseTransport(server.getEndpoint());
-            case STREAMABLE_HTTP -> builder.streamableHttpTransport(server.getEndpoint());
-        }
-        if (server.getTransport() != McpTransport.STDIO) {
-            server.getHeaders().forEach(builder::header);
-        }
-        if (requestTimeout != null) {
-            builder.timeout(requestTimeout);
-        }
-        return builder;
     }
 
     /** 探测超时：server 自配超时与探测上限取小 */

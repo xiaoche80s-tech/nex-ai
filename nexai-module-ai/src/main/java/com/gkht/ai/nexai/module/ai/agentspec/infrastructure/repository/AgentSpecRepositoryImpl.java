@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * 智能体规格 Repository 实现：规格聚合根与其不可变版本快照的 DO ↔ 领域模型适配。
- * 聚合重建（reconstitute）与主体更新随版本发布工单启用；版本快照仅插入与查询（不可变）。
+ * 版本簿记（max+1、快照插入、指针更新）收拢在 persistPublication 单方法内。
  */
 @Repository
 public class AgentSpecRepositoryImpl implements AgentSpecRepository {
@@ -33,7 +33,11 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
     @Override
     public Long save(AgentSpec spec) {
         AgentSpecDO dataObject = agentSpecConverter.toDataObject(spec);
-        agentSpecMapper.insert(dataObject);
+        if (dataObject.getId() == null) {
+            agentSpecMapper.insert(dataObject);
+        } else {
+            agentSpecMapper.updateById(dataObject);
+        }
         return dataObject.getId();
     }
 
@@ -50,31 +54,20 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
     }
 
     @Override
-    public Integer findMaxVersionNo(Long specId) {
-        return agentSpecVersionMapper.selectMaxVersionNo(specId);
-    }
-
-    @Override
-    public Long saveVersion(AgentSpecVersion version) {
-        AgentSpecVersionDO dataObject = agentSpecConverter.toVersionDataObject(version);
-        agentSpecVersionMapper.insert(dataObject);
-        return dataObject.getId();
-    }
-
-    @Override
     public List<AgentSpecVersion> listVersions(Long specId) {
         return agentSpecVersionMapper.selectListBySpecId(specId).stream()
                 .map(this::reconstituteVersion).toList();
     }
 
     @Override
-    public boolean existsVersion(Long specId, int versionNo) {
-        return agentSpecVersionMapper.existsBySpecAndVersion(specId, versionNo);
-    }
-
-    @Override
-    public void update(AgentSpec spec) {
+    public Integer persistPublication(AgentSpec spec, String note) {
+        Integer maxVersionNo = agentSpecVersionMapper.selectMaxVersionNo(spec.getId());
+        int nextVersionNo = maxVersionNo == null ? 1 : maxVersionNo + 1;
+        AgentSpecVersion version = spec.publish(nextVersionNo, note);
+        AgentSpecVersionDO versionDataObject = agentSpecConverter.toVersionDataObject(version);
+        agentSpecVersionMapper.insert(versionDataObject);
         agentSpecMapper.updateById(agentSpecConverter.toDataObject(spec));
+        return version.getVersionNo();
     }
 
     private AgentSpec reconstitute(AgentSpecDO dataObject) {

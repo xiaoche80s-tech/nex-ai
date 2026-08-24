@@ -1,5 +1,6 @@
 package com.gkht.ai.nexai.module.ai.agentspec.application.command.mount;
 
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -18,7 +19,8 @@ public class ToolMountCommand {
 
     @Schema(description = "工具来源（MCP = MCP Server，PLATFORM = 平台工具库）", requiredMode = Schema.RequiredMode.REQUIRED, example = "MCP")
     @NotNull(message = "工具挂载必须声明来源")
-    @Pattern(regexp = "MCP|PLATFORM", message = "工具来源仅支持 MCP（MCP Server）与 PLATFORM（平台工具库）")
+    @Pattern(regexp = ToolMount.SOURCE_REGEX,
+            message = "工具来源仅支持 MCP（MCP Server）与 PLATFORM（平台工具库）")
     private String source;
 
     @Schema(description = "来源条目编号（MCP = MCP Server 编号；PLATFORM = 平台工具库条目编号）", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
@@ -26,11 +28,13 @@ public class ToolMountCommand {
     private Long sourceId;
 
     @Schema(description = "工具白名单（工具名），空 = 该来源全部工具", example = "[\"search\"]")
-    @Size(max = 128, message = "工具白名单不能超过 128 项")
+    @Size(max = ToolMount.ALLOWED_TOOLS_MAX_SIZE,
+            message = "工具白名单不能超过 " + ToolMount.ALLOWED_TOOLS_MAX_SIZE + " 项")
     private List<String> allowedTools;
 
     @Schema(description = "敏感工具名单（工具名）：名单内工具调用前挂起等人工审批（HITL）；白名单非空时须为其子集", example = "[\"delete_user\"]")
-    @Size(max = 128, message = "敏感工具名单不能超过 128 项")
+    @Size(max = ToolMount.SENSITIVE_TOOLS_MAX_SIZE,
+            message = "敏感工具名单不能超过 " + ToolMount.SENSITIVE_TOOLS_MAX_SIZE + " 项")
     private List<String> sensitiveTools;
 
 }

@@ -101,7 +101,7 @@ public final class AgentRuntimeConfig {
     }
 
     /**
-     * 构建装配指令
+     * 构建装配指令（位置参数便捷入口，测试与简单场景用；生产组装走 {@link #builder()}）
      *
      * @param userId      会话用户（anonymous 亦可），不能为 null
      * @param sessionKey  会话业务键，不能为 null
@@ -133,14 +133,155 @@ public final class AgentRuntimeConfig {
                                         List<McpServer> mcpServers,
                                         List<FolderMount> folders,
                                         Channel channel, Model model) {
-        if (userId == null || sessionKey == null || tenantId == null || agentId == null
-                || agentName == null || specId == null || ownerLevel == null
-                || channel == null || model == null) {
-            throw new IllegalArgumentException("装配指令的必填字段不能为空");
+        return builder()
+                .userId(userId).sessionKey(sessionKey).tenantId(tenantId)
+                .agentId(agentId).agentName(agentName)
+                .specId(specId).versionNo(versionNo)
+                .ownerLevel(ownerLevel).ownerUserId(ownerUserId)
+                .systemPrompt(systemPrompt).maxIters(maxIters)
+                .generateOptions(generateOptions).executionEnv(executionEnv)
+                .tools(tools).skillMounts(skillMounts)
+                .mcpServers(mcpServers).folders(folders)
+                .channel(channel).model(model)
+                .build();
+    }
+
+    /** 构建器入口：装配链字段多，生产组装按名赋值（新增字段不动既有调用点） */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /** 装配指令构建器：必填校验集中在 {@link Builder#build()} */
+    public static final class Builder {
+
+        private String userId;
+        private String sessionKey;
+        private Long tenantId;
+        private String agentId;
+        private String agentName;
+        private Long specId;
+        private Integer versionNo;
+        private OwnerLevel ownerLevel;
+        private Long ownerUserId;
+        private String systemPrompt;
+        private Integer maxIters;
+        private GenerateOptions generateOptions;
+        private ExecutionEnvConfig executionEnv;
+        private List<ToolMount> tools;
+        private List<SkillMountDirectory> skillMounts;
+        private List<McpServer> mcpServers;
+        private List<FolderMount> folders;
+        private Channel channel;
+        private Model model;
+
+        private Builder() {
         }
-        return new AgentRuntimeConfig(userId, sessionKey, tenantId, agentId, agentName, specId,
-                versionNo, ownerLevel, ownerUserId, systemPrompt, maxIters, generateOptions,
-                executionEnv, tools, skillMounts, mcpServers, folders, channel, model);
+
+        public Builder userId(String userId) {
+            this.userId = userId;
+            return this;
+        }
+
+        public Builder sessionKey(String sessionKey) {
+            this.sessionKey = sessionKey;
+            return this;
+        }
+
+        public Builder tenantId(Long tenantId) {
+            this.tenantId = tenantId;
+            return this;
+        }
+
+        public Builder agentId(String agentId) {
+            this.agentId = agentId;
+            return this;
+        }
+
+        public Builder agentName(String agentName) {
+            this.agentName = agentName;
+            return this;
+        }
+
+        public Builder specId(Long specId) {
+            this.specId = specId;
+            return this;
+        }
+
+        public Builder versionNo(Integer versionNo) {
+            this.versionNo = versionNo;
+            return this;
+        }
+
+        public Builder ownerLevel(OwnerLevel ownerLevel) {
+            this.ownerLevel = ownerLevel;
+            return this;
+        }
+
+        public Builder ownerUserId(Long ownerUserId) {
+            this.ownerUserId = ownerUserId;
+            return this;
+        }
+
+        public Builder systemPrompt(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
+            return this;
+        }
+
+        public Builder maxIters(Integer maxIters) {
+            this.maxIters = maxIters;
+            return this;
+        }
+
+        public Builder generateOptions(GenerateOptions generateOptions) {
+            this.generateOptions = generateOptions;
+            return this;
+        }
+
+        public Builder executionEnv(ExecutionEnvConfig executionEnv) {
+            this.executionEnv = executionEnv;
+            return this;
+        }
+
+        public Builder tools(List<ToolMount> tools) {
+            this.tools = tools;
+            return this;
+        }
+
+        public Builder skillMounts(List<SkillMountDirectory> skillMounts) {
+            this.skillMounts = skillMounts;
+            return this;
+        }
+
+        public Builder mcpServers(List<McpServer> mcpServers) {
+            this.mcpServers = mcpServers;
+            return this;
+        }
+
+        public Builder folders(List<FolderMount> folders) {
+            this.folders = folders;
+            return this;
+        }
+
+        public Builder channel(Channel channel) {
+            this.channel = channel;
+            return this;
+        }
+
+        public Builder model(Model model) {
+            this.model = model;
+            return this;
+        }
+
+        public AgentRuntimeConfig build() {
+            if (userId == null || sessionKey == null || tenantId == null || agentId == null
+                    || agentName == null || specId == null || ownerLevel == null
+                    || channel == null || model == null) {
+                throw new IllegalArgumentException("装配指令的必填字段不能为空");
+            }
+            return new AgentRuntimeConfig(userId, sessionKey, tenantId, agentId, agentName, specId,
+                    versionNo, ownerLevel, ownerUserId, systemPrompt, maxIters, generateOptions,
+                    executionEnv, tools, skillMounts, mcpServers, folders, channel, model);
+        }
     }
 
     public String getUserId() {

@@ -24,9 +24,9 @@ class FolderMountTest {
         FolderMount mount = assertDoesNotThrow(() -> FolderMount.of(FolderType.ASSET, "product-faq.2026",
                 List.of(FolderFile.of("faq.md", "http://f/1", HASH, 12L),
                         FolderFile.of("docs/guide.md", "http://f/2", "b".repeat(64), 40L))));
-        assertEquals(FolderType.ASSET, mount.getType());
-        assertEquals("product-faq.2026", mount.getName());
-        assertEquals(2, mount.getFiles().size());
+        assertEquals(FolderType.ASSET, mount.type());
+        assertEquals("product-faq.2026", mount.name());
+        assertEquals(2, mount.files().size());
     }
 
     @Test

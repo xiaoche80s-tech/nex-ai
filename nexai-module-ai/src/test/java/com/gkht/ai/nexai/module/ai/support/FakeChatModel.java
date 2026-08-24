@@ -20,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * （断言系统提示注入、跨轮次上下文、工具结果回填）。脚本耗尽后抛错（暴露意外调用）。
  *
  * <p>注入方式：测试 stub {@code ChatModelFactory}（create() 返回本实例），装配链其余
- * （ModelRegistry、agent 构建、PG 状态存储、事件流）全真实——接缝只打在模型上，
+ * （ChatModelProvider、agent 构建、PG 状态存储、事件流）全真实——接缝只打在模型上，
  * 符合 spec「主接缝 = HTTP API 层，模型用 Mock 模型」的辅助接缝约定。</p>
  */
 public class FakeChatModel implements Model {

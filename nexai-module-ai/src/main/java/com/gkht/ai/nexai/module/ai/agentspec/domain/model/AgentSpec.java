@@ -18,12 +18,13 @@ import java.util.regex.Pattern;
  */
 public class AgentSpec {
 
-    /** 名称长度上限（字符） */
-    static final int NAME_MAX_LENGTH = 64;
-    /** 图标长度上限（字符） */
-    static final int ICON_MAX_LENGTH = 128;
-    /** 业务编码格式：小写字母开头，小写字母/数字/连字符组成，总长 2~64 */
-    static final Pattern SPEC_CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,63}$");
+    /** 名称长度上限（字符；Command 校验注解共用） */
+    public static final int NAME_MAX_LENGTH = 64;
+    /** 图标长度上限（字符；Command 校验注解共用） */
+    public static final int ICON_MAX_LENGTH = 128;
+    /** 业务编码格式：小写字母开头，小写字母/数字/连字符组成，总长 2~64（Command 校验注解共用） */
+    public static final String SPEC_CODE_REGEX = "^[a-z][a-z0-9-]{1,63}$";
+    static final Pattern SPEC_CODE_PATTERN = Pattern.compile(SPEC_CODE_REGEX);
 
     /** 编号，未落库时为 null */
     private Long id;
@@ -74,8 +75,7 @@ public class AgentSpec {
             throw new IllegalArgumentException("新规格必须携带初始草稿");
         }
         return new AgentSpec(null, name.strip(), specCode.strip(), normalizeNullable(icon),
-                ownerLevel, ownerUserId, draft, null);
-    }
+                ownerLevel, ownerUserId, draft, null);    }
 
     /**
      * 从持久化数据重建聚合（Repository 专用，字段原样恢复）
@@ -125,17 +125,18 @@ public class AgentSpec {
     }
 
     /**
-     * 切换当前生效版本（回退指针）：仅校验目标版本确实存在。
+     * 切换当前生效版本（回退指针）：以传入的目标版本对象为准——存在性由调用方
+     * 解析出对象即证明（悬空指针在解析处报错），本方法只校验目标确实归属本聚合。
      *
-     * @param versionNo    目标版本号
-     * @param versionExists 目标版本是否已发布
-     * @throws IllegalStateException 目标版本未被发布（悬空指针）时抛出
+     * @param target 目标版本快照（须归属本规格）
+     * @throws IllegalStateException 目标版本不属于本规格时抛出
      */
-    public void switchToVersion(int versionNo, boolean versionExists) {
-        if (!versionExists) {
-            throw new IllegalStateException("版本 " + versionNo + " 不存在");
+    public void switchToVersion(AgentSpecVersion target) {
+        if (target == null || !Objects.equals(target.getSpecId(), id)) {
+            throw new IllegalStateException(
+                    "版本 " + (target == null ? null : target.getVersionNo()) + " 不存在");
         }
-        this.currentVersionNo = versionNo;
+        this.currentVersionNo = target.getVersionNo();
     }
 
     /** 当前生效版本号（当前版本指针），null 表示从未发布 */
@@ -182,12 +183,9 @@ public class AgentSpec {
         }
     }
 
-    /** 可空文本规范化：空白归 null，其余去首尾空白 */
+    /** 可空文本规范化：空白归 null，其余去首尾空白（收敛于 {@link NullableTexts}） */
     private static String normalizeNullable(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.strip();
+        return NullableTexts.normalizeNullable(value);
     }
 
     public Long getId() {

@@ -47,17 +47,6 @@ public class SkillRepositoryImpl implements SkillRepository {
     }
 
     @Override
-    public Skill findByNameAndOwner(SkillOwnerLevel ownerLevel, Long ownerUserId, String name) {
-        SkillDO dataObject = skillMapper.selectOne(
-                new com.gkht.ai.nexai.framework.mybatis.core.query.LambdaQueryWrapperX<SkillDO>()
-                        .eq(SkillDO::getOwnerLevel, ownerLevel.name())
-                        .eq(ownerUserId != null, SkillDO::getOwnerUserId, ownerUserId)
-                        .isNull(ownerUserId == null, SkillDO::getOwnerUserId)
-                        .eq(SkillDO::getName, name));
-        return dataObject == null ? null : reconstitute(dataObject);
-    }
-
-    @Override
     public void deleteByIdCascade(Long id) {
         skillMapper.deleteById(id);
         skillVersionMapper.delete(new com.gkht.ai.nexai.framework.mybatis.core.query.LambdaQueryWrapperX<SkillVersionDO>()

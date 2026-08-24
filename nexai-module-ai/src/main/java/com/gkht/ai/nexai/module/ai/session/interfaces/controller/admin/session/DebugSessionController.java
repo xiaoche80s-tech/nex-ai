@@ -11,6 +11,7 @@ import com.gkht.ai.nexai.module.ai.session.application.dto.SessionDTO;
 import com.gkht.ai.nexai.module.ai.session.application.query.SessionPageQuery;
 import com.gkht.ai.nexai.module.ai.session.application.service.SessionService;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
+import com.gkht.ai.nexai.module.ai.session.interfaces.sse.SseBridge;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -129,42 +130,32 @@ public class DebugSessionController {
     }
 
     /**
-     * Flux<RuntimeEvent> → SseEmitter 桥接：每个事件发一帧 data（载荷即事件 JSON），
-     * 流正常结束 complete，异常发 SESSION_ERROR 帧后 complete（不挂死连接）。
+     * Flux<RuntimeEvent> → SseEmitter 桥接（壳在 {@link SseBridge}，此处只声明帧形状）：
+     * 每个事件以事件类型名发一帧 data（载荷即事件 JSON），错误发 SESSION_ERROR 帧收尾。
      */
     private SseEmitter bridge(Flux<RuntimeEvent> events) {
-        SseEmitter emitter = new SseEmitter(0L); // 无超时（智能体轮次可能较长）
-        events.subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-                .subscribe(
-                        event -> send(emitter, event),
-                        error -> {
-                            sendError(emitter, error.getMessage());
-                            emitter.complete();
-                        },
-                        emitter::complete);
-        return emitter;
-    }
+        return SseBridge.bridge(events, new SseBridge.FrameEncoder() {
 
-    private void send(SseEmitter emitter, RuntimeEvent event) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(event.type().name())
-                    .data(event.payload()));
-        } catch (IOException ex) {
-            // 客户端断开：取消订阅（框架 doFinally 释放常驻实例引用）
-            emitter.completeWithError(ex);
-        }
-    }
+            @Override
+            public void encode(SseEmitter emitter, RuntimeEvent event) throws IOException {
+                emitter.send(SseEmitter.event()
+                        .name(event.type().name())
+                        .data(event.payload()));
+            }
 
-    private void sendError(SseEmitter emitter, String message) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("SESSION_ERROR")
-                    .data("{\"type\":\"SESSION_ERROR\",\"message\":\""
-                            + (message == null ? "未知错误" : message.replace("\"", "'")) + "\"}"));
-        } catch (IOException ignored) {
-            // 客户端已断开，忽略
-        }
+            @Override
+            public void encodeError(SseEmitter emitter, String message) throws IOException {
+                RuntimeEvent error = RuntimeEvent.sessionError(message);
+                emitter.send(SseEmitter.event()
+                        .name(error.type().name())
+                        .data(error.payload()));
+            }
+
+            @Override
+            public void onComplete(SseEmitter emitter) {
+                // 无收尾帧：流结束即 complete（由壳统一执行）
+            }
+        });
     }
 
 }
