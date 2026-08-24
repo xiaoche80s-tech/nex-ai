@@ -84,12 +84,18 @@
           <span>{{ scope.row.description || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('ai.spec.tableStatus')" align="center" width="110">
+      <el-table-column :label="t('ai.spec.tableStatus')" align="center" width="130">
         <template #default="scope">
-          <el-tag v-if="scope.row.currentVersionNo" type="success" disable-transitions>
+          <!-- 三态（工单 23）：从未发布=草稿；已发布且无草稿=vN 已发布（稳定）；已发布且有草稿=vN · 编辑中 -->
+          <el-tag v-if="!scope.row.currentVersionNo" type="warning" disable-transitions>
+            {{ t('ai.spec.statusDraft') }}
+          </el-tag>
+          <el-tag v-else-if="!scope.row.hasDraft" type="success" disable-transitions>
             {{ t('ai.spec.statusPublished') }} v{{ scope.row.currentVersionNo }}
           </el-tag>
-          <el-tag v-else type="warning" disable-transitions>{{ t('ai.spec.statusDraft') }}</el-tag>
+          <el-tag v-else type="primary" disable-transitions>
+            v{{ scope.row.currentVersionNo }} · {{ t('ai.spec.statusEditing') }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column
@@ -113,7 +119,7 @@
             link
             type="primary"
             v-hasPermi="['ai:spec:query']"
-            @click="openVersion(scope.row.id)"
+            @click="openVersion(scope.row)"
           >
             {{ t('ai.spec.version') }}
           </el-button>
@@ -185,10 +191,10 @@ const openForm = (id?: number) => {
   formRef.value.open(id)
 }
 
-/** 打开版本管理弹窗 */
+/** 打开版本管理弹窗（传整行：发布门禁需要 hasDraft 三态语义） */
 const versionRef = ref()
-const openVersion = (id: number) => {
-  versionRef.value.open(id)
+const openVersion = (row: SpecApi.AgentSpecVO) => {
+  versionRef.value.open(row)
 }
 
 /** 初始化 **/

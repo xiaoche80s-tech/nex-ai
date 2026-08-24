@@ -84,6 +84,23 @@ export interface AgentSpecConfig {
 /** 归属层级（MVP 开放 TENANT/USER，平台级后置） */
 export type OwnerLevel = 'TENANT' | 'USER'
 
+/** 配置平铺字段（四层，草稿回填与版本预览同构，对应后端 AgentSpecFlatConfigDTO） */
+export interface AgentSpecFlatConfig {
+  modelId: number | null
+  description: string | null
+  systemPrompt: string | null
+  maxIters: number | null
+  temperature: number | null
+  topP: number | null
+  maxTokens: number | null
+  skillIds: number[] | null
+  tools: ToolMount[] | null
+  folders: FolderMount[] | null
+  workspaceEnabled: boolean | null
+  sandboxEnabled: boolean | null
+  capabilities: ExecutionCapability[] | null
+}
+
 /** 智能体规格列表项（对应后端 AgentSpecDTO） */
 export interface AgentSpecVO {
   id: number
@@ -94,10 +111,10 @@ export interface AgentSpecVO {
   ownerLevel: string
   /** 归属用户编号（用户级 = 创建者） */
   ownerUserId: number | null
-  /** 描述（服务端从草稿 JSON 解析填充） */
+  /** 描述（服务端从草稿 JSON 解析填充；已发布无草稿时为空） */
   description: string | null
   icon: string | null
-  /** 是否有未发布草稿（当前无发布能力时恒为草稿态） */
+  /** 是否有草稿（发布清空草稿、编辑保存重建——列表三态渲染依据） */
   hasDraft: boolean
   /** 当前生效版本号（当前版本指针，运行寻址），null = 从未发布 */
   currentVersionNo: number | null
@@ -112,6 +129,17 @@ export interface AgentSpecVersionVO {
   /** 发布备注 */
   note: string | null
   /** 是否为当前生效版本 */
+  current: boolean
+  /** 发布人昵称（创建者已删除时回退编号） */
+  publisherName: string | null
+  createTime: Date
+}
+
+/** 版本快照详情（只读预览，对应后端 AgentSpecVersionDetailDTO：版本元信息 + 四层配置平铺） */
+export interface AgentSpecVersionDetailVO extends AgentSpecFlatConfig {
+  id: number
+  versionNo: number
+  note: string | null
   current: boolean
   createTime: Date
 }
@@ -130,8 +158,9 @@ export interface AgentSpecSwitchVersionForm {
   versionNo: number
 }
 
-/** 规格详情（编辑面回填，对应后端 AgentSpecDetailDTO：主体元数据 + 草稿配置平铺） */
-export interface AgentSpecDetailVO {
+/** 规格详情（编辑面回填，对应后端 AgentSpecDetailDTO：主体元数据 + 配置平铺，草稿优先、
+ *  已发布无草稿时取当前生效快照） */
+export interface AgentSpecDetailVO extends AgentSpecFlatConfig {
   id: number
   name: string
   /** 业务编码（创建后不可变） */
@@ -143,20 +172,6 @@ export interface AgentSpecDetailVO {
   /** 当前生效版本号（当前版本指针），null = 从未发布 */
   currentVersionNo: number | null
   createTime: Date
-  // —— 草稿配置平铺（与创建/更新表单同构） ——
-  modelId: number | null
-  description: string | null
-  systemPrompt: string | null
-  maxIters: number | null
-  temperature: number | null
-  topP: number | null
-  maxTokens: number | null
-  skillIds: number[] | null
-  tools: ToolMount[] | null
-  folders: FolderMount[] | null
-  workspaceEnabled: boolean | null
-  sandboxEnabled: boolean | null
-  capabilities: ExecutionCapability[] | null
 }
 
 /** 规格更新表单（编辑面；specCode/ownerLevel 创建后不可变，不在其中） */
@@ -229,6 +244,14 @@ export const publishSpec = (data: AgentSpecPublishForm) => {
 // 查询规格版本列表
 export const getSpecVersionPage = (specId: number) => {
   return request.get({ url: '/ai/spec/version-page', params: { specId } })
+}
+
+// 获得版本快照详情（只读预览：版本元信息 + 四层配置平铺）
+export const getSpecVersionDetail = (specId: number, versionNo: number) => {
+  return request.get<AgentSpecVersionDetailVO>({
+    url: '/ai/spec/version-get',
+    params: { specId, versionNo }
+  })
 }
 
 // 切换当前版本（回退指针）
