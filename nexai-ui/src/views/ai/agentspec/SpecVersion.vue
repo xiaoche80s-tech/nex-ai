@@ -91,7 +91,7 @@
       </el-table-column>
       <template #empty>
         <span>{{ t('ai.spec.versionEmpty') }}</span>
-      </el-table-column>
+      </template>
     </el-table>
 
     <!-- 版本快照只读预览抽屉（固化保真的全量四层配置，不含主体元数据） -->

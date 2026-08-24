@@ -8,6 +8,7 @@ import com.gkht.ai.nexai.framework.tenant.config.TenantProperties;
 import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
 import com.gkht.ai.nexai.framework.tenant.core.db.TenantDatabaseInterceptor;
 import com.gkht.ai.nexai.framework.test.core.ut.BaseDbUnitTest;
+import com.gkht.ai.nexai.module.system.api.user.AdminUserApi;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecUpdateCommand;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -69,8 +71,8 @@ public class AgentSpecControllerTest extends BaseDbUnitTest {
     private AgentSpecService agentSpecService;
 
     /** 发布人昵称解析走 system api（跨模块），单测上下文无 system 模块，mock 之（工单 25） */
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+    @MockitoBean
+    private AdminUserApi adminUserApi;
 
     @Resource
     private AgentSpecMapper agentSpecMapper;

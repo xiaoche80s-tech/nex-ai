@@ -1,6 +1,7 @@
 package com.gkht.ai.nexai.module.ai.session.interfaces.controller.app.openai;
 
 import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
+import com.gkht.ai.nexai.module.system.api.user.AdminUserApi;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput;
@@ -69,8 +70,8 @@ public class OpenAiCompatContractTest {
     private com.gkht.ai.nexai.module.ai.session.application.service.AgentRuntimeAssembler runtimeAssembler;
 
     /** AgentSpecServiceImpl 依赖发布人解析（system api），单测上下文无 system 模块，mock 之（工单 25） */
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+    @MockitoBean
+    private AdminUserApi adminUserApi;
 
     /** OpenAI 出口 base URL（SDK 拼接 /chat/completions） */
     @org.springframework.beans.factory.annotation.Value("${local.server.port}")
@@ -245,11 +246,13 @@ public class OpenAiCompatContractTest {
                 com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel.TENANT, null, null, 1,
                 java.time.LocalDateTime.now());
         Mockito.when(agentSpecRepository.findBySpecCode("contract-agent")).thenReturn(spec);
-        Mockito.when(agentSpecRepository.listVersions(7L)).thenReturn(List.of(
-                com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion.reconstitute(
-                        70L, 7L, 1, com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig.of(
-                                1L, null, null, null, null, null, null, null, null),
-                        null, java.time.LocalDateTime.now())));
+        var version = com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion.reconstitute(
+                70L, 7L, 1, com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig.of(
+                        1L, null, null, null, null, null, null, null, null),
+                null, java.time.LocalDateTime.now());
+        Mockito.when(agentSpecRepository.listVersions(7L)).thenReturn(List.of(version));
+        // 生效快照解析走单条查询（requireCurrentVersion → findVersion）
+        Mockito.when(agentSpecRepository.findVersion(7L, 1)).thenReturn(version);
     }
 
     @Test

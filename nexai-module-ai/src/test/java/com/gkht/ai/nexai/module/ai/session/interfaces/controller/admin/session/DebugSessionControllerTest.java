@@ -1,5 +1,6 @@
 package com.gkht.ai.nexai.module.ai.session.interfaces.controller.admin.session;
 
+import com.gkht.ai.nexai.module.system.api.user.AdminUserApi;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -82,8 +84,8 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
     private SessionService sessionService;
 
     /** AgentSpecServiceImpl 依赖发布人解析（system api），单测上下文无 system 模块，mock 之（工单 25） */
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+    @MockitoBean
+    private AdminUserApi adminUserApi;
 
     @Resource
     private AgentRuntimeGateway runtimeGateway;
@@ -248,6 +250,15 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 public List<com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion> listVersions(Long specId) {
                     return List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion
                             .reconstitute(1L, 1L, 1, mountedConfig(), null, null));
+                }
+
+                @Override
+                public com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion findVersion(
+                        Long specId, Integer versionNo) {
+                    return Integer.valueOf(1).equals(versionNo)
+                            ? com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion
+                                    .reconstitute(1L, 1L, 1, mountedConfig(), null, null)
+                            : null;
                 }
 
                 @Override

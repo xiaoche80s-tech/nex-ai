@@ -60,6 +60,13 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
     }
 
     @Override
+    public AgentSpecVersion findVersion(Long specId, Integer versionNo) {
+        AgentSpecVersionDO dataObject =
+                agentSpecVersionMapper.selectBySpecIdAndVersionNo(specId, versionNo);
+        return dataObject == null ? null : reconstituteVersion(dataObject);
+    }
+
+    @Override
     public Integer persistPublication(AgentSpec spec, String note) {
         Integer maxVersionNo = agentSpecVersionMapper.selectMaxVersionNo(spec.getId());
         int nextVersionNo = maxVersionNo == null ? 1 : maxVersionNo + 1;

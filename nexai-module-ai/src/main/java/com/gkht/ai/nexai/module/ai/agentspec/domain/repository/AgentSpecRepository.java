@@ -38,6 +38,12 @@ public interface AgentSpecRepository {
     List<AgentSpecVersion> listVersions(Long specId);
 
     /**
+     * 按规格 + 版本号读取单条版本快照（按需读取：config 为全量 JSON，
+     * 生效快照解析/版本预览/切换目标解析共用），不存在返回 null
+     */
+    AgentSpecVersion findVersion(Long specId, Integer versionNo);
+
+    /**
      * 发布落库（调用方事务内原子执行）：计算新版本号（现有最大 + 1，首次 = 1）、
      * 经聚合根固化不可变快照并推进当前版本指针、快照插入与主体更新一起持久化。
      *

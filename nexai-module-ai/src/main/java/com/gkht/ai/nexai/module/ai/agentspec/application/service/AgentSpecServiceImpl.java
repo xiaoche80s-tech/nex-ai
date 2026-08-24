@@ -206,10 +206,11 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Override
     public AgentSpecVersionDetailDTO getSpecVersion(Long specId, Integer versionNo) {
         AgentSpec spec = requireSpec(specId);
-        AgentSpecVersion version = agentSpecRepository.listVersions(specId).stream()
-                .filter(v -> v.getVersionNo().equals(versionNo))
-                .findFirst()
-                .orElseThrow(() -> exception(AGENT_SPEC_VERSION_NOT_EXISTS, specId));
+        // 按需读取：config 为全量 JSON，单条查询而非拉全量版本列表后内存过滤
+        AgentSpecVersion version = agentSpecRepository.findVersion(specId, versionNo);
+        if (version == null) {
+            throw exception(AGENT_SPEC_VERSION_NOT_EXISTS, specId);
+        }
         return agentSpecConverter.toVersionDetailDTO(version,
                 versionNo.equals(spec.getCurrentVersionNo()));
     }
@@ -219,10 +220,10 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     public void switchSpecVersion(AgentSpecSwitchVersionCommand command) {
         AgentSpec spec = requireSpec(command.getId());
         // 解析出目标版本对象即证明其存在（存在性不再以布尔旗标喂给聚合）
-        AgentSpecVersion target = agentSpecRepository.listVersions(command.getId()).stream()
-                .filter(v -> v.getVersionNo().equals(command.getVersionNo()))
-                .findFirst()
-                .orElseThrow(() -> exception(AGENT_SPEC_VERSION_NOT_EXISTS, command.getId()));
+        AgentSpecVersion target = agentSpecRepository.findVersion(command.getId(), command.getVersionNo());
+        if (target == null) {
+            throw exception(AGENT_SPEC_VERSION_NOT_EXISTS, command.getId());
+        }
         try {
             spec.switchToVersion(target);
         } catch (IllegalStateException ex) {
@@ -258,10 +259,11 @@ public class AgentSpecServiceImpl implements AgentSpecService {
         if (!spec.hasPublishedVersion()) {
             throw exception(SESSION_ASSEMBLE_INVALID, "规格尚未发布版本");
         }
-        return agentSpecRepository.listVersions(spec.getId()).stream()
-                .filter(v -> v.getVersionNo() == spec.getCurrentVersionNo())
-                .findFirst()
-                .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失"));
+        AgentSpecVersion version = agentSpecRepository.findVersion(spec.getId(), spec.getCurrentVersionNo());
+        if (version == null) {
+            throw exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失");
+        }
+        return version;
     }
 
     /** 读取规格，不存在报业务异常（不存在/跨租户/已删除均归此） */

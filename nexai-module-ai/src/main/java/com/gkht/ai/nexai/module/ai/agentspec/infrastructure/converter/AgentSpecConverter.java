@@ -21,7 +21,8 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecVersionDO;
-import lombok.Data;import org.mapstruct.Mapper;
+import lombok.Data;
+import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
@@ -48,11 +49,6 @@ public interface AgentSpecConverter {
     AgentSpecDTO toDTO(AgentSpecDO specDO);
 
     List<AgentSpecDTO> toDTOList(List<AgentSpecDO> list);
-
-    /**
-     * 版本快照 → 列表 DTO（不含全量配置；current 当前版本标识由应用服务按版本指针设置）
-     */
-    AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
 
     /**
      * 版本快照 DO → 列表 DTO（工单 25 发布人链路：creator 为 DO 审计字段，String 自动转 Long；

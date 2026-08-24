@@ -38,4 +38,11 @@ public interface AgentSpecVersionMapper extends BaseMapperX<AgentSpecVersionDO> 
                 .eq(AgentSpecVersionDO::getVersionNo, versionNo)) > 0;
     }
 
+    /** 按规格 + 版本号取单条快照（按需读取——config 为全量 JSON，不随列表多拉），不存在返回 null */
+    default AgentSpecVersionDO selectBySpecIdAndVersionNo(Long specId, int versionNo) {
+        return selectOne(new LambdaQueryWrapper<AgentSpecVersionDO>()
+                .eq(AgentSpecVersionDO::getSpecId, specId)
+                .eq(AgentSpecVersionDO::getVersionNo, versionNo));
+    }
+
 }
