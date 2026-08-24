@@ -1,6 +1,7 @@
 package com.gkht.ai.nexai.module.ai.session.domain.gateway;
 
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
+import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallContext;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
@@ -35,6 +36,23 @@ public interface AgentRuntimeGateway {
      * @param content 用户消息文本
      */
     Flux<RuntimeEvent> chat(AgentRuntimeConfig config, String content);
+
+    /**
+     * OpenAI 兼容出口调用（工单 16）：以客户端全量历史（role + content）调用常驻智能体，
+     * 返回 OpenAI 兼容流式 chunk 序列（事件类型 {@code OPENAI_CHUNK}，载荷 = chunk JSON）。
+     *
+     * <p><b>无状态出口</b>：OpenAI 协议由客户端管理历史；每次调用独立会话槽位
+     * （sessionKey = 出口前缀 + requestId），实例仍常驻复用（ADR-0001：不 per-请求新建）。
+     * 事件转换直用 agentscope {@code ChatCompletionsStreamingAdapter}（ADR-0001 禁自建）。
+     * 错误以 {@code SESSION_ERROR} 类型事件收尾（载荷为平台错误 JSON，非 chunk 形态——
+     * 调用方据此分流渲染）。</p>
+     *
+     * @param config    装配指令（model 字段路由的规格解析结果）
+     * @param messages  客户端全量消息历史（system/user/assistant）
+     * @param requestId 请求标识（OpenAI 响应 id 数据源，兼作出口会话槽位）
+     */
+    Flux<RuntimeEvent> chatOpenAi(AgentRuntimeConfig config, List<ChatMessageInput> messages,
+                                  String requestId);
 
     /**
      * 对挂起中的敏感工具调用做人工审批（HITL 三态：确认/拒绝/改参数），返回续行事件流。

@@ -4,6 +4,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
@@ -13,6 +14,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderFile;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderType;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
@@ -168,6 +172,8 @@ public class AgentSpecServiceImpl implements AgentSpecService {
                 : GenerateOptions.of(command.getTemperature(), command.getTopP(), command.getMaxTokens());
         List<ToolMount> tools = command.getTools() == null ? null
                 : command.getTools().stream().map(this::toMount).toList();
+        List<FolderMount> folders = command.getFolders() == null ? null
+                : command.getFolders().stream().map(this::toFolderMount).toList();
         ExecutionEnvConfig executionEnv = Boolean.TRUE.equals(command.getWorkspaceEnabled())
                 || Boolean.TRUE.equals(command.getSandboxEnabled())
                 || command.getCapabilities() != null && !command.getCapabilities().isEmpty()
@@ -177,13 +183,22 @@ public class AgentSpecServiceImpl implements AgentSpecService {
                                 : command.getCapabilities().stream().map(ExecutionCapability::valueOf).toList())
                 : null;
         return AgentSpecConfig.of(command.getModelId(), command.getDescription(), command.getSystemPrompt(),
-                command.getMaxIters(), generateOptions, command.getSkillIds(), tools, executionEnv);
+                command.getMaxIters(), generateOptions, command.getSkillIds(), tools, folders, executionEnv);
     }
 
     private ToolMount toMount(ToolMountCommand mountCommand) {
         return ToolMount.of(ToolSource.valueOf(mountCommand.getSource()),
                 mountCommand.getSourceId(), mountCommand.getAllowedTools(),
                 mountCommand.getSensitiveTools());
+    }
+
+    /** 文件夹挂载命令 → 值对象（文件清单为上传接口返回的凭证：url + 哈希 + 字节数） */
+    private FolderMount toFolderMount(FolderMountCommand folderCommand) {
+        return FolderMount.of(FolderType.valueOf(folderCommand.getType()), folderCommand.getName(),
+                folderCommand.getFiles() == null ? null : folderCommand.getFiles().stream()
+                        .map(file -> FolderFile.of(file.getPath(), file.getUrl(),
+                                file.getContentHash(), file.getSize() == null ? 0L : file.getSize()))
+                        .toList());
     }
 
 }

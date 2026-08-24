@@ -1,5 +1,6 @@
 package com.gkht.ai.nexai.module.ai.agentspec.application.command;
 
+import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMountCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMax;
@@ -81,6 +82,9 @@ public class AgentSpecCreateCommand {
 
     @Schema(description = "工具挂载列表（来源 + 引用 + 可选白名单，编辑面后置）")
     private List<ToolMountCommand> tools;
+
+    @Schema(description = "规格私有文件夹挂载列表（ASSET 资料文件夹 / TOOLSET 工具集文件夹，工单 18）")
+    private List<FolderMountCommand> folders;
 
     // —— 执行环境层 ——
 

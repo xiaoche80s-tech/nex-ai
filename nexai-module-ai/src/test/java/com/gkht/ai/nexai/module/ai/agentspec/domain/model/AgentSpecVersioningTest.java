@@ -19,7 +19,7 @@ class AgentSpecVersioningTest {
 
     private static AgentSpec specWithDraft(Long modelId) {
         AgentSpecConfig config = AgentSpecConfig.of(modelId, "草稿描述", "草稿提示", 10,
-                null, null, null, null);
+                null, null, null, null, null);
         // 经 reconstitute 携带编号（模拟已落库规格；publish 需要非空规格编号）
         return AgentSpec.reconstitute(7L, "客服助手", "customer-service", null,
                 OwnerLevel.TENANT, null, config, null, null);
@@ -67,7 +67,7 @@ class AgentSpecVersioningTest {
         String frozenPrompt = v1.getConfig().getSystemPrompt();
 
         // 再编辑进入新草稿（整体替换），不触碰已发布快照
-        AgentSpecConfig edited = AgentSpecConfig.of(1L, "新描述", "新提示", 10, null, null, null, null);
+        AgentSpecConfig edited = AgentSpecConfig.of(1L, "新描述", "新提示", 10, null, null, null, null, null);
         spec.replaceDraft(edited);
         assertEquals(1, spec.getCurrentVersionNo(), "编辑草稿不得改变当前版本指针");
         assertEquals("新提示", spec.getDraft().getSystemPrompt());
@@ -85,7 +85,7 @@ class AgentSpecVersioningTest {
     void switchVersionChecksExistence() {
         AgentSpec spec = specWithDraft(1L);
         spec.publish(1, null);
-        spec.replaceDraft(AgentSpecConfig.of(1L, null, null, null, null, null, null, null));
+        spec.replaceDraft(AgentSpecConfig.of(1L, null, null, null, null, null, null, null, null));
         spec.publish(2, null);
         assertEquals(2, spec.getCurrentVersionNo());
 

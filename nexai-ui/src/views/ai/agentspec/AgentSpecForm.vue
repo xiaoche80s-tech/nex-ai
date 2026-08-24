@@ -217,6 +217,76 @@
         </div>
       </el-form-item>
 
+      <el-form-item :label="t('ai.spec.formFolders')">
+        <div class="w-full">
+          <template v-if="formData.workspaceEnabled">
+            <el-button plain type="primary" size="small" class="mb-8px mr-8px" @click="addFolder('ASSET')">
+              <Icon icon="ep:folder-add" class="mr-5px" /> {{ t('ai.spec.addAssetFolder') }}
+            </el-button>
+            <el-button plain type="primary" size="small" class="mb-8px" @click="addFolder('TOOLSET')">
+              <Icon icon="ep:folder-opened" class="mr-5px" /> {{ t('ai.spec.addToolsetFolder') }}
+            </el-button>
+            <div
+              v-for="(folder, folderIndex) in formData.folders || []"
+              :key="folderIndex"
+              class="border border-gray-200 rounded-4px p-8px mb-8px"
+            >
+              <div class="flex items-center mb-4px">
+                <el-tag size="small" class="mr-8px" :type="folder.type === 'ASSET' ? 'success' : 'warning'">
+                  {{ folder.type === 'ASSET' ? t('ai.spec.folderTypeAsset') : t('ai.spec.folderTypeToolset') }}
+                </el-tag>
+                <el-input
+                  v-model="folder.name"
+                  size="small"
+                  class="!w-220px mr-8px"
+                  :placeholder="t('ai.spec.folderNamePlaceholder')"
+                />
+                <el-upload
+                  :show-file-list="false"
+                  multiple
+                  :http-request="(options: any) => uploadFolderFile(folder, options)"
+                >
+                  <el-button plain size="small" type="primary">
+                    <Icon icon="ep:upload" class="mr-5px" /> {{ t('ai.spec.folderUpload') }}
+                  </el-button>
+                </el-upload>
+                <el-button link type="danger" size="small" class="ml-auto" @click="removeFolder(folderIndex)">
+                  {{ t('table.del') }}
+                </el-button>
+              </div>
+              <el-table v-if="folder.files.length" :data="folder.files" size="small">
+                <el-table-column :label="t('ai.spec.folderFilePath')" min-width="180">
+                  <template #default="{ row }">
+                    <el-input v-model="row.path" size="small" :placeholder="t('ai.spec.folderFilePath')" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="size" :label="t('ai.spec.folderFileSize')" width="110">
+                  <template #default="{ row }">{{ formatSize(row.size) }}</template>
+                </el-table-column>
+                <el-table-column :label="t('ai.spec.folderFileHash')" min-width="140">
+                  <template #default="{ row }">
+                    <span class="text-12px text-gray-400 font-mono">{{ row.contentHash.slice(0, 12) }}…</span>
+                  </template>
+                </el-table-column>
+                <el-table-column :label="t('table.action')" width="70" align="center">
+                  <template #default="{ $index }">
+                    <el-button link type="danger" @click="folder.files.splice($index, 1)">
+                      {{ t('table.del') }}
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+            <div class="text-12px text-gray-400 leading-20px mt-2px">
+              {{ t('ai.spec.formFoldersTip') }}
+            </div>
+          </template>
+          <div v-else class="text-12px text-gray-400 leading-20px">
+            {{ t('ai.spec.formFoldersDisabled') }}
+          </div>
+        </div>
+      </el-form-item>
+
       <el-divider content-position="left">{{ t('ai.spec.sectionEnv') }}</el-divider>
       <el-form-item :label="t('ai.spec.formWorkspace')">
         <el-switch v-model="formData.workspaceEnabled" @change="onWorkspaceToggle" />
@@ -280,6 +350,7 @@ const formData = ref<SpecApi.AgentSpecCreateForm>({
   maxTokens: undefined,
   skillIds: [],
   tools: [],
+  folders: [],
   workspaceEnabled: false,
   sandboxEnabled: false,
   capabilities: []
@@ -330,6 +401,36 @@ const addToolMount = () => {
   formData.value.tools.push({ source: 'MCP', sourceId: 0, allowedTools: [], sensitiveTools: [] })
 }
 
+// ---------- 私有文件夹挂载（工单 18：ASSET 资料 / TOOLSET 工具集） ----------
+
+const addFolder = (type: SpecApi.FolderType) => {
+  formData.value.folders = formData.value.folders || []
+  formData.value.folders.push({ type, name: '', files: [] })
+}
+
+const removeFolder = (index: number) => {
+  formData.value.folders?.splice(index, 1)
+}
+
+/** 上传文件夹内单个文件：服务端签发凭证（url + 哈希 + 字节数），path 默认取原文件名 */
+const uploadFolderFile = async (folder: SpecApi.FolderMount, options: any) => {
+  const result = (await SpecApi.uploadFolderFile({ file: options.file })) as SpecApi.FolderFileUploadResult
+  folder.files.push({
+    path: options.file.name,
+    url: result.url,
+    contentHash: result.contentHash,
+    size: result.size
+  })
+  message.success(t('ai.spec.folderUploaded'))
+}
+
+/** 字节数人类可读化 */
+const formatSize = (size: number): string => {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
 /** 打开弹窗（仅创建） */
 const open = () => {
   dialogVisible.value = true
@@ -360,11 +461,12 @@ const loadMountOptions = async () => {
   }
 }
 
-/** 执行环境联动：关工作区 → 沙箱与能力一并清空；关沙箱 → 能力清空（非沙箱禁执行能力） */
+/** 执行环境联动：关工作区 → 沙箱、能力与文件夹挂载一并清空（文件夹须物化落 workspace） */
 const onWorkspaceToggle = (enabled: boolean | string | number) => {
   if (!enabled) {
     formData.value.sandboxEnabled = false
     formData.value.capabilities = []
+    formData.value.folders = []
   }
 }
 const onSandboxToggle = (enabled: boolean | string | number) => {
@@ -379,9 +481,17 @@ const submitForm = async () => {
   await formRef.value.validate()
   // 挂载清洗：未选择目标的行（sourceId=0 哨兵）与空白名单语义（空数组 = 全部）保持原样提交
   const tools = (formData.value.tools || []).filter((tool) => tool.sourceId > 0)
+  // 文件夹清洗：未命名或无文件的文件夹不提交；目录名合法段校验与后端领域校验同口径
+  const folders = (formData.value.folders || []).filter(
+    (folder) => folder.name && folder.files.length > 0
+  )
+  if (folders.some((folder) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(folder.name))) {
+    message.error(t('ai.spec.folderNamePattern'))
+    return
+  }
   formLoading.value = true
   try {
-    await SpecApi.createSpec({ ...formData.value, tools })
+    await SpecApi.createSpec({ ...formData.value, tools, folders })
     dialogVisible.value = false
     message.success(t('ai.spec.created'))
     emit('success')

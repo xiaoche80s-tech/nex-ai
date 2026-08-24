@@ -52,4 +52,12 @@ public interface FileApi {
     String presignGetUrl(@NotEmpty(message = "URL 不能为空") String url,
                          Integer expirationSeconds);
 
+    /**
+     * 按访问地址读取文件内容（跨模块消费方物化用，如 AI 模块规格私有文件夹装配物化）
+     *
+     * @param url 完整的文件访问地址（createFile 返回值）
+     * @return 文件内容；文件不存在时返回 null；读取失败抛 IllegalStateException
+     */
+    byte[] getFileContent(@NotEmpty(message = "URL 不能为空") String url);
+
 }

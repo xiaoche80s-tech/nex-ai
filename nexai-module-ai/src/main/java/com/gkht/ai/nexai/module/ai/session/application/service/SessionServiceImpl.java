@@ -4,13 +4,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
-import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
-import com.gkht.ai.nexai.module.ai.channel.domain.model.Channel;
-import com.gkht.ai.nexai.module.ai.channel.domain.model.Model;
-import com.gkht.ai.nexai.module.ai.channel.domain.repository.ChannelRepository;
-import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
-import com.gkht.ai.nexai.module.ai.mcpserver.domain.repository.McpServerRepository;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionConfirmCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionCreateCommand;
 import com.gkht.ai.nexai.module.ai.session.application.command.DebugSessionMessageCommand;
@@ -24,12 +18,7 @@ import com.gkht.ai.nexai.module.ai.session.domain.model.SessionType;
 import com.gkht.ai.nexai.module.ai.session.domain.repository.SessionRepository;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
-import com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
-import com.gkht.ai.nexai.module.ai.skill.domain.gateway.SkillMaterializationGateway;
-import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
-import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillVersion;
-import com.gkht.ai.nexai.module.ai.skill.domain.repository.SkillRepository;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.converter.SessionConverter;
 import com.gkht.ai.nexai.module.ai.session.infrastructure.mapper.SessionMapper;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
@@ -40,17 +29,13 @@ import org.springframework.validation.annotation.Validated;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_NOT_EXISTS;
-import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.CHANNEL_NOT_EXISTS;
-import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_NOT_EXISTS;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASSEMBLE_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASKING_CONFIRM_REQUIRED;
@@ -67,9 +52,6 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SESSION_ASKIN
 @Validated
 public class SessionServiceImpl implements SessionService {
 
-    /** 匿名用户槽位标识（无登录态的终端会话） */
-    private static final String ANONYMOUS_USER = "anonymous";
-
     @Resource
     private SessionRepository sessionRepository;
 
@@ -83,16 +65,7 @@ public class SessionServiceImpl implements SessionService {
     private AgentSpecRepository agentSpecRepository;
 
     @Resource
-    private ChannelRepository channelRepository;
-
-    @Resource
-    private SkillRepository skillRepository;
-
-    @Resource
-    private SkillMaterializationGateway skillMaterializationGateway;
-
-    @Resource
-    private McpServerRepository mcpServerRepository;
+    private AgentRuntimeAssembler runtimeAssembler;
 
     @Resource
     private AgentRuntimeGateway runtimeGateway;
@@ -264,105 +237,16 @@ public class SessionServiceImpl implements SessionService {
     // ------------------------------------------------------------------
 
     /**
-     * 会话 → 装配指令：读规格（当前版本或指定版本快照）、渠道与模型，组装运行时配置。
-     * 快路径：指定版本为空 → 用规格当前版本（常驻缓存命中复用）；非默认版本 → specReference
-     * 不同，自然回落 per-spec 装配。
-     *
-     * <p>挂载解析（工单 12/13，跨聚合只读）：技能引用 → 幂等物化 + 目录分组（技能推新版本
-     * 经版本指纹参与失效重建）；MCP 挂载 → 读聚合本体（不存在/停用 = 配置性缺失，装配显式
-     * 报错；网络不可达 = 运行性缺失，网关装配期降级跳过）。</p>
+     * 会话 → 装配指令：读规格（当前版本或指定版本快照）后经共享组装器装配
+     * （与 OpenAI 兼容出口同一装配链，工单 16）。快路径：指定版本为空 → 用规格当前版本
+     * （常驻缓存命中复用）；非默认版本 → specReference 不同，自然回落 per-spec 装配。
      */
     private AgentRuntimeConfig assembleRuntime(Session session, Long userId) {
         AgentSpec spec = requireSpec(session.getSpecId());
         AgentSpecVersion version = resolveVersion(spec, session.getVersionNo());
-        var config = version.getConfig();
-        if (config.getModelId() == null) {
-            throw exception(SESSION_ASSEMBLE_INVALID, "规格未配置模型");
-        }
-        Model model = requireModel(config.getModelId());
-        Channel channel = requireChannel(model.getChannelId());
-        if (!model.isEnabled()) {
-            throw exception(SESSION_ASSEMBLE_INVALID, "模型已停用");
-        }
-        if (!channel.isEnabled()) {
-            throw exception(SESSION_ASSEMBLE_INVALID, "渠道已停用");
-        }
-        String runtimeUserId = userId == null ? ANONYMOUS_USER : String.valueOf(userId);
-        String agentName = spec.getSpecCode() + "-v" + version.getVersionNo();
-        Long tenantId = com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder.getTenantId();
-        if (tenantId == null) {
-            throw exception(SESSION_ASSEMBLE_INVALID, "租户上下文缺失");
-        }
-        return AgentRuntimeConfig.of(runtimeUserId, session.getSessionKey(), tenantId,
-                spec.getSpecCode(), agentName, spec.getId(), version.getVersionNo(),
-                spec.getOwnerLevel(), spec.getOwnerUserId(),
-                config.getSystemPrompt(), config.getMaxIters(),
-                config.getGenerateOptions(), config.getExecutionEnv(),
-                config.getTools(),
-                resolveSkillMounts(config, tenantId),
-                resolveMcpServers(config),
-                channel, model);
-    }
-
-    /**
-     * 技能引用 → 挂载目录分组：每个 skillId 读聚合（跨聚合只读）取当前版本内容，
-     * 幂等物化（内容比对一致跳过落盘）后按物化父目录分组；指纹 = skillId@versionNo 串
-     * （版本戳数据源——技能推新版本即失效重建，新会话用新内容）。
-     */
-    private List<SkillMountDirectory> resolveSkillMounts(AgentSpecConfig config, Long tenantId) {
-        if (config.getSkillIds().isEmpty()) {
-            return List.of();
-        }
-        Map<String, List<String>> namesByDir = new LinkedHashMap<>();
-        Map<String, List<String>> fingerprintsByDir = new LinkedHashMap<>();
-        for (Long skillId : config.getSkillIds()) {
-            Skill skill = skillRepository.findById(skillId);
-            if (skill == null) {
-                throw exception(SESSION_ASSEMBLE_INVALID, "挂载的技能不存在（编号 " + skillId + "）");
-            }
-            if (!skill.hasVersion()) {
-                throw exception(SESSION_ASSEMBLE_INVALID, "挂载的技能尚无版本（" + skill.getName() + "）");
-            }
-            SkillVersion currentVersion = skillRepository.listVersions(skillId).stream()
-                    .filter(v -> v.getVersionNo() == skill.getCurrentVersionNo())
-                    .findFirst()
-                    .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID,
-                            "挂载的技能当前版本快照缺失（" + skill.getName() + "）"));
-            String dir = skillMaterializationGateway.materialize(skill, tenantId,
-                    currentVersion.getContent());
-            String parent = Path.of(dir).getParent().toString();
-            namesByDir.computeIfAbsent(parent, k -> new ArrayList<>()).add(skill.getName());
-            fingerprintsByDir.computeIfAbsent(parent, k -> new ArrayList<>())
-                    .add(skillId + "@" + skill.getCurrentVersionNo());
-        }
-        return namesByDir.entrySet().stream()
-                .map(entry -> SkillMountDirectory.of(entry.getKey(), entry.getValue(),
-                        String.join(",", fingerprintsByDir.get(entry.getKey()))))
-                .toList();
-    }
-
-    /**
-     * MCP 挂载 → 聚合本体列表：不存在/已停用为配置性缺失（数据一致性问题应在管理面暴露），
-     * 装配显式报错；连接不可达为运行性缺失，由网关装配期降级跳过（工单 13 语义定案）。
-     */
-    private List<McpServer> resolveMcpServers(AgentSpecConfig config) {
-        List<McpServer> servers = new ArrayList<>();
-        for (var mount : config.getTools()) {
-            if (mount.getSource() != ToolSource.MCP) {
-                continue;
-            }
-            McpServer server = mcpServerRepository.findById(mount.getSourceId());
-            if (server == null) {
-                throw exception(SESSION_ASSEMBLE_INVALID,
-                        "挂载的 MCP Server 不存在（编号 " + mount.getSourceId() + "）");
-            }
-            if (!server.isEnabled()) {
-                throw exception(SESSION_ASSEMBLE_INVALID,
-                        "挂载的 MCP Server 已停用（" + server.getName() + "）");
-            }
-            servers.add(server);
-        }
-        return servers;
+        String runtimeUserId = userId == null ? AgentRuntimeAssembler.ANONYMOUS_USER
+                : String.valueOf(userId);
+        return runtimeAssembler.assemble(spec, version, runtimeUserId, session.getSessionKey());
     }
 
     /** 解析装配版本快照：会话指定版本优先，否则规格当前版本 */
@@ -399,22 +283,6 @@ public class SessionServiceImpl implements SessionService {
             throw exception(AGENT_SPEC_NOT_EXISTS);
         }
         return spec;
-    }
-
-    private Model requireModel(Long modelId) {
-        Model model = channelRepository.findModelById(modelId);
-        if (model == null) {
-            throw exception(MODEL_NOT_EXISTS);
-        }
-        return model;
-    }
-
-    private Channel requireChannel(Long channelId) {
-        Channel channel = channelRepository.findById(channelId);
-        if (channel == null) {
-            throw exception(CHANNEL_NOT_EXISTS);
-        }
-        return channel;
     }
 
 }

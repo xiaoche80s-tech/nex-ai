@@ -41,5 +41,7 @@ public enum RuntimeEventType {
     ALL_TOOLS_DENIED,
     CUSTOM,
     /** 平台侧收尾错误事件（非 agentscope 类型） */
-    SESSION_ERROR
+    SESSION_ERROR,
+    /** OpenAI 兼容出口的流式 chunk（payload = ChatCompletionsChunk JSON，工单 16；非 agentscope 类型） */
+    OPENAI_CHUNK
 }

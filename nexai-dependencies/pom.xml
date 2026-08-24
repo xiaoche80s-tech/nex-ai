@@ -46,6 +46,7 @@
         <skywalking.version>9.6.0</skywalking.version>
         <spring-boot-admin.version>4.0.4</spring-boot-admin.version>
         <opentelemetry.version>1.39.0</opentelemetry.version>
+        <openai-java.version>4.52.0</openai-java.version>
         <!-- Test 测试相关 -->
         <podam.version>8.0.2.RELEASE</podam.version>
         <jedis-mock.version>1.1.15</jedis-mock.version>
@@ -382,6 +383,22 @@
                 <groupId>io.opentelemetry</groupId>
                 <artifactId>opentelemetry-exporter-otlp</artifactId>
                 <version>${opentelemetry.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+                <version>${opentelemetry.version}</version>
+            </dependency>
+            <!-- OpenAI 官方 Java SDK（工单 16 契约测试客户端，test scope） -->
+            <dependency>
+                <groupId>com.openai</groupId>
+                <artifactId>openai-java</artifactId>
+                <version>${openai-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openai</groupId>
+                <artifactId>openai-java-client-okhttp</artifactId>
+                <version>${openai-java.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.skywalking</groupId>

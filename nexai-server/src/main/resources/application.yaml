@@ -273,6 +273,28 @@ nexai:
       # sandbox:
       #   images:
       #     python: python:3.12-slim
+    observability: # 可观测与治理预埋（工单 14）：先采集不计价，保留期限清理任务第三波立项
+      audit:
+        enabled: true # 审计事件采集（谁-何时-哪个会话-调了什么工具-结果摘要，onActing 拦截点落 PG）
+        retention-days: 365 # 保留期限（天，仅配置承载）
+        max-payload-length: 512 # 入参/结果摘要截断长度（敏感键恒打码）
+        # 追加敏感键关键词（小写子串匹配，与内置 password/secret/token/api_key/authorization 等名单合并）
+        # sensitive-key-keywords: [ "mobile", "idcard" ]
+      usage:
+        enabled: true # 模型用量采集（token/缓存命中/耗时，onModelCall 拦截点落 PG）
+        retention-days: 365 # 保留期限（天，仅配置承载）
+      otel:
+        enabled: false # OpenTelemetry SDK 接线开关（三段 span 的 OtelTracingMiddleware 恒挂，无 SDK 时 no-op）。
+        # 开启后经 otel.* 标准属性配置导出器与采样，例如：
+        # otel:
+        #   traces:
+        #     exporter: otlp
+        #     sampler: parentbased_traceidratio
+        #     sampler.arg: "0.1"
+        #   exporter:
+        #     otlp:
+        #       traces:
+        #         endpoint: http://localhost:4317
   web:
     admin-ui:
       url: http://dashboard.nexai.iocoder.cn # Admin 管理后台 UI 的地址

@@ -199,6 +199,44 @@ public class AgentSpecVersionControllerTest extends BaseDbUnitTest {
     }
 
     @Test
+    @DisplayName("发布固化（工单 18）：文件夹清单（url + 哈希）随版本快照固化，不可变")
+    public void publishFreezesFolderManifest() throws SQLException {
+        Long specId = createSpec("cs-folder", 1L, "你是客服");
+        // 直接建带 folders 的草稿（复用 controller 创建面）
+        com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand command =
+                new com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecCreateCommand();
+        command.setName("客服助手");
+        command.setSpecCode("cs-folder-2");
+        command.setSystemPrompt("你是客服");
+        command.setModelId(1L);
+        command.setWorkspaceEnabled(true);
+        com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand.FolderFileCommand file =
+                new com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand.FolderFileCommand();
+        file.setPath("faq.md");
+        file.setUrl("http://files/faq.md");
+        file.setContentHash("a".repeat(64));
+        file.setSize(12L);
+        com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand folder =
+                new com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand();
+        folder.setType("TOOLSET");
+        folder.setName("scripts");
+        folder.setFiles(java.util.List.of(file));
+        command.setFolders(java.util.List.of(folder));
+        Long folderSpecId = agentSpecController.createSpec(command).getData();
+
+        agentSpecService.publishSpec(publishCommand(folderSpecId, null));
+        String config = queryVersionConfig(folderSpecId, 1);
+        assertNotNull(config);
+        assertTrue(config.contains("\"folders\""), "快照应固化文件夹清单");
+        assertTrue(config.contains("\"type\":\"TOOLSET\""), "快照应固化文件夹类型");
+        assertTrue(config.contains("\"contentHash\":\"" + "a".repeat(64) + "\""),
+                "快照应固化内容哈希（内容寻址，物化比对依据）");
+        // 首个无 folders 规格的发布路径不受影响
+        agentSpecService.publishSpec(publishCommand(specId, null));
+        assertFalse(queryVersionConfig(specId, 1).contains("\"folders\""));
+    }
+
+    @Test
     @DisplayName("发布不存在的规格被拒")
     public void publishRejectsMissingSpec() {
         assertServiceException(() -> agentSpecService.publishSpec(publishCommand(9999L, null)),

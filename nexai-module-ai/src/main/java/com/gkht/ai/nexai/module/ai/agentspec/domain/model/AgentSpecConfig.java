@@ -40,6 +40,8 @@ public final class AgentSpecConfig {
     private final List<Long> skillIds;
     /** 工具挂载列表（来源 + 引用 + 可选白名单，MCP 与平台工具库共用） */
     private final List<ToolMount> tools;
+    /** 规格私有文件夹挂载列表（ASSET 资料文件夹 / TOOLSET 工具集文件夹，工单 18） */
+    private final List<FolderMount> folders;
 
     // —— 执行环境层 ——
     /** 执行环境配置，null 视为全关（纯对话智能体） */
@@ -47,7 +49,8 @@ public final class AgentSpecConfig {
 
     private AgentSpecConfig(Long modelId, String description, String systemPrompt, Integer maxIters,
                             GenerateOptions generateOptions, List<Long> skillIds,
-                            List<ToolMount> tools, ExecutionEnvConfig executionEnv) {
+                            List<ToolMount> tools, List<FolderMount> folders,
+                            ExecutionEnvConfig executionEnv) {
         this.modelId = modelId;
         this.description = description;
         this.systemPrompt = systemPrompt;
@@ -55,6 +58,7 @@ public final class AgentSpecConfig {
         this.generateOptions = generateOptions;
         this.skillIds = skillIds;
         this.tools = tools;
+        this.folders = folders;
         this.executionEnv = executionEnv;
     }
 
@@ -68,11 +72,13 @@ public final class AgentSpecConfig {
      * @param generateOptions 调用参数组，可空 = 全默认
      * @param skillIds        技能引用列表，可空
      * @param tools           工具挂载列表，可空
+     * @param folders         规格私有文件夹挂载列表，可空；非空时须启用 workspace
      * @param executionEnv    执行环境配置，可空 = 全关（纯对话）
      */
     public static AgentSpecConfig of(Long modelId, String description, String systemPrompt, Integer maxIters,
                                      GenerateOptions generateOptions, List<Long> skillIds,
-                                     List<ToolMount> tools, ExecutionEnvConfig executionEnv) {
+                                     List<ToolMount> tools, List<FolderMount> folders,
+                                     ExecutionEnvConfig executionEnv) {
         String strippedDescription = normalizeNullable(description);
         if (strippedDescription != null && strippedDescription.length() > DESCRIPTION_MAX_LENGTH) {
             throw new IllegalArgumentException("规格自描述不能超过 " + DESCRIPTION_MAX_LENGTH + " 个字符");
@@ -90,8 +96,19 @@ public final class AgentSpecConfig {
                 != mounts.size()) {
             throw new IllegalArgumentException("同一工具来源条目不能重复挂载");
         }
+        // 文件夹挂载语义（工单 18）：同规格文件夹名唯一；文件须落 workspace，须启用 workspace 才可挂载
+        List<FolderMount> folderMounts = folders == null ? List.of() : List.copyOf(folders);
+        if (!folderMounts.isEmpty()) {
+            if (folderMounts.stream().map(FolderMount::getName).distinct().count()
+                    != folderMounts.size()) {
+                throw new IllegalArgumentException("同规格文件夹名不能重复");
+            }
+            if (executionEnv == null || !executionEnv.isWorkspaceEnabled()) {
+                throw new IllegalArgumentException("挂载私有文件夹须启用 workspace（文件物化落 workspace）");
+            }
+        }
         return new AgentSpecConfig(modelId, strippedDescription, prompt, maxIters, generateOptions,
-                snapshotIds(skillIds), mounts, executionEnv);
+                snapshotIds(skillIds), mounts, folderMounts, executionEnv);
     }
 
     /** 引用列表规范化为不可变快照（null 视为空列表） */
@@ -135,6 +152,11 @@ public final class AgentSpecConfig {
         return tools;
     }
 
+    /** 规格私有文件夹挂载列表，空 = 无文件夹挂载 */
+    public List<FolderMount> getFolders() {
+        return folders;
+    }
+
     /** 执行环境配置，null = 全关（纯对话智能体） */
     public ExecutionEnvConfig getExecutionEnv() {
         return executionEnv;
@@ -155,13 +177,14 @@ public final class AgentSpecConfig {
                 && Objects.equals(generateOptions, other.generateOptions)
                 && Objects.equals(skillIds, other.skillIds)
                 && Objects.equals(tools, other.tools)
+                && Objects.equals(folders, other.folders)
                 && Objects.equals(executionEnv, other.executionEnv);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(modelId, description, systemPrompt, maxIters, generateOptions,
-                skillIds, tools, executionEnv);
+                skillIds, tools, folders, executionEnv);
     }
 
 }

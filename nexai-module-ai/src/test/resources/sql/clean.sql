@@ -13,3 +13,9 @@ DELETE FROM "ai_skill_version";
 DELETE FROM "ai_skill";
 
 DELETE FROM "ai_mcp_server";
+
+
+DELETE FROM "ai_audit_event";
+DELETE FROM "ai_model_usage";
+
+DELETE FROM "ai_tenant_api_key";

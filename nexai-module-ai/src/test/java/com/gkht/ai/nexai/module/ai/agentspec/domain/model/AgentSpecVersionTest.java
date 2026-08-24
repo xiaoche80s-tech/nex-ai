@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class AgentSpecVersionTest {
 
     private static AgentSpecConfig config() {
-        return AgentSpecConfig.of(1L, "回答客户咨询", "你是客服", 10, null, null, null, null);
+        return AgentSpecConfig.of(1L, "回答客户咨询", "你是客服", 10, null, null, null, null, null);
     }
 
     @Test

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class AgentSpecConfigTest {
 
     private static AgentSpecConfig configOf(String description, String systemPrompt, Integer maxIters) {
-        return AgentSpecConfig.of(null, description, systemPrompt, maxIters, null, null, null, null);
+        return AgentSpecConfig.of(null, description, systemPrompt, maxIters, null, null, null, null, null);
     }
 
     @Test
@@ -101,13 +101,57 @@ class AgentSpecConfigTest {
         ToolMount mcpDuplicated = ToolMount.of(ToolSource.MCP, 1L, null, null);
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> AgentSpecConfig.of(null, null, null, null, null, null,
-                        List.of(mcpOne, mcpDuplicated), null));
+                        List.of(mcpOne, mcpDuplicated), null, null));
         assertEquals("同一工具来源条目不能重复挂载", ex.getMessage());
 
         // MCP 与平台工具库是不同来源：同编号不冲突
         ToolMount platform = ToolMount.of(ToolSource.PLATFORM, 1L, null, null);
         assertDoesNotThrow(() -> AgentSpecConfig.of(null, null, null, null, null, null,
-                List.of(mcpOne, platform), null));
+                List.of(mcpOne, platform), null, null));
     }
+
+    @Test
+    @DisplayName("folders 通道：挂载私有文件夹须启用 workspace（进校验链，工单 18）")
+    void rejectsFoldersWithoutWorkspace() {
+        FolderMount folder = FolderMount.of(FolderType.ASSET, "faq",
+                List.of(FolderFile.of("faq.md", "http://f/faq.md", HASH_A, 12L)));
+        ExecutionEnvConfig workspaceOn = ExecutionEnvConfig.of(true, false, null);
+
+        // 未启用 workspace（null 或 false）挂载文件夹被拒绝
+        IllegalArgumentException nullEnv = assertThrows(IllegalArgumentException.class,
+                () -> AgentSpecConfig.of(null, null, null, null, null, null, null,
+                        List.of(folder), null));
+        assertEquals("挂载私有文件夹须启用 workspace（文件物化落 workspace）", nullEnv.getMessage());
+        IllegalArgumentException noWorkspace = assertThrows(IllegalArgumentException.class,
+                () -> AgentSpecConfig.of(null, null, null, null, null, null, null,
+                        List.of(folder), ExecutionEnvConfig.disabled()));
+        assertEquals("挂载私有文件夹须启用 workspace（文件物化落 workspace）", noWorkspace.getMessage());
+
+        // 启用 workspace：ASSET/TOOLSET 均可挂载（挂载本身不强制开沙箱，工单 18 语义）
+        assertDoesNotThrow(() -> AgentSpecConfig.of(null, null, null, null, null, null, null,
+                List.of(folder), workspaceOn));
+        FolderMount toolset = FolderMount.of(FolderType.TOOLSET, "scripts",
+                List.of(FolderFile.of("run.py", "http://f/run.py", HASH_B, 30L)));
+        assertDoesNotThrow(() -> AgentSpecConfig.of(null, null, null, null, null, null, null,
+                List.of(toolset), workspaceOn));
+    }
+
+    @Test
+    @DisplayName("folders 通道：同规格文件夹名跨类型统一判重")
+    void rejectsDuplicateFolderNameAcrossTypes() {
+        ExecutionEnvConfig workspaceOn = ExecutionEnvConfig.of(true, false, null);
+        FolderMount asset = FolderMount.of(FolderType.ASSET, "shared",
+                List.of(FolderFile.of("a.md", "http://f/a.md", HASH_A, 1L)));
+        FolderMount toolset = FolderMount.of(FolderType.TOOLSET, "shared",
+                List.of(FolderFile.of("t.sh", "http://f/t.sh", HASH_B, 1L)));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> AgentSpecConfig.of(null, null, null, null, null, null, null,
+                        List.of(asset, toolset), workspaceOn));
+        assertEquals("同规格文件夹名不能重复", ex.getMessage());
+    }
+
+    /** 固定内容哈希（64 位 hex，仅测试用） */
+    private static final String HASH_A = "a".repeat(64);
+    private static final String HASH_B = "b".repeat(64);
 
 }

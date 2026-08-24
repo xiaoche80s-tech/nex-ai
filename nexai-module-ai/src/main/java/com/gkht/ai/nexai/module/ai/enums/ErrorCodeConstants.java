@@ -31,6 +31,7 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_SPEC_PUBLISH_INVALID = new ErrorCode(1_022_004_011, "规格发布失败：{}");
     ErrorCode AGENT_SPEC_VERSION_NOT_EXISTS = new ErrorCode(1_022_004_012, "目标版本不存在");
     ErrorCode AGENT_SPEC_VERSION_CONFLICT = new ErrorCode(1_022_004_013, "版本发布冲突，请重试");
+    ErrorCode AGENT_SPEC_FOLDER_FILE_INVALID = new ErrorCode(1_022_004_014, "规格私有文件夹文件上传失败：{}");
 
     // ========== 会话 SESSION 1-022-005-000 ==========
     ErrorCode SESSION_NOT_EXISTS = new ErrorCode(1_022_005_000, "会话不存在");
@@ -49,5 +50,11 @@ public interface ErrorCodeConstants {
     ErrorCode MCP_SERVER_CONFIG_INVALID = new ErrorCode(1_022_007_002, "MCP Server 配置校验失败：{}");
     ErrorCode MCP_SERVER_TOOLS_WHITELIST_INVALID = new ErrorCode(1_022_007_004, "工具白名单中的工具不在该 Server 最近拉取的工具清单内：{}");
     ErrorCode MCP_MOUNT_UNAVAILABLE = new ErrorCode(1_022_007_005, "MCP 工具挂载不可用：{}（装配已降级跳过，该来源工具暂不可调用）");
+
+    // ========== 租户 API Key 1-022-010-000（工单 16） ==========
+    ErrorCode API_KEY_NOT_EXISTS = new ErrorCode(1_022_010_000, "API Key 不存在");
+    ErrorCode API_KEY_INVALID = new ErrorCode(1_022_010_001, "API Key 配置校验失败：{}");
+    ErrorCode API_KEY_UNAUTHORIZED = new ErrorCode(1_022_010_002, "API Key 无效或已吊销");
+    ErrorCode API_KEY_SPEC_FORBIDDEN = new ErrorCode(1_022_010_003, "API Key 不在目标智能体的放行规格范围内");
 
 }

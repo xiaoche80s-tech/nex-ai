@@ -24,6 +24,14 @@
             <artifactId>nexai-spring-boot-starter-biz-tenant</artifactId>
         </dependency>
 
+        <!-- 基础设施模块 api：文件实体经 FileApi 落存储（工单 18 规格私有文件夹，
+             跨模块调用仅依赖 api 面，同 system 模块惯例） -->
+        <dependency>
+            <groupId>com.gkht.ai</groupId>
+            <artifactId>nexai-module-infra</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- AI 智能体运行时：agentscope-java v2（库嵌入，ADR-0001；版本经 nexai-dependencies 的
              agentscope-bom 管理）。使用面：模型构造（连通性探测与运行时装配）
              + 运行时基座 HarnessAgent（workspace/沙箱/子代理/记忆/转录）
@@ -60,6 +68,23 @@
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-postgresql</artifactId>
         </dependency>
+        <!-- OpenAI 兼容出口（工单 16，ADR-0001 直用）：事件流 → ChatCompletions 流式 chunk -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-chat-completions-web</artifactId>
+        </dependency>
+
+        <!-- OpenTelemetry（工单 14）：OTel 三段 span 经框架 OtelTracingMiddleware（agentscope-core 传递
+             提供 otel api），SDK 自动配置由平台接线（AiOtelConfiguration 按 nexai.ai.observability.otel.enabled
+             开关初始化；导出器与采样经 otel.* 标准属性配置），版本经 nexai-dependencies 管理 -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
 
         <!-- Web 相关 -->
         <dependency>
@@ -93,6 +118,17 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- OpenAI SDK 契约测试客户端（工单 16：OpenAI 兼容出口流式契约） -->
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java-client-okhttp</artifactId>
             <scope>test</scope>
         </dependency>
 

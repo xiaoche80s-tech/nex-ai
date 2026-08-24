@@ -95,4 +95,12 @@ public interface FileService {
      */
     FileDO getFileByConfigIdAndPath(Long configId, String path);
 
+    /**
+     * 按访问地址获得文件内容（反查 infra_file 记录后经存储客户端读取）
+     *
+     * @param url 完整的文件访问地址（createFile 返回值）
+     * @return 文件内容；文件记录不存在时返回 null
+     */
+    byte[] getFileContentByUrl(String url);
+
 }

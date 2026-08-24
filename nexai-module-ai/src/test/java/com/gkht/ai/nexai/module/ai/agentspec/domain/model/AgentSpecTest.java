@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AgentSpecTest {
 
     private static AgentSpecConfig draft() {
-        return AgentSpecConfig.of(null, "回答客户咨询", null, null, null, null, null, null);
+        return AgentSpecConfig.of(null, "回答客户咨询", null, null, null, null, null, null, null);
     }
 
     @Test

@@ -39,6 +39,13 @@ public interface AgentSpecMapper extends BaseMapperX<AgentSpecDO> {
         return selectPage(pageParam, query);
     }
 
+    /** 按业务编码查询（租户内唯一；OpenAI 兼容出口 model 路由用） */
+    default AgentSpecDO selectBySpecCode(String specCode) {
+        return selectOne(new LambdaQueryWrapperX<AgentSpecDO>()
+                .eq(AgentSpecDO::getSpecCode, specCode)
+                .orderByDesc(AgentSpecDO::getId));
+    }
+
     /**
      * 同归属层级下业务编码是否已存在（创建时应用层唯一性预校验；
      * tenant_id 由租户插件自动过滤，owner_user_id 归属用户隔离）

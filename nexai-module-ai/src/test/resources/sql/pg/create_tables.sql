@@ -168,3 +168,72 @@ CREATE TABLE IF NOT EXISTS ai_mcp_server (
     tenant_id int8 NOT NULL DEFAULT 0,
     CONSTRAINT pk_ai_mcp_server PRIMARY KEY (id)
 );
+
+CREATE SEQUENCE IF NOT EXISTS ai_audit_event_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_audit_event (
+    id int8 NOT NULL,
+    session_key varchar(64) NOT NULL,
+    spec_id int8 NULL DEFAULT NULL,
+    version_no int4 NULL DEFAULT NULL,
+    agent_id varchar(64) NULL DEFAULT NULL,
+    user_id varchar(64) NULL DEFAULT NULL,
+    tool_call_id varchar(128) NULL DEFAULT NULL,
+    tool_name varchar(128) NOT NULL,
+    outcome varchar(16) NOT NULL,
+    arguments_digest text NULL DEFAULT NULL,
+    result_digest text NULL DEFAULT NULL,
+    duration_ms int8 NULL DEFAULT NULL,
+    occurred_at timestamp NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_audit_event PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_audit_event_session ON ai_audit_event (tenant_id, session_key);
+
+CREATE SEQUENCE IF NOT EXISTS ai_model_usage_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_model_usage (
+    id int8 NOT NULL,
+    session_key varchar(64) NOT NULL,
+    spec_id int8 NULL DEFAULT NULL,
+    version_no int4 NULL DEFAULT NULL,
+    agent_id varchar(64) NULL DEFAULT NULL,
+    user_id varchar(64) NULL DEFAULT NULL,
+    model_name varchar(256) NOT NULL,
+    message_count int4 NULL DEFAULT NULL,
+    input_tokens int4 NULL DEFAULT NULL,
+    output_tokens int4 NULL DEFAULT NULL,
+    cached_tokens int4 NULL DEFAULT NULL,
+    total_tokens int4 NULL DEFAULT NULL,
+    duration_seconds float8 NULL DEFAULT NULL,
+    occurred_at timestamp NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_model_usage PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_model_usage_session ON ai_model_usage (tenant_id, session_key);
+
+CREATE SEQUENCE IF NOT EXISTS ai_tenant_api_key_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_tenant_api_key (
+    id int8 NOT NULL,
+    name varchar(64) NOT NULL,
+    key_prefix varchar(32) NOT NULL,
+    key_hash varchar(64) NOT NULL,
+    status varchar(16) NOT NULL DEFAULT 'ENABLED',
+    spec_codes text NULL DEFAULT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_tenant_api_key PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_tenant_api_key_hash ON ai_tenant_api_key (key_hash) WHERE deleted = 0;

@@ -2,6 +2,7 @@ package com.gkht.ai.nexai.module.ai.session.domain.valueobject;
 
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
@@ -64,6 +65,9 @@ public final class AgentRuntimeConfig {
     /** 挂载层：MCP Server 聚合本体（source=MCP 挂载的解析结果，连接配置直接可用），空 = 无 MCP 挂载 */
     private final List<McpServer> mcpServers;
 
+    /** 挂载层：规格私有文件夹（ASSET/TOOLSET，装配期物化进 workspace，工单 18），空 = 无文件夹挂载 */
+    private final List<FolderMount> folders;
+
     /** 模型来源：渠道（端点/密钥/提供商）与模型标识 */
     private final Channel channel;
     private final Model model;
@@ -74,7 +78,7 @@ public final class AgentRuntimeConfig {
                                Integer maxIters, GenerateOptions generateOptions,
                                ExecutionEnvConfig executionEnv, List<ToolMount> tools,
                                List<SkillMountDirectory> skillMounts, List<McpServer> mcpServers,
-                               Channel channel, Model model) {
+                               List<FolderMount> folders, Channel channel, Model model) {
         this.userId = userId;
         this.sessionKey = sessionKey;
         this.tenantId = tenantId;
@@ -91,6 +95,7 @@ public final class AgentRuntimeConfig {
         this.tools = tools == null ? List.of() : List.copyOf(tools);
         this.skillMounts = skillMounts == null ? List.of() : List.copyOf(skillMounts);
         this.mcpServers = mcpServers == null ? List.of() : List.copyOf(mcpServers);
+        this.folders = folders == null ? List.of() : List.copyOf(folders);
         this.channel = channel;
         this.model = model;
     }
@@ -113,6 +118,7 @@ public final class AgentRuntimeConfig {
      * @param tools       工具挂载列表，可空
      * @param skillMounts 技能挂载目录列表，可空
      * @param mcpServers  MCP Server 聚合列表（source=MCP 挂载解析结果），可空
+     * @param folders     规格私有文件夹挂载列表（装配期物化进 workspace），可空
      * @param channel     渠道，不能为 null
      * @param model       模型，不能为 null
      */
@@ -125,6 +131,7 @@ public final class AgentRuntimeConfig {
                                         List<ToolMount> tools,
                                         List<SkillMountDirectory> skillMounts,
                                         List<McpServer> mcpServers,
+                                        List<FolderMount> folders,
                                         Channel channel, Model model) {
         if (userId == null || sessionKey == null || tenantId == null || agentId == null
                 || agentName == null || specId == null || ownerLevel == null
@@ -133,7 +140,7 @@ public final class AgentRuntimeConfig {
         }
         return new AgentRuntimeConfig(userId, sessionKey, tenantId, agentId, agentName, specId,
                 versionNo, ownerLevel, ownerUserId, systemPrompt, maxIters, generateOptions,
-                executionEnv, tools, skillMounts, mcpServers, channel, model);
+                executionEnv, tools, skillMounts, mcpServers, folders, channel, model);
     }
 
     public String getUserId() {
@@ -203,6 +210,11 @@ public final class AgentRuntimeConfig {
     /** MCP Server 聚合列表（source=MCP 挂载解析结果），空 = 无 MCP 挂载 */
     public List<McpServer> getMcpServers() {
         return mcpServers;
+    }
+
+    /** 规格私有文件夹挂载列表（装配期物化进 workspace），空 = 无文件夹挂载 */
+    public List<FolderMount> getFolders() {
+        return folders;
     }
 
     public Channel getChannel() {

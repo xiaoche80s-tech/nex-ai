@@ -66,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Import({DebugSessionController.class, SessionServiceImpl.class, SessionRepositoryImpl.class,
         SessionConverterImpl.class, SessionMapper.class,
+        com.gkht.ai.nexai.module.ai.session.application.service.AgentRuntimeAssembler.class,
         TenantDbTestConfiguration.class, DebugSessionControllerTest.StubRepositoryConfiguration.class,
         DebugSessionControllerTest.FakeRuntimeGatewayConfiguration.class})
 public class DebugSessionControllerTest extends BaseDbUnitTest {
@@ -212,7 +213,7 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
         static AgentSpecConfig mountedConfig() {
             return AgentSpecConfig.of(1L, null, "系统提示", null,
                     null, List.of(5L),
-                    List.of(ToolMount.of(ToolSource.MCP, 7L, List.of(), List.of())), null);
+                    List.of(ToolMount.of(ToolSource.MCP, 7L, List.of(), List.of())), null, null);
         }
 
         @Bean
@@ -221,6 +222,11 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 @Override
                 public Long save(AgentSpec spec) {
                     return 1L;
+                }
+
+                @Override
+                public com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec findBySpecCode(String specCode) {
+                    return null;
                 }
 
                 @Override
@@ -387,6 +393,13 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
         public AgentRuntimeGateway agentRuntimeGateway() {
             return new AgentRuntimeGateway() {
                 final AtomicReference<String> lastContent = new AtomicReference<>();
+
+                @Override
+                public Flux<RuntimeEvent> chatOpenAi(AgentRuntimeConfig config,
+                        java.util.List<com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput> messages,
+                        String requestId) {
+                    return Flux.empty();
+                }
 
                 @Override
                 public Flux<RuntimeEvent> chat(AgentRuntimeConfig config, String content) {

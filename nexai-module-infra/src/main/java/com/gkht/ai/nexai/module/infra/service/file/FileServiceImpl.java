@@ -243,4 +243,15 @@ public class FileServiceImpl implements FileService {
         return fileMapper.selectLatestByConfigIdAndPath(configId, path);
     }
 
+    @Override
+    @SneakyThrows
+    public byte[] getFileContentByUrl(String url) {
+        // 按访问地址反查文件记录（url 为 createFile 的唯一返回凭证），再经存储客户端读内容
+        FileDO file = fileMapper.selectOne(FileDO::getUrl, url);
+        if (file == null) {
+            return null;
+        }
+        return getFileContent(file.getConfigId(), file.getPath());
+    }
+
 }

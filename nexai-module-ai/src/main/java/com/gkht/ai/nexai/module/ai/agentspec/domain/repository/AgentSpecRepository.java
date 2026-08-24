@@ -27,6 +27,12 @@ public interface AgentSpecRepository {
     AgentSpec findById(Long id);
 
     /**
+     * 按业务编码读取聚合（租户内寻址——OpenAI 兼容出口的 model 路由用，工单 16）；
+     * 同租户内编码唯一（部分唯一索引保证），不存在返回 null
+     */
+    AgentSpec findBySpecCode(String specCode);
+
+    /**
      * 读取规格下的版本号最大值，从未发布返回 null（发布时事务内计算新版本号）
      */
     Integer findMaxVersionNo(Long specId);

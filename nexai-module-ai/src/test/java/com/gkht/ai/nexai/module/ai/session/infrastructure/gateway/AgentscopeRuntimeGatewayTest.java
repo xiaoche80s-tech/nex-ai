@@ -1,6 +1,9 @@
 package com.gkht.ai.nexai.module.ai.session.infrastructure.gateway;
 
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderFile;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderType;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.channel.domain.model.Channel;
@@ -13,10 +16,12 @@ import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
+import com.gkht.ai.nexai.module.ai.shared.util.Hashes;
 import com.gkht.ai.nexai.module.ai.support.BasePgDbAndRedisUnitTest;
 import com.gkht.ai.nexai.module.ai.support.ConfirmableTool;
 import com.gkht.ai.nexai.module.ai.support.FakeChatModel;
 import com.gkht.ai.nexai.module.ai.framework.config.AiRuntimeProperties;
+import com.gkht.ai.nexai.module.infra.api.file.FileApi;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +32,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -50,7 +56,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFactory.class,
         com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry.class,
         com.gkht.ai.nexai.module.ai.shared.tool.builtin.SampleEchoTool.class,
-        AgentscopeRuntimeGatewayTest.HitlToolConfiguration.class})
+        AgentscopeRuntimeGatewayTest.HitlToolConfiguration.class,
+        // 工单 14：审计/用量采集 middleware + 仓储（PG 落库断言链路）
+        com.gkht.ai.nexai.module.ai.audit.infrastructure.gateway.AuditCollectorMiddleware.class,
+        com.gkht.ai.nexai.module.ai.audit.infrastructure.repository.AuditEventRepositoryImpl.class,
+        com.gkht.ai.nexai.module.ai.usage.infrastructure.gateway.UsageCollectorMiddleware.class,
+        com.gkht.ai.nexai.module.ai.usage.infrastructure.repository.ModelUsageRepositoryImpl.class,
+        com.gkht.ai.nexai.module.ai.framework.config.AiObservabilityProperties.class})
 public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
 
     /** HITL 测试工具装配：注册敏感工具（checkPermissions 恒 ASK），经 RuntimeToolContributor 注入装配链 */
@@ -96,7 +108,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 ExecutionEnvConfig.disabled(),
                 List.of(),
                 null, null,
-                channel(), model());
+                null, channel(), model());
     }
 
     /** 固定会话键的装配指令（跨轮/跨调用测试用，验证状态持久化与实例复用） */
@@ -107,7 +119,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 ExecutionEnvConfig.disabled(),
                 List.of(),
                 null, null,
-                channel(), model());
+                null, channel(), model());
     }
 
     private Channel channel() {
@@ -249,7 +261,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "contract-agent", "contract-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
                 ExecutionEnvConfig.disabled(), List.of(), null, null,
-                channelWithTime(LocalDateTime.now()), model());
+                null, channelWithTime(LocalDateTime.now()), model());
         runtimeGateway.chat(updated, "q2").collectList().block();
         assertEquals(2, creates.get(), "渠道 updateTime 变化应触发重建（新实例）");
     }
@@ -276,7 +288,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "contract-agent", "contract-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, GenerateOptions.of(0.5, null, null),
                 ExecutionEnvConfig.disabled(), List.of(), null, null,
-                channel(), modelWithTime(LocalDateTime.now()));
+                null, channel(), modelWithTime(LocalDateTime.now()));
         runtimeGateway.chat(updated, "q2").collectList().block();
         assertEquals(2, creates.get(), "模型 updateTime 变化应触发重建（新实例）");
     }
@@ -306,7 +318,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 ExecutionEnvConfig.disabled(),
                 List.of(),
                 null, null,
-                channel(), model());
+                null, channel(), model());
         runtimeGateway.chat(v2, "q2").collectList().block();
         assertEquals(2, creates.get(), "版本号变化应触发重建（新实例）");
     }
@@ -330,7 +342,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 ExecutionEnvConfig.of(true, false, null),
                 List.of(),
                 null, null,
-                channel(), model());
+                null, channel(), model());
 
         runtimeGateway.chat(wsConfig, "你好").collectList().block();
 
@@ -367,7 +379,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 ExecutionEnvConfig.of(true, false, null),
                 List.of(),
                 null, null,
-                channel(), model());
+                null, channel(), model());
         runtimeGateway.chat(wsConfig, "你好").collectList().block();
 
         // 路径越界（逃逸 workspace 根）→ 拒绝读取（返回 null）
@@ -398,7 +410,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
                         1L, List.of("sensitive_op"), List.of("sensitive_op"))),
                 null, null,
-                channel(), model());
+                null, channel(), model());
 
         // 第一轮：敏感工具被调用 → 事件流应含 REQUIRE_USER_CONFIRM 挂起
         List<RuntimeEvent> first = runtimeGateway.chat(hitlConfig, "执行敏感操作").collectList().block();
@@ -447,7 +459,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
                         1L, List.of("sensitive_op"), List.of("sensitive_op"))),
                 null, null,
-                channel(), model());
+                null, channel(), model());
 
         List<RuntimeEvent> first = runtimeGateway.chat(hitlConfig, "执行敏感操作").collectList().block();
         RuntimeEvent confirmEvent = first.stream()
@@ -502,7 +514,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
         AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
                 "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
-                List.of(), List.of(mount), null, channel(), model());
+                List.of(), List.of(mount), null, null, channel(), model());
         List<RuntimeEvent> events = runtimeGateway.chat(config, "帮我处理订单").collectList().block();
 
         assertNotNull(events);
@@ -537,7 +549,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
                 List.of(), List.of(materializedSkillMount("order-helper", "5@1")), null,
-                channel(), model()), "q1").collectList().block();
+                null, channel(), model()), "q1").collectList().block();
         assertEquals(1, creates.get());
 
         // 技能推新版本（指纹 5@2）→ 版本戳变化 → 失效重建（新会话即用新技能内容）
@@ -545,7 +557,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 "skill-agent", "skill-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
                 "你是测试智能体", 5, null, ExecutionEnvConfig.disabled(),
                 List.of(), List.of(materializedSkillMount("order-helper", "5@2")), null,
-                channel(), model()), "q2").collectList().block();
+                null, channel(), model()), "q2").collectList().block();
         assertEquals(2, creates.get(), "技能版本指纹变化应触发重建");
     }
 
@@ -573,7 +585,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.MCP,
                         999L, List.of(), List.of())),
-                null, List.of(deadServer), channel(), model());
+                null, List.of(deadServer), null, channel(), model());
 
         List<RuntimeEvent> events = runtimeGateway.chat(config, "你好").collectList().block();
 
@@ -600,7 +612,7 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
                         com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
                         1L, List.of("echo"), List.of())),
-                null, null, channel(), model());
+                null, null, null, channel(), model());
 
         List<RuntimeEvent> events = runtimeGateway.chat(config, "请调用回显工具").collectList().block();
 
@@ -627,6 +639,219 @@ public class AgentscopeRuntimeGatewayTest extends BasePgDbAndRedisUnitTest {
                 .anyMatch(schema -> "echo_upper".equals(schema.getName()));
         assertTrue(echoVisible, "白名单内工具 echo 应对模型可见");
         assertFalse(echoUpperVisible, "白名单外工具 echo_upper 应被收敛移除");
+    }
+
+    // ------------------------------------------------------------------
+    //  工单 18：规格私有文件夹（workspace 物化 + 内容哈希比对 + 版本戳失效）
+    // ------------------------------------------------------------------
+
+    /** 文件实体存取接缝（infra FileApi 跨模块 api）：物化下载内容由此桩提供 */
+    @MockitoBean
+    private FileApi fileApi;
+
+    @Test
+    public void testFolderMountMaterializesIntoWorkspace() throws Exception {
+        byte[] assetContent = "参考资料内容".getBytes(StandardCharsets.UTF_8);
+        byte[] toolsetContent = "#!/bin/sh\necho hi\n".getBytes(StandardCharsets.UTF_8);
+        Mockito.when(fileApi.getFileContent(Mockito.anyString())).thenAnswer(inv -> {
+            String url = inv.getArgument(0);
+            return url.endsWith("faq.md") ? assetContent : toolsetContent;
+        });
+        FakeChatModel fake = FakeChatModel.script().reply("收到资料").build();
+        stubModel(fake);
+
+        FolderMount asset = FolderMount.of(FolderType.ASSET, "faq",
+                List.of(FolderFile.of("faq.md", "http://files/faq.md",
+                        Hashes.sha256Hex(assetContent), assetContent.length)));
+        FolderMount toolset = FolderMount.of(FolderType.TOOLSET, "scripts",
+                List.of(FolderFile.of("run.sh", "http://files/run.sh",
+                        Hashes.sha256Hex(toolsetContent), toolsetContent.length)));
+
+        AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
+                "folder-agent", "folder-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "系统提示", 5, null,
+                ExecutionEnvConfig.of(true, false, null),
+                List.of(), null, null, List.of(asset, toolset),
+                channel(), model());
+        List<RuntimeEvent> events = runtimeGateway.chat(config, "你好").collectList().block();
+
+        assertNotNull(events);
+        assertTrue(events.stream().noneMatch(e -> e.type() == RuntimeEventType.SESSION_ERROR),
+                "文件夹挂载物化不应报错：" + events.stream().map(RuntimeEvent::type).toList());
+
+        // 物化落位：ASSET → knowledge/<name>/，TOOLSET → toolsets/<name>/（workspace 布局调研定案）
+        Path ws = runtimeProperties.getWorkspace().resolvedRoot()
+                .resolve("t1").resolve("folder-agent");
+        assertEquals("参考资料内容",
+                Files.readString(ws.resolve("knowledge").resolve("faq").resolve("faq.md")));
+        assertEquals(new String(toolsetContent, StandardCharsets.UTF_8),
+                Files.readString(ws.resolve("toolsets").resolve("scripts").resolve("run.sh")));
+
+        // 物化后可经文件工具同面读取（智能体直读契约）
+        assertEquals("参考资料内容",
+                runtimeGateway.readWorkspaceFile(config, "knowledge/faq/faq.md"));
+    }
+
+    @Test
+    public void testFolderMountHashMismatchFailsExplicitly() {
+        FakeChatModel fake = FakeChatModel.script().reply("x").build();
+        stubModel(fake);
+        // 存储对象内容与清单哈希不符（FileApi 后端对象被覆盖）→ 显式报错，不静默沿用
+        byte[] overwritten = "被覆盖后的内容".getBytes(StandardCharsets.UTF_8);
+        Mockito.when(fileApi.getFileContent(Mockito.anyString())).thenReturn(overwritten);
+        FolderMount stale = FolderMount.of(FolderType.ASSET, "faq",
+                List.of(FolderFile.of("faq.md", "http://files/faq.md",
+                        "0".repeat(64), overwritten.length)));
+
+        AgentRuntimeConfig config = AgentRuntimeConfig.of(USER_ID, freshSessionKey(), 1L,
+                "stale-folder-agent", "stale-folder-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "系统提示", 5, null,
+                ExecutionEnvConfig.of(true, false, null),
+                List.of(), null, null, List.of(stale),
+                channel(), model());
+
+        List<RuntimeEvent> events = runtimeGateway.chat(config, "你好").collectList().block();
+        assertNotNull(events);
+        assertEquals(1, events.size());
+        assertEquals(RuntimeEventType.SESSION_ERROR, events.get(0).type());
+        assertTrue(events.get(0).payload().contains("哈希不匹配"),
+                "应显式报内容哈希不匹配：" + events.get(0).payload());
+    }
+
+    @Test
+    public void testFolderMountFingerprintInvalidatesInstance() {
+        FakeChatModel fake = FakeChatModel.script().reply("v1").reply("v2").build();
+        AtomicInteger creates = new AtomicInteger();
+        Mockito.when(chatModelFactory.create(Mockito.any(), Mockito.anyString()))
+                .thenAnswer(inv -> {
+                    creates.incrementAndGet();
+                    return fake;
+                });
+        Mockito.when(fileApi.getFileContent(Mockito.anyString()))
+                .thenReturn("v1 内容".getBytes(StandardCharsets.UTF_8));
+
+        byte[] v1 = "v1 内容".getBytes(StandardCharsets.UTF_8);
+        byte[] v2 = "v2 内容".getBytes(StandardCharsets.UTF_8);
+        String fixedKey = "dbg-folder-fp-" + System.nanoTime();
+        // v1 挂载：装配一次
+        runtimeGateway.chat(AgentRuntimeConfig.of(USER_ID, fixedKey, 1L,
+                "fp-folder-agent", "fp-folder-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "系统提示", 5, null, ExecutionEnvConfig.of(true, false, null),
+                List.of(), null, null, List.of(FolderMount.of(FolderType.ASSET, "faq",
+                        List.of(FolderFile.of("faq.md", "http://files/faq.md",
+                                Hashes.sha256Hex(v1), v1.length)))),
+                channel(), model()), "q1").collectList().block();
+        assertEquals(1, creates.get());
+
+        // 清单内容变化（哈希变化 → 指纹变化）→ 版本戳失效重建
+        Mockito.when(fileApi.getFileContent(Mockito.anyString()))
+                .thenReturn(v2);
+        runtimeGateway.chat(AgentRuntimeConfig.of(USER_ID, fixedKey, 1L,
+                "fp-folder-agent", "fp-folder-agent-v1", 1L, 1, OwnerLevel.TENANT, null,
+                "系统提示", 5, null, ExecutionEnvConfig.of(true, false, null),
+                List.of(), null, null, List.of(FolderMount.of(FolderType.ASSET, "faq",
+                        List.of(FolderFile.of("faq.md", "http://files/faq.md",
+                                Hashes.sha256Hex(v2), v2.length)))),
+                channel(), model()), "q2").collectList().block();
+        assertEquals(2, creates.get(), "文件夹清单指纹变化应触发重建");
+    }
+
+    // ------------------------------------------------------------------
+    //  工单 14：审计/用量采集（middleware → PG 落库，维度含租户/会话/规格）
+    // ------------------------------------------------------------------
+
+    /** 测试数据落专用租户 999999（clean.sql 按该租户精确清理） */
+    private static final long OBS_TENANT = 999999L;
+
+    @Resource
+    private javax.sql.DataSource dataSource;
+
+    /** 采集链路装配指令（专用租户 + 平台工具挂载，便于触发工具调用审计） */
+    private AgentRuntimeConfig observabilityConfig(String agentCode) {
+        return AgentRuntimeConfig.of(USER_ID, freshSessionKey(), OBS_TENANT,
+                agentCode, agentCode + "-v1", 7L, 2, OwnerLevel.TENANT, null,
+                "系统提示", 5, null, ExecutionEnvConfig.disabled(),
+                List.of(com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount.of(
+                        com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource.PLATFORM,
+                        1L, List.of("echo"), List.of())),
+                null, null, null, channel(), model());
+    }
+
+    /** 采集落库经 doFinally 异步执行（流终止后），断言前轮询等待（上限 10 秒） */
+    private static void awaitPersisted(java.util.function.BooleanSupplier condition) throws InterruptedException {
+        for (int i = 0; i < 100 && !condition.getAsBoolean(); i++) {
+            Thread.sleep(100);
+        }
+    }
+
+    @Test
+    public void testAuditCollectorPersistsToolCalls() throws Exception {
+        // 脚本：调用平台工具 echo → 审计应记录该工具调用（含结果状态）
+        FakeChatModel fake = FakeChatModel.script()
+                .callTool("echo", java.util.Map.of("text", "审计回显"))
+                .reply("完成")
+                .build();
+        stubModel(fake);
+
+        List<RuntimeEvent> events = runtimeGateway.chat(observabilityConfig("audit-agent"), "请调用回显工具")
+                .collectList().block();
+        assertNotNull(events);
+        assertTrue(events.stream().anyMatch(e -> e.type() == RuntimeEventType.TOOL_CALL_END),
+                "前置：工具调用应发生");
+
+        awaitPersisted(() -> queryLong(
+                "SELECT COUNT(*) FROM ai_audit_event WHERE tenant_id = " + OBS_TENANT) > 0);
+        // 审计事件落库：租户/会话/规格维度 + 工具名 + 结果口径
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                     "SELECT tool_name, outcome, spec_id, agent_id FROM ai_audit_event "
+                             + "WHERE tenant_id = ? ORDER BY id")) {
+            statement.setLong(1, OBS_TENANT);
+            try (var resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next(), "审计事件应落库（租户 " + OBS_TENANT + "）");
+                assertEquals("echo", resultSet.getString(1));
+                assertEquals("SUCCESS", resultSet.getString(2));
+                assertEquals(7L, resultSet.getLong(3));
+                assertEquals("audit-agent", resultSet.getString(4));
+            }
+        }
+    }
+
+    /** 单值标量查询（轮询用） */
+    private long queryLong(String sql) {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.createStatement();
+             var resultSet = statement.executeQuery(sql)) {
+            return resultSet.next() ? resultSet.getLong(1) : 0;
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
+    @Test
+    public void testUsageCollectorPersistsModelCalls() throws Exception {
+        FakeChatModel fake = FakeChatModel.script().reply("你好").build();
+        stubModel(fake);
+
+        runtimeGateway.chat(observabilityConfig("usage-agent"), "你好").collectList().block();
+        awaitPersisted(() -> queryLong(
+                "SELECT COUNT(*) FROM ai_model_usage WHERE tenant_id = " + OBS_TENANT) > 0);
+
+        // 模型用量落库：FakeChatModel 的 usage（input=10/output=5）+ 维度（租户/会话/规格/模型名）
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                     "SELECT model_name, input_tokens, output_tokens, total_tokens, spec_id "
+                             + "FROM ai_model_usage WHERE tenant_id = ? ORDER BY id")) {
+            statement.setLong(1, OBS_TENANT);
+            try (var resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next(), "模型用量应落库（租户 " + OBS_TENANT + "）");
+                assertEquals("fake-chat-model", resultSet.getString(1));
+                assertEquals(10, resultSet.getInt(2));
+                assertEquals(5, resultSet.getInt(3));
+                assertEquals(15, resultSet.getInt(4));
+                assertEquals(7L, resultSet.getLong(5));
+            }
+        }
     }
 
     /** 渠道（带 updateTime） */

@@ -27,4 +27,13 @@ public class FileApiImpl implements FileApi {
         return fileService.presignGetUrl(url, expirationSeconds);
     }
 
+    @Override
+    public byte[] getFileContent(String url) {
+        try {
+            return fileService.getFileContentByUrl(url);
+        } catch (Exception ex) {
+            throw new IllegalStateException("读取文件内容失败：" + url, ex);
+        }
+    }
+
 }

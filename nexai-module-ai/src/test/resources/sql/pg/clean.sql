@@ -13,3 +13,8 @@ DELETE FROM ai_skill_version WHERE tenant_id = 999999;
 DELETE FROM ai_skill WHERE tenant_id = 999999;
 
 DELETE FROM ai_mcp_server WHERE tenant_id = 999999;
+
+DELETE FROM ai_audit_event WHERE tenant_id = 999999;
+DELETE FROM ai_model_usage WHERE tenant_id = 999999;
+
+DELETE FROM ai_tenant_api_key WHERE tenant_id = 999999;

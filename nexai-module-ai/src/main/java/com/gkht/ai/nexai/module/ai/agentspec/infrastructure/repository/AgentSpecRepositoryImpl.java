@@ -44,6 +44,12 @@ public class AgentSpecRepositoryImpl implements AgentSpecRepository {
     }
 
     @Override
+    public AgentSpec findBySpecCode(String specCode) {
+        AgentSpecDO dataObject = agentSpecMapper.selectBySpecCode(specCode);
+        return dataObject == null ? null : reconstitute(dataObject);
+    }
+
+    @Override
     public Integer findMaxVersionNo(Long specId) {
         return agentSpecVersionMapper.selectMaxVersionNo(specId);
     }

@@ -9,6 +9,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderFile;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderMount;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderType;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
@@ -101,6 +104,7 @@ public interface AgentSpecConverter {
         private GenerateOptionsJSON generateOptions;
         private List<Long> skillIds;
         private List<ToolMountJSON> tools;
+        private List<FolderMountJSON> folders;
         private ExecutionEnvJSON executionEnv;
 
         static ConfigJSON from(AgentSpecConfig config) {
@@ -114,6 +118,8 @@ public interface AgentSpecConverter {
             json.setSkillIds(config.getSkillIds());
             json.setTools(config.getTools() == null ? null
                     : config.getTools().stream().map(ToolMountJSON::from).toList());
+            json.setFolders(config.getFolders() == null || config.getFolders().isEmpty() ? null
+                    : config.getFolders().stream().map(FolderMountJSON::from).toList());
             json.setExecutionEnv(ExecutionEnvJSON.from(config.getExecutionEnv()));
             return json;
         }
@@ -123,6 +129,7 @@ public interface AgentSpecConverter {
                     generateOptions == null ? null : generateOptions.toDomain(),
                     skillIds,
                     tools == null ? null : tools.stream().map(ToolMountJSON::toDomain).toList(),
+                    folders == null ? null : folders.stream().map(FolderMountJSON::toDomain).toList(),
                     executionEnv == null ? null : executionEnv.toDomain());
         }
 
@@ -196,6 +203,52 @@ public interface AgentSpecConverter {
         ToolMount toDomain() {
             return ToolMount.of(source == null ? null : ToolSource.valueOf(source),
                     sourceId, allowedTools, sensitiveTools);
+        }
+
+    }
+
+    /** 文件夹挂载 JSON 桥接（工单 18 folders 通道：type/name/files 清单含内容哈希） */
+    @Data
+    class FolderMountJSON {
+
+        private String type;
+        private String name;
+        private List<FolderFileJSON> files;
+
+        static FolderMountJSON from(FolderMount mount) {
+            FolderMountJSON json = new FolderMountJSON();
+            json.setType(mount.getType().name());
+            json.setName(mount.getName());
+            json.setFiles(mount.getFiles().stream().map(FolderFileJSON::from).toList());
+            return json;
+        }
+
+        FolderMount toDomain() {
+            return FolderMount.of(type == null ? null : FolderType.valueOf(type), name,
+                    files == null ? null : files.stream().map(FolderFileJSON::toDomain).toList());
+        }
+
+    }
+
+    @Data
+    class FolderFileJSON {
+
+        private String path;
+        private String url;
+        private String contentHash;
+        private Long size;
+
+        static FolderFileJSON from(FolderFile file) {
+            FolderFileJSON json = new FolderFileJSON();
+            json.setPath(file.path());
+            json.setUrl(file.url());
+            json.setContentHash(file.contentHash());
+            json.setSize(file.size());
+            return json;
+        }
+
+        FolderFile toDomain() {
+            return FolderFile.of(path, url, contentHash, size == null ? 0L : size);
         }
 
     }

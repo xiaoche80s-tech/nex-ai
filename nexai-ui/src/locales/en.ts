@@ -628,6 +628,23 @@ export default {
       mountWhitelistPlaceholder: 'Empty = all tools (tool names allowed)',
       mountSensitive: 'Sensitive Tools',
       mountSensitivePlaceholder: 'Pause for approval before call (optional)',
+      // Private folder mounts (ticket 18)
+      formFolders: 'Private Folders',
+      formFoldersTip:
+        'Spec-owned static files, manifest fixed per published version; materialized into the workspace at assembly (assets → knowledge/, toolsets → toolsets/), verified by content hash',
+      formFoldersDisabled: 'Private folders require the workspace to be enabled',
+      addAssetFolder: 'Add Asset Folder',
+      addToolsetFolder: 'Add Toolset Folder',
+      folderTypeAsset: 'Asset',
+      folderTypeToolset: 'Toolset',
+      folderNamePlaceholder: 'Target sub-directory name (e.g. product-faq)',
+      folderNamePattern:
+        'Folder name must start with a letter or digit and contain only letters/digits/dot/underscore/hyphen (1~64 chars)',
+      folderUpload: 'Upload Files',
+      folderUploaded: 'File uploaded',
+      folderFilePath: 'Relative path in folder',
+      folderFileSize: 'Size',
+      folderFileHash: 'Content hash',
       // Validation & notices
       nameRequired: 'Name is required',
       specCodeRequired: 'Spec code is required',
@@ -751,6 +768,27 @@ export default {
       deleted: 'Deleted',
       deleteConfirm:
         'Delete this MCP server? Specs mounting it will fail assembly explicitly until unmouted.'
+    },
+    apiKey: {
+      title: 'Tenant API Keys',
+      create: 'Generate API Key',
+      name: 'Key Name',
+      namePlaceholder: 'e.g. integration',
+      nameRequired: 'Key name is required',
+      keyPrefix: 'Prefix',
+      status: 'Status',
+      enabled: 'Active',
+      revoked: 'Revoked',
+      specScope: 'Spec Scope',
+      specScopePlaceholder: 'Select allowed agents (multi-select)',
+      specScopeTip: 'Empty = all agents of this tenant; the key can only call specs within the allowed scope',
+      allSpecs: 'All agents',
+      revoke: 'Revoke',
+      revokeConfirm: 'Revoke API key "{name}"? Calls via this key will fail immediately (leak containment, irreversible)',
+      onceWarning: 'The plaintext key is shown only once. Copy and store it now — it cannot be viewed again',
+      copy: 'Copy',
+      copied: 'Copied to clipboard',
+      created: 'API key generated'
     },
     platformTool: {
       title: 'Platform Tools',

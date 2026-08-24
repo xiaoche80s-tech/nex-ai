@@ -24,6 +24,36 @@ export interface ToolMount {
 /** 执行能力（仅沙箱模式可选） */
 export type ExecutionCapability = 'SHELL' | 'PYTHON' | 'NODE'
 
+/** 规格私有文件夹类型（ASSET = 资料文件夹，TOOLSET = 工具集文件夹） */
+export type FolderType = 'ASSET' | 'TOOLSET'
+
+/** 文件夹内单个文件条目（上传凭证：url + 内容哈希 + 字节数，内容寻址） */
+export interface FolderFile {
+  /** 文件夹内相对路径（可含子目录） */
+  path: string
+  /** 存储地址（上传接口返回） */
+  url: string
+  /** 内容 SHA-256（上传接口返回，装配物化比对依据） */
+  contentHash: string
+  /** 文件字节数 */
+  size: number
+}
+
+/** 规格私有文件夹挂载（类型 + 目标子目录名 + 文件清单，随版本快照固化） */
+export interface FolderMount {
+  type: FolderType
+  /** 目标子目录名（物化到 workspace 的 knowledge/<name> 或 toolsets/<name>） */
+  name: string
+  files: FolderFile[]
+}
+
+/** 上传凭证（上传接口返回，前端填入 folders 清单） */
+export interface FolderFileUploadResult {
+  url: string
+  contentHash: string
+  size: number
+}
+
 /** 执行环境配置（workspace / 沙箱 / 执行能力，随版本快照固化） */
 export interface ExecutionEnv {
   workspaceEnabled: boolean
@@ -45,6 +75,7 @@ export interface AgentSpecConfig {
   // —— 挂载层（编辑面后置）——
   skillIds?: number[]
   tools?: ToolMount[]
+  folders?: FolderMount[]
   // —— 执行环境层 ——
   /** null 表示全关（纯对话智能体） */
   executionEnv?: ExecutionEnv | null
@@ -124,9 +155,16 @@ export interface AgentSpecCreateForm {
   skillIds?: number[]
   /** 挂载层：工具挂载（MCP Server / 平台工具库，随版本快照固化） */
   tools?: ToolMount[]
+  /** 挂载层：规格私有文件夹（ASSET 资料 / TOOLSET 工具集，随版本快照固化；须启用 workspace） */
+  folders?: FolderMount[]
   workspaceEnabled?: boolean
   sandboxEnabled?: boolean
   capabilities?: ExecutionCapability[]
+}
+
+// 上传文件夹内单个文件（返回凭证：url + contentHash + size）
+export const uploadFolderFile = (data: { file: File }) => {
+  return request.upload({ url: '/ai/spec/folder-file/upload', data })
 }
 
 // 创建规格（携带首个草稿）

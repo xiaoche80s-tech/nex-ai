@@ -32,6 +32,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 
 import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServiceException;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CODE_DUPLICATE;
@@ -212,6 +213,46 @@ public class AgentSpecControllerTest extends BaseDbUnitTest {
         command.setSandboxEnabled(true);
         assertServiceException(() -> agentSpecService.createSpec(command, null),
                 AGENT_SPEC_CONFIG_INVALID, "未启用 workspace 时不能开启沙箱或执行能力（纯对话智能体）");
+    }
+
+    @Test
+    @DisplayName("folders 通道（工单 18）：清单随草稿落库；未启用 workspace 挂载被拒")
+    public void foldersMountPersistsAndValidates() throws SQLException {
+        AgentSpecCreateCommand command = createCommand("folder-spec");
+        command.setWorkspaceEnabled(true);
+        command.setFolders(List.of(folderCommand("faq")));
+
+        agentSpecController.createSpec(command).getData();
+        String draft = queryDraft("folder-spec");
+        assertNotNull(draft);
+        assertTrue(draft.contains("\"folders\""), "草稿 JSON 应含文件夹清单分组");
+        assertTrue(draft.contains("\"type\":\"ASSET\""), "草稿应固化文件夹类型");
+        assertTrue(draft.contains("\"contentHash\":\"" + "a".repeat(64) + "\""),
+                "草稿应固化内容哈希（内容寻址）");
+        assertTrue(draft.contains("\"executionEnv\""), "挂载文件夹的草稿应含执行环境层");
+
+        // 未启用 workspace 挂载文件夹 → 领域校验拒绝（业务错误码而非 500）
+        AgentSpecCreateCommand noWorkspace = createCommand("folder-nows");
+        noWorkspace.setFolders(List.of(folderCommand("faq")));
+        assertServiceException(() -> agentSpecService.createSpec(noWorkspace, null),
+                AGENT_SPEC_CONFIG_INVALID, "挂载私有文件夹须启用 workspace（文件物化落 workspace）");
+    }
+
+    /** 文件夹挂载命令（固定凭证：faq.md + 全 a 哈希） */
+    private com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand
+    folderCommand(String name) {
+        com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand.FolderFileCommand file =
+                new com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand.FolderFileCommand();
+        file.setPath("faq.md");
+        file.setUrl("http://files/faq.md");
+        file.setContentHash("a".repeat(64));
+        file.setSize(12L);
+        com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand folder =
+                new com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.FolderMountCommand();
+        folder.setType("ASSET");
+        folder.setName(name);
+        folder.setFiles(List.of(file));
+        return folder;
     }
 
     @Test

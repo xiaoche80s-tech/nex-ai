@@ -2,6 +2,8 @@ package com.gkht.ai.nexai.module.ai.session.infrastructure.gateway;
 
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionCapability;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ExecutionEnvConfig;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderFile;
+import com.gkht.ai.nexai.module.ai.agentspec.domain.model.FolderMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.GenerateOptions;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.OwnerLevel;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
@@ -10,14 +12,17 @@ import com.gkht.ai.nexai.module.ai.channel.infrastructure.gateway.ChatModelFacto
 import com.gkht.ai.nexai.module.ai.framework.config.AiRuntimeProperties;
 import com.gkht.ai.nexai.module.ai.mcpserver.domain.model.McpServer;
 import com.gkht.ai.nexai.module.ai.mcpserver.infrastructure.gateway.AgentscopeMcpServerGateway;
+import com.gkht.ai.nexai.module.infra.api.file.FileApi;
 import com.gkht.ai.nexai.module.ai.session.domain.gateway.AgentRuntimeGateway;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.AgentRuntimeConfig;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEvent;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeEventType;
+import com.gkht.ai.nexai.module.ai.session.domain.valueobject.RuntimeContextKeys;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.SkillMountDirectory;
 import com.gkht.ai.nexai.module.ai.session.domain.valueobject.ToolCallDecision;
 import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolEntry;
 import com.gkht.ai.nexai.module.ai.shared.tool.PlatformToolRegistry;
+import com.gkht.ai.nexai.module.ai.shared.util.Hashes;
 import com.gkht.ai.nexai.module.ai.shared.util.RootCauses;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
@@ -122,6 +127,14 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     @Autowired(required = false)
     private PlatformToolRegistry platformToolRegistry;
 
+    /** 文件实体存取（infra FileApi 跨模块 api，工单 18 文件夹物化下载；测试上下文未装配时为 null） */
+    @Autowired(required = false)
+    private FileApi fileApi;
+
+    /** 运行时采集中间件（工单 14：审计 onActing / 用量 onModelCall，按配置条件注册；测试上下文可为空） */
+    @Autowired(required = false)
+    private List<io.agentscope.core.middleware.MiddlewareBase> runtimeCollectorMiddlewares = List.of();
+
     /** 常驻实例注册表（线程安全；装配一次、常驻复用，版本戳失效重建） */
     private final AgentInstanceManager instanceManager = new AgentInstanceManager();
 
@@ -144,6 +157,42 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
                 return Flux.just(errorEvent(rootMessage(ex)));
             }
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** OpenAI 兼容出口转换器（ADR-0001 直用 agentscope ChatCompletionsStreamingAdapter） */
+    private final io.agentscope.core.chat.completions.streaming.ChatCompletionsStreamingAdapter
+            openAiAdapter = new io.agentscope.core.chat.completions.streaming.ChatCompletionsStreamingAdapter();
+
+    @Override
+    public Flux<RuntimeEvent> chatOpenAi(AgentRuntimeConfig config,
+                                         List<com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput> messages,
+                                         String requestId) {
+        return Flux.defer(() -> {
+            try {
+                InstanceEntry entry = instanceManager.acquire(config);
+                RuntimeContext context = runtimeContext(config);
+                List<Msg> msgs = messages.stream().map(AgentscopeRuntimeGateway::toMsg).toList();
+                // 无状态出口：adapter 收客户端全量历史；model 名回填路由的规格编码
+                return openAiAdapter.stream(entry.agent().getDelegate(), msgs, requestId,
+                                config.getAgentId())
+                        .map(chunk -> RuntimeEvent.of(RuntimeEventType.OPENAI_CHUNK,
+                                JsonUtils.getJsonCodec().toJson(chunk)))
+                        .onErrorResume(ex -> Flux.just(errorEvent(rootMessage(ex))))
+                        .doFinally(signal -> instanceManager.release(entry));
+            } catch (Exception ex) {
+                return Flux.just(errorEvent(rootMessage(ex)));
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 出口消息 → agentscope Msg（system/user/assistant 扁平口径；其余角色归 user） */
+    private static Msg toMsg(
+            com.gkht.ai.nexai.module.ai.session.domain.valueobject.ChatMessageInput input) {
+        return switch (input.getRole()) {
+            case "system" -> new io.agentscope.core.message.SystemMessage(input.getContent());
+            case "assistant" -> new io.agentscope.core.message.AssistantMessage(input.getContent());
+            default -> new UserMessage(input.getContent());
+        };
     }
 
     @Override
@@ -291,6 +340,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
             builder.generateOptions(toAgentscopeOptions(config.getGenerateOptions()));
         }
 
+        // 可观测预埋（工单 14，ADR-0001 直用框架）：OTel 三段 span（agent 调用/模型调用/工具执行）
+        // 恒挂——无全局 OTel SDK 时全部 no-op 近零开销，SDK 导出器与采样经 otel.* 标准属性配置；
+        // 平台自建采集（审计 onActing / 用量 onModelCall，宪法内自建）经注入列表按配置装配
+        builder.middleware(new io.agentscope.core.tracing.OtelTracingMiddleware());
+        runtimeCollectorMiddlewares.forEach(builder::middleware);
+
         // 技能挂载目录 → 文件仓库 + 名单收敛（工单 12）：仓库按物化基目录读取，
         // SkillFilter.only 使仅挂载技能对模型可见（目录下其余技能与 workspace/skills 层一并滤除）
         if (!config.getSkillMounts().isEmpty()) {
@@ -320,6 +375,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         if (workspaceEnabled) {
             Path workspace = ensureWorkspace(config);
             materializeAgentsMd(workspace, config.getSystemPrompt());
+            materializeFolders(workspace, config);
             builder.workspace(workspace);
             if (env.isSandboxEnabled()) {
                 DockerFilesystemSpec sandboxSpec = new DockerFilesystemSpec()
@@ -536,6 +592,54 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
         }
     }
 
+    /**
+     * 规格私有文件夹物化（工单 18）：ASSET → workspace {@code knowledge/<name>/}（agentscope
+     * 原生预留位）、TOOLSET → {@code toolsets/<name>/}（自定义目录，不占框架硬编码路径）。
+     * 版本快照清单为唯一权威源，装配期按 contentHash 内容比对：磁盘内容一致跳过覆写
+     * （物化缓存命中）；存储对象与清单哈希不符（FileApi 后端对象被覆盖）或对象缺失时
+     * <b>显式报错</b>，不静默沿用旧物化。文件可被智能体经文件工具直读
+     * （TOOLSET 脚本执行受既有沙箱能力链约束，挂载本身不强制开沙箱）。
+     */
+    private void materializeFolders(Path workspace, AgentRuntimeConfig config) {
+        for (FolderMount folder : config.getFolders()) {
+            Path dir = workspace.resolve(folder.targetSegment()).resolve(folder.getName());
+            for (FolderFile file : folder.getFiles()) {
+                Path target = resolveWithin(dir, file.path());
+                if (target == null) {
+                    throw new IllegalStateException(
+                            "文件夹挂载路径逃逸：" + folder.getName() + "/" + file.path());
+                }
+                try {
+                    if (Files.exists(target)
+                            && file.contentHash().equals(sha256Hex(Files.readAllBytes(target)))) {
+                        continue; // 内容一致跳过覆写（物化缓存命中）
+                    }
+                    if (fileApi == null) {
+                        throw new IllegalStateException(
+                                "文件存储 API 未装配，无法物化文件夹：" + folder.getName());
+                    }
+                    byte[] content = fileApi.getFileContent(file.url());
+                    if (content == null) {
+                        throw new IllegalStateException(
+                                "文件夹挂载的存储对象缺失：" + file.url());
+                    }
+                    if (!file.contentHash().equals(sha256Hex(content))) {
+                        throw new IllegalStateException("文件夹挂载内容哈希不匹配（存储对象已被覆盖？）："
+                                + folder.getName() + "/" + file.path());
+                    }
+                    Files.createDirectories(target.getParent());
+                    Files.write(target, content);
+                } catch (IOException ex) {
+                    throw new IllegalStateException("文件夹物化失败：" + target, ex);
+                }
+            }
+        }
+    }
+
+    private static String sha256Hex(byte[] content) {
+        return Hashes.sha256Hex(content);
+    }
+
     private IsolationScope isolationScope(OwnerLevel ownerLevel) {
         // 归属级隔离：用户级规格按 AGENT（同一规格的会话共享 workspace 根，无额外 uid 前缀层——
         // 平台路径已含 u{userId} 段）；租户/平台级按 USER（会话间按用户命名空间隔离）
@@ -632,12 +736,15 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
     // ------------------------------------------------------------------
 
     private RuntimeContext runtimeContext(AgentRuntimeConfig config) {
+        // specId/versionNo 供审计与用量 middleware 取规格维度（工单 14；维度键常量两端共用）
         return RuntimeContext.builder()
                 .sessionId(config.getSessionKey())
                 .userId(config.getUserId())
-                .put("tenantId", config.getTenantId())
-                .put("sessionKey", config.getSessionKey())
-                .put("agentId", config.getAgentId())
+                .put(RuntimeContextKeys.TENANT_ID, config.getTenantId())
+                .put(RuntimeContextKeys.SESSION_KEY, config.getSessionKey())
+                .put(RuntimeContextKeys.AGENT_ID, config.getAgentId())
+                .put(RuntimeContextKeys.SPEC_ID, config.getSpecId())
+                .put(RuntimeContextKeys.VERSION_NO, config.getVersionNo())
                 .build();
     }
 
@@ -708,7 +815,7 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
 
         private final Map<String, InstanceEntry> instances = new ConcurrentHashMap<>();
 
-        /** 装配指令 → 版本戳（渠道/模型/MCP 更新时间 + 技能指纹 + 规格引用），任一变化即失效 */
+        /** 装配指令 → 版本戳（渠道/模型/MCP 更新时间 + 技能/文件夹指纹 + 规格引用），任一变化即失效 */
         private String versionStamp(AgentRuntimeConfig config) {
             long channelStamp = config.getChannel().getUpdateTime() == null
                     ? 0L : config.getChannel().getUpdateTime().hashCode();
@@ -720,8 +827,12 @@ public class AgentscopeRuntimeGateway implements AgentRuntimeGateway {
             String skillStamp = config.getSkillMounts().stream()
                     .map(SkillMountDirectory::getFingerprint)
                     .reduce("", String::concat);
+            // 文件夹挂载经版本发布自然纳入失效（清单固化进版本快照），指纹兜底同版本号下的清单比对
+            String folderStamp = config.getFolders().stream()
+                    .map(FolderMount::fingerprint)
+                    .reduce("", String::concat);
             return config.specReference() + ":" + channelStamp + ":" + modelStamp
-                    + ":" + mcpStamp + ":" + skillStamp.hashCode();
+                    + ":" + mcpStamp + ":" + skillStamp.hashCode() + ":" + folderStamp.hashCode();
         }
 
         /** 获取（或构建）实例并持有引用；调用方必须配对 release */
