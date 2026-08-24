@@ -53,7 +53,7 @@ public class AgentSpecController {
     }
 
     @GetMapping("/get")
-    @Operation(summary = "获得规格详情", description = "编辑面回填用：主体元数据 + 全量草稿配置平铺")
+    @Operation(summary = "获得规格详情", description = "编辑面回填用：主体元数据 + 配置平铺（草稿优先；已发布无草稿时取当前生效快照）")
     @Parameter(name = "id", description = "规格编号", required = true, example = "1")
     @PreAuthorize("@ss.hasPermission('ai:spec:query')")
     public CommonResult<AgentSpecDetailDTO> getSpec(@RequestParam("id") Long id) {

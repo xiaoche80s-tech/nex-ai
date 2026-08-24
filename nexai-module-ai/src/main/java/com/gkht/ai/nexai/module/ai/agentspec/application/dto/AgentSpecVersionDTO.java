@@ -7,7 +7,8 @@ import java.time.LocalDateTime;
 
 /**
  * 智能体规格版本快照 DTO（列表项）：不可变快照的元信息。
- * 全量配置不随列表返回（快照可能很大），详情按需读取。
+ * 全量配置不随列表返回（快照可能很大），详情经 version-get 按需读取
+ * （{@link AgentSpecVersionDetailDTO}，只读预览）。
  */
 @Schema(description = "管理后台 - 智能体规格版本快照 DTO（列表项）")
 @Data
@@ -24,6 +25,12 @@ public class AgentSpecVersionDTO {
 
     @Schema(description = "是否为当前生效版本（当前版本指针判等）")
     private Boolean current;
+
+    @Schema(description = "发布人编号（快照创建者）", example = "1")
+    private Long creator;
+
+    @Schema(description = "发布人昵称（经 AdminUserApi 解析；用户已删除时回退显示编号）", example = "芋道")
+    private String publisherName;
 
     @Schema(description = "创建时间")
     private LocalDateTime createTime;

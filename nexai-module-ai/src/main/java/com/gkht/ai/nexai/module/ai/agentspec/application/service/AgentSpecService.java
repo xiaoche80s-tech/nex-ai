@@ -8,6 +8,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecUpdate
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 
@@ -60,11 +61,22 @@ public interface AgentSpecService {
     Integer publishSpec(AgentSpecPublishCommand command);
 
     /**
-     * 查询规格的版本列表（按版本号升序，含当前版本标识）
+     * 查询规格的版本列表（按版本号升序，含当前版本标识与发布人昵称）
      *
      * @param specId 规格编号
      */
     List<AgentSpecVersionDTO> listSpecVersions(Long specId);
+
+    /**
+     * 查询版本快照详情（只读预览，工单 24）：版本元信息 + 全量四层配置平铺
+     *（与规格详情同构，固化保真）。
+     *
+     * @param specId    规格编号
+     * @param versionNo 版本号
+     * @throws com.gkht.ai.nexai.framework.common.exception.ServiceException 规格或版本不存在
+     *         （不存在/跨租户/已删除均归此，按聚合 + 租户双隔离）
+     */
+    AgentSpecVersionDetailDTO getSpecVersion(Long specId, Integer versionNo);
 
     /**
      * 切换当前生效版本（回退当前版本指针；快照本身不可变）

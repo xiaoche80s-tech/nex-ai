@@ -81,6 +81,10 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
     @Resource
     private SessionService sessionService;
 
+    /** AgentSpecServiceImpl 依赖发布人解析（system api），单测上下文无 system 模块，mock 之（工单 25） */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+
     @Resource
     private AgentRuntimeGateway runtimeGateway;
 

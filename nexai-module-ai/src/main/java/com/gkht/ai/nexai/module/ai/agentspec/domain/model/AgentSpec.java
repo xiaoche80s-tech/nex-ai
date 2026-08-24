@@ -11,10 +11,11 @@ import java.util.regex.Pattern;
  * workspace 目录段与装配 agentName 用它）与归属层级（决定可见性、编辑权与 workspace 布局，
  * 同样创建后不可变）；二者均不进版本快照。</p>
  *
- * <p>版本语义：草稿 {@link #draft} 与已发布不可变快照（{@link AgentSpecVersion}，独立表）
- * 分离——发布把草稿固化为版本快照并推进 {@link #currentVersionNo}（当前版本指针，运行寻址）；
- * 再编辑只改草稿不动快照；切换当前版本仅回退指针。DB 版本快照是唯一权威源，
- * 本地盘仅为其物化缓存。</p>
+ * <p>版本语义（ADR 0004 显式状态机）：草稿 {@link #draft} 与已发布不可变快照
+ * （{@link AgentSpecVersion}，独立表）分离——发布把草稿固化为版本快照、推进
+ * {@link #currentVersionNo}（当前版本指针，运行寻址）并<b>清空草稿</b>（发布即回到稳定态）；
+ * 编辑保存重建草稿，仅草稿态（有草稿）可发布；切换当前版本仅回退指针、不动草稿。
+ * DB 版本快照是唯一权威源，本地盘仅为其物化缓存。</p>
  */
 public class AgentSpec {
 
@@ -38,7 +39,7 @@ public class AgentSpec {
     private final OwnerLevel ownerLevel;
     /** 归属用户编号（用户级 = 创建者），非用户级为 null，创建后不可变 */
     private final Long ownerUserId;
-    /** 草稿配置，null 表示当前无草稿 */
+    /** 草稿配置，null 表示当前无草稿（已发布态——发布清空草稿，编辑保存重建） */
     private AgentSpecConfig draft;
     /** 当前生效版本号（当前版本指针，运行寻址），null 表示从未发布 */
     private Integer currentVersionNo;
@@ -90,7 +91,9 @@ public class AgentSpec {
     }
 
     /**
-     * 发布当前草稿：固化为不可变版本快照并推进当前版本指针。
+     * 发布当前草稿：固化为不可变版本快照、推进当前版本指针并清空草稿——发布即回到
+     * 稳定态，编辑保存（{@link #replaceDraft}）重建草稿后方可再发布（ADR 0004 显式状态机；
+     * 并发双发布的后者因无草稿或版本号唯一索引自然被拒，无需额外防重）。
      *
      * <p>发布校验（补齐草稿态可空的行为性配置）：模型引用必须非空（无模型即无可运行）。
      * 挂载引用的条目存在性由装配期校验（跨聚合只读），此处不校验。</p>
@@ -109,11 +112,13 @@ public class AgentSpec {
         }
         AgentSpecVersion version = AgentSpecVersion.create(id, nextVersionNo, draft, note);
         currentVersionNo = version.getVersionNo();
+        draft = null;
         return version;
     }
 
     /**
-     * 用新草稿整体替换当前草稿（编辑面）：只动草稿，不触碰任何已发布快照。
+     * 用新草稿整体替换当前草稿（编辑面）：编辑保存重建草稿（发布后草稿已清空，
+     * 编辑以此为入口回到草稿态），不触碰任何已发布快照。
      *
      * @param newDraft 新草稿配置，不能为 null
      */

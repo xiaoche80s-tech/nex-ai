@@ -11,6 +11,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.application.command.mount.ToolMount
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.EffectiveSpecSnapshot;
 import com.gkht.ai.nexai.module.ai.agentspec.application.query.AgentSpecPageQuery;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
@@ -28,6 +29,9 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.repository.AgentSpecRepository;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.converter.AgentSpecConverter;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.mapper.AgentSpecMapper;
+import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.mapper.AgentSpecVersionMapper;
+import com.gkht.ai.nexai.module.system.api.user.AdminUserApi;
+import com.gkht.ai.nexai.module.system.api.user.dto.AdminUserRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -35,6 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.gkht.ai.nexai.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.AGENT_SPEC_CODE_DUPLICATE;
@@ -67,7 +75,14 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     private AgentSpecMapper agentSpecMapper;
 
     @Resource
+    private AgentSpecVersionMapper agentSpecVersionMapper;
+
+    @Resource
     private AgentSpecConverter agentSpecConverter;
+
+    /** 版本发布人昵称解析（跨模块走 system api，工单 25） */
+    @Resource
+    private AdminUserApi adminUserApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -130,7 +145,13 @@ public class AgentSpecServiceImpl implements AgentSpecService {
 
     @Override
     public AgentSpecDetailDTO getSpec(Long id) {
-        return agentSpecConverter.toDetailDTO(requireSpec(id));
+        AgentSpec spec = requireSpec(id);
+        // 配置平铺回填来源（ADR 0004）：草稿优先；已发布无草稿时取当前生效快照
+        //（已发布态点「编辑」以生效快照为底稿，保存即重建草稿）。无草稿必已发布
+        //（创建必带草稿，仅发布清空），该分支理论不可达，命中即数据不一致，显式报错。
+        AgentSpecConfig backfill = spec.getDraft() != null ? spec.getDraft()
+                : requireCurrentVersion(spec).getConfig();
+        return agentSpecConverter.toDetailDTO(spec, backfill);
     }
 
     @Override
@@ -151,14 +172,46 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     @Override
     public List<AgentSpecVersionDTO> listSpecVersions(Long specId) {
         AgentSpec spec = requireSpec(specId);
-        List<AgentSpecVersionDTO> versions = agentSpecRepository.listVersions(specId).stream()
+        // 发布人（creator）是快照 DO 的审计字段、不进领域模型——列表读路径经 Mapper
+        // 直查 DO 转 DTO（轻量读写分离）；current 标识按版本指针判等（未发布全部非 current）
+        List<AgentSpecVersionDTO> versions = agentSpecVersionMapper.selectListBySpecId(specId).stream()
                 .map(agentSpecConverter::toVersionDTO).toList();
-        // 当前生效版本标识按版本指针判等（当前版本指针指向哪个版本号，哪个版本即 current；
-        // 未发布规格全部非 current——恒为非 null，前端直接判断）
         Integer currentVersionNo = spec.getCurrentVersionNo();
         versions.forEach(version ->
                 version.setCurrent(currentVersionNo != null && currentVersionNo.equals(version.getVersionNo())));
+        fillPublisherNames(versions);
         return versions;
+    }
+
+    /** 批量解析发布人昵称（跨模块走 system api）；用户已删除/不存在时回退显示编号，不报错 */
+    private void fillPublisherNames(List<AgentSpecVersionDTO> versions) {
+        Set<Long> creatorIds = versions.stream()
+                .map(AgentSpecVersionDTO::getCreator)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (creatorIds.isEmpty()) {
+            return;
+        }
+        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(creatorIds);
+        versions.forEach(version -> {
+            Long creator = version.getCreator();
+            if (creator == null) {
+                return;
+            }
+            AdminUserRespDTO user = users.get(creator);
+            version.setPublisherName(user != null ? user.getNickname() : String.valueOf(creator));
+        });
+    }
+
+    @Override
+    public AgentSpecVersionDetailDTO getSpecVersion(Long specId, Integer versionNo) {
+        AgentSpec spec = requireSpec(specId);
+        AgentSpecVersion version = agentSpecRepository.listVersions(specId).stream()
+                .filter(v -> v.getVersionNo().equals(versionNo))
+                .findFirst()
+                .orElseThrow(() -> exception(AGENT_SPEC_VERSION_NOT_EXISTS, specId));
+        return agentSpecConverter.toVersionDetailDTO(version,
+                versionNo.equals(spec.getCurrentVersionNo()));
     }
 
     @Override
@@ -193,18 +246,22 @@ public class AgentSpecServiceImpl implements AgentSpecService {
     }
 
     /**
-     * 生效快照解析（单一真相）：当前版本指针指向的版本快照，缺失即数据一致性问题，
-     * 显式报错（错误码/消息与原两处入口内联实现逐字一致）。
+     * 生效快照解析（单一真相）：当前版本指针指向的版本快照，未发布或指针悬空即
+     * 数据一致性问题，显式报错（错误码/消息与原两处入口内联实现逐字一致）。
      */
     private EffectiveSpecSnapshot resolveCurrent(AgentSpec spec) {
+        return new EffectiveSpecSnapshot(spec, requireCurrentVersion(spec));
+    }
+
+    /** 解析当前生效版本快照：指针指向的版本，未发布/快照缺失即数据一致性问题，显式报错 */
+    private AgentSpecVersion requireCurrentVersion(AgentSpec spec) {
         if (!spec.hasPublishedVersion()) {
             throw exception(SESSION_ASSEMBLE_INVALID, "规格尚未发布版本");
         }
-        AgentSpecVersion version = agentSpecRepository.listVersions(spec.getId()).stream()
+        return agentSpecRepository.listVersions(spec.getId()).stream()
                 .filter(v -> v.getVersionNo() == spec.getCurrentVersionNo())
                 .findFirst()
                 .orElseThrow(() -> exception(SESSION_ASSEMBLE_INVALID, "当前版本快照缺失"));
-        return new EffectiveSpecSnapshot(spec, version);
     }
 
     /** 读取规格，不存在报业务异常（不存在/跨租户/已删除均归此） */

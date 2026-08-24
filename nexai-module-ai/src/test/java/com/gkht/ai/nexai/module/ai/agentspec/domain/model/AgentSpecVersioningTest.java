@@ -12,8 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 规格聚合根的版本状态机纯 JUnit：发布（快照固化 + 当前版本推进 + 发布校验）、
- * 编辑不动快照（发布后编辑不影响既有快照）、切换当前版本。
+ * 规格聚合根的版本状态机纯 JUnit（ADR 0004 显式状态机）：发布（快照固化 +
+ * 当前版本推进 + 清空草稿 + 发布校验）、编辑保存重建草稿且不动快照、切换当前版本不动草稿。
  */
 class AgentSpecVersioningTest {
 
@@ -26,11 +26,12 @@ class AgentSpecVersioningTest {
     }
 
     @Test
-    @DisplayName("发布：草稿固化为快照、当前版本推进、快照内容即草稿内容")
+    @DisplayName("发布：草稿固化为快照、当前版本推进、草稿清空（发布即回到稳定态）")
     void publishFreezesDraftAndAdvancesPointer() {
         AgentSpec spec = specWithDraft(1L);
         assertFalse(spec.hasPublishedVersion());
         assertNull(spec.getCurrentVersionNo());
+        AgentSpecConfig draftBeforePublish = spec.getDraft();
 
         AgentSpecVersion v1 = spec.publish(1, "首版");
         assertEquals(1, v1.getVersionNo());
@@ -39,8 +40,11 @@ class AgentSpecVersioningTest {
         assertTrue(spec.hasPublishedVersion());
         assertEquals(1, spec.getCurrentVersionNo());
 
-        // 快照与草稿内容同源：发布即固化当前草稿
-        assertEquals(spec.getDraft(), v1.getConfig());
+        // 快照与草稿内容同源：发布即固化发布时的草稿
+        assertEquals(draftBeforePublish, v1.getConfig());
+        // 发布清空草稿（ADR 0004）：规格回到稳定态，hasDraft=false
+        assertFalse(spec.hasDraft());
+        assertNull(spec.getDraft());
     }
 
     @Test
@@ -60,13 +64,14 @@ class AgentSpecVersioningTest {
     }
 
     @Test
-    @DisplayName("发布后编辑草稿：既有快照不受影响，发布新版本得到新快照")
+    @DisplayName("发布后编辑草稿：既有快照不受影响；全链路 发布→编辑重建→可再发布 v3")
     void editingAfterPublishDoesNotMutateSnapshot() {
         AgentSpec spec = specWithDraft(1L);
         AgentSpecVersion v1 = spec.publish(1, null);
         String frozenPrompt = v1.getConfig().getSystemPrompt();
+        assertFalse(spec.hasDraft(), "发布后草稿已清空");
 
-        // 再编辑进入新草稿（整体替换），不触碰已发布快照
+        // 编辑保存重建草稿（整体替换），不触碰已发布快照
         AgentSpecConfig edited = AgentSpecConfig.of(1L, "新描述", "新提示", 10, null, null, null, null, null);
         spec.replaceDraft(edited);
         assertEquals(1, spec.getCurrentVersionNo(), "编辑草稿不得改变当前版本指针");
@@ -78,10 +83,30 @@ class AgentSpecVersioningTest {
         assertEquals("新提示", v2.getConfig().getSystemPrompt());
         assertEquals("草稿描述", v1.getConfig().getDescription(), "v1 快照仍是发布时的内容");
         assertEquals(2, spec.getCurrentVersionNo());
+        assertFalse(spec.hasDraft(), "发布 v2 后草稿再次清空");
+
+        // 全链路（工单 22）：发布清空 → 编辑保存重建 → 可再发布 v3
+        spec.replaceDraft(AgentSpecConfig.of(1L, "v3 描述", "v3 提示", 10, null, null, null, null, null));
+        AgentSpecVersion v3 = spec.publish(3, "三版");
+        assertEquals(3, v3.getVersionNo());
+        assertEquals(3, spec.getCurrentVersionNo());
+        assertEquals("v3 提示", v3.getConfig().getSystemPrompt());
     }
 
     @Test
-    @DisplayName("切换当前版本：目标版本归属本规格则回退指针，缺失或不归属则拒绝且指针不变")
+    @DisplayName("无草稿时再发布被拒（发布门禁：仅草稿态可发布）")
+    void publishRejectsWhenDraftCleared() {
+        AgentSpec spec = specWithDraft(1L);
+        spec.publish(1, null);
+        assertFalse(spec.hasDraft());
+        IllegalStateException rejected = assertThrows(IllegalStateException.class,
+                () -> spec.publish(2, null));
+        assertEquals("没有可发布的草稿", rejected.getMessage());
+        assertEquals(1, spec.getCurrentVersionNo(), "被拒发布不得推进当前版本指针");
+    }
+
+    @Test
+    @DisplayName("切换当前版本：目标版本归属本规格则回退指针；切换不动草稿；缺失或不归属则拒绝且指针不变")
     void switchVersionChecksExistence() {
         AgentSpec spec = specWithDraft(1L);
         AgentSpecVersion v1 = spec.publish(1, null);
@@ -89,14 +114,19 @@ class AgentSpecVersioningTest {
         spec.publish(2, null);
         assertEquals(2, spec.getCurrentVersionNo());
 
+        // 编辑保存重建草稿后切换当前版本：只动指针，不动草稿（两条独立工作线，ADR 0004）
+        spec.replaceDraft(AgentSpecConfig.of(1L, "编辑中", null, null, null, null, null, null, null));
         spec.switchToVersion(v1);
         assertEquals(1, spec.getCurrentVersionNo(), "回退到已发布版本应只移动当前版本指针");
+        assertTrue(spec.hasDraft(), "切换当前版本不得清空草稿");
+        assertEquals("编辑中", spec.getDraft().getDescription(), "切换当前版本不得修改草稿内容");
 
         // 归属其他规格的版本对象 = 悬空目标，拒绝且指针不动
         IllegalStateException missing = assertThrows(IllegalStateException.class,
                 () -> spec.switchToVersion(AgentSpecVersion.reconstitute(99L, 8L, 99, null, null, null)));
         assertEquals("版本 99 不存在", missing.getMessage());
         assertEquals(1, spec.getCurrentVersionNo(), "切换失败不得改变当前版本指针");
+        assertEquals("编辑中", spec.getDraft().getDescription(), "切换失败同样不得动草稿");
     }
 
     @Test

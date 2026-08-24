@@ -68,6 +68,10 @@ public class OpenAiCompatContractTest {
     @MockitoBean
     private com.gkht.ai.nexai.module.ai.session.application.service.AgentRuntimeAssembler runtimeAssembler;
 
+    /** AgentSpecServiceImpl 依赖发布人解析（system api），单测上下文无 system 模块，mock 之（工单 25） */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+
     /** OpenAI 出口 base URL（SDK 拼接 /chat/completions） */
     @org.springframework.beans.factory.annotation.Value("${local.server.port}")
     private int serverPort;

@@ -6030,7 +6030,7 @@ COMMENT ON COLUMN ai_agent_spec.spec_code IS '业务编码（slug），创建后
 COMMENT ON COLUMN ai_agent_spec.icon IS '图标标识（管理元数据，不参与版本化）';
 COMMENT ON COLUMN ai_agent_spec.owner_level IS '归属层级（PLATFORM/TENANT/USER），创建后不可变；MVP 开放 TENANT/USER';
 COMMENT ON COLUMN ai_agent_spec.owner_user_id IS '归属用户编号（用户级 = 创建者），非用户级为 NULL，创建后不可变';
-COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON，按 agentscope 分层：agent 层（模型引用/自描述/系统提示/maxIters）+ 模型调用层（generateOptions: temperature/topP/maxTokens）+ 挂载层（skillIds/tools，编辑面后置）+ 执行环境层（executionEnv: workspace/sandbox/capabilities），NULL 表示无草稿';
+COMMENT ON COLUMN ai_agent_spec.draft IS '草稿配置 JSON，按 agentscope 分层：agent 层（模型引用/自描述/系统提示/maxIters）+ 模型调用层（generateOptions: temperature/topP/maxTokens）+ 挂载层（skillIds/tools，编辑面后置）+ 执行环境层（executionEnv: workspace/sandbox/capabilities），NULL 表示无草稿（发布清空草稿、编辑保存重建——ADR 0004 显式状态机，已发布态无草稿即稳定态）';
 COMMENT ON COLUMN ai_agent_spec.current_version_no IS '当前生效版本号（当前版本指针，运行寻址），NULL 表示从未发布';
 COMMENT ON COLUMN ai_agent_spec.creator IS '创建者';
 COMMENT ON COLUMN ai_agent_spec.create_time IS '创建时间';

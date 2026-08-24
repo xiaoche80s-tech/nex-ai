@@ -4,9 +4,11 @@ import com.gkht.ai.nexai.framework.common.pojo.CommonResult;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecPublishCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.command.AgentSpecSwitchVersionCommand;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.service.AgentSpecService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -50,6 +52,18 @@ public class AgentSpecVersionController {
     @PreAuthorize("@ss.hasPermission('ai:spec:query')")
     public CommonResult<List<AgentSpecVersionDTO>> listSpecVersions(@RequestParam("specId") Long specId) {
         return success(agentSpecService.listSpecVersions(specId));
+    }
+
+    @GetMapping("/version-get")
+    @Operation(summary = "获得版本快照详情", description = "只读预览（工单 24）：版本元信息 + 与规格详情同构的全量四层配置平铺（固化保真，不含主体元数据）")
+    @Parameters({
+            @Parameter(name = "specId", description = "规格编号", required = true, example = "1"),
+            @Parameter(name = "versionNo", description = "版本号", required = true, example = "1")
+    })
+    @PreAuthorize("@ss.hasPermission('ai:spec:query')")
+    public CommonResult<AgentSpecVersionDetailDTO> getSpecVersion(
+            @RequestParam("specId") Long specId, @RequestParam("versionNo") Integer versionNo) {
+        return success(agentSpecService.getSpecVersion(specId, versionNo));
     }
 
     @PutMapping("/switch-version")

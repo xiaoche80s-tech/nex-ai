@@ -68,6 +68,10 @@ public class AgentSpecControllerTest extends BaseDbUnitTest {
     @Resource
     private AgentSpecService agentSpecService;
 
+    /** 发布人昵称解析走 system api（跨模块），单测上下文无 system 模块，mock 之（工单 25） */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.gkht.ai.nexai.module.system.api.user.AdminUserApi adminUserApi;
+
     @Resource
     private AgentSpecMapper agentSpecMapper;
 

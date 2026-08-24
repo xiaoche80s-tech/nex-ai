@@ -4,7 +4,9 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecDetailDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecFlatConfigDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDTO;
+import com.gkht.ai.nexai.module.ai.agentspec.application.dto.AgentSpecVersionDetailDTO;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpec;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecConfig;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.AgentSpecVersion;
@@ -19,8 +21,7 @@ import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolMount;
 import com.gkht.ai.nexai.module.ai.agentspec.domain.model.ToolSource;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecDO;
 import com.gkht.ai.nexai.module.ai.agentspec.infrastructure.dataobject.AgentSpecVersionDO;
-import lombok.Data;
-import org.mapstruct.Mapper;
+import lombok.Data;import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
@@ -54,9 +55,18 @@ public interface AgentSpecConverter {
     AgentSpecVersionDTO toVersionDTO(AgentSpecVersion version);
 
     /**
-     * 聚合 → 详情 DTO（编辑面回填）：分层草稿配置平铺为与命令同构的表单形态；无草稿时配置项为 null。
+     * 版本快照 DO → 列表 DTO（工单 25 发布人链路：creator 为 DO 审计字段，String 自动转 Long；
+     * current/publisherName 由应用服务按指针设置/经 AdminUserApi 解析，此处忽略）
      */
-    default AgentSpecDetailDTO toDetailDTO(AgentSpec spec) {
+    @Mapping(target = "current", ignore = true)
+    @Mapping(target = "publisherName", ignore = true)
+    AgentSpecVersionDTO toVersionDTO(AgentSpecVersionDO versionDO);
+
+    /**
+     * 聚合 → 详情 DTO（编辑面回填）：配置平铺来源由应用服务解析（草稿优先，已发布无草稿时
+     * 取当前生效快照——ADR 0004），分层配置平铺为与命令同构的表单形态；来源为 null 时配置项为 null。
+     */
+    default AgentSpecDetailDTO toDetailDTO(AgentSpec spec, AgentSpecConfig backfill) {
         AgentSpecDetailDTO dto = new AgentSpecDetailDTO();
         dto.setId(spec.getId());
         dto.setName(spec.getName());
@@ -67,52 +77,74 @@ public interface AgentSpecConverter {
         dto.setHasDraft(spec.hasDraft());
         dto.setCurrentVersionNo(spec.getCurrentVersionNo());
         dto.setCreateTime(spec.getCreateTime());
-        AgentSpecConfig draft = spec.getDraft();
-        if (draft != null) {
-            dto.setModelId(draft.getModelId());
-            dto.setDescription(draft.getDescription());
-            dto.setSystemPrompt(draft.getSystemPrompt());
-            dto.setMaxIters(draft.getMaxIters());
-            if (draft.getGenerateOptions() != null) {
-                dto.setTemperature(draft.getGenerateOptions().getTemperature());
-                dto.setTopP(draft.getGenerateOptions().getTopP());
-                dto.setMaxTokens(draft.getGenerateOptions().getMaxTokens());
-            }
-            dto.setSkillIds(draft.getSkillIds());
-            if (draft.getTools() != null) {
-                dto.setTools(draft.getTools().stream().map(mount -> {
-                    AgentSpecDetailDTO.ToolMountDTO mountDTO = new AgentSpecDetailDTO.ToolMountDTO();
-                    mountDTO.setSource(mount.source().name());
-                    mountDTO.setSourceId(mount.sourceId());
-                    mountDTO.setAllowedTools(mount.allowedTools());
-                    mountDTO.setSensitiveTools(mount.sensitiveTools());
-                    return mountDTO;
-                }).toList());
-            }
-            if (draft.getFolders() != null) {
-                dto.setFolders(draft.getFolders().stream().map(folder -> {
-                    AgentSpecDetailDTO.FolderMountDTO folderDTO = new AgentSpecDetailDTO.FolderMountDTO();
-                    folderDTO.setType(folder.type().name());
-                    folderDTO.setName(folder.name());
-                    folderDTO.setFiles(folder.files().stream().map(file -> {
-                        AgentSpecDetailDTO.FolderFileDTO fileDTO = new AgentSpecDetailDTO.FolderFileDTO();
-                        fileDTO.setPath(file.path());
-                        fileDTO.setUrl(file.url());
-                        fileDTO.setContentHash(file.contentHash());
-                        fileDTO.setSize(file.size());
-                        return fileDTO;
-                    }).toList());
-                    return folderDTO;
-                }).toList());
-            }
-            if (draft.getExecutionEnv() != null) {
-                dto.setWorkspaceEnabled(draft.getExecutionEnv().isWorkspaceEnabled());
-                dto.setSandboxEnabled(draft.getExecutionEnv().isSandboxEnabled());
-                dto.setCapabilities(draft.getExecutionEnv().getCapabilities().stream()
-                        .map(Enum::name).toList());
-            }
-        }
+        fillFlatConfig(dto, backfill);
         return dto;
+    }
+
+    /**
+     * 版本快照 → 详情 DTO（只读预览，工单 24）：版本元信息 + 全量四层配置平铺
+     *（快照与草稿同构，固化保真）；current 标记由应用服务按版本指针设置。
+     */
+    default AgentSpecVersionDetailDTO toVersionDetailDTO(AgentSpecVersion version, boolean current) {
+        AgentSpecVersionDetailDTO dto = new AgentSpecVersionDetailDTO();
+        dto.setId(version.getId());
+        dto.setVersionNo(version.getVersionNo());
+        dto.setNote(version.getNote());
+        dto.setCreateTime(version.getCreateTime());
+        dto.setCurrent(current);
+        fillFlatConfig(dto, version.getConfig());
+        return dto;
+    }
+
+    /**
+     * 分层配置值对象 → 平铺表单形态（草稿回填与版本预览共用；config 为 null 时各配置项保持 null）
+     */
+    default void fillFlatConfig(AgentSpecFlatConfigDTO target, AgentSpecConfig config) {
+        if (config == null) {
+            return;
+        }
+        target.setModelId(config.getModelId());
+        target.setDescription(config.getDescription());
+        target.setSystemPrompt(config.getSystemPrompt());
+        target.setMaxIters(config.getMaxIters());
+        if (config.getGenerateOptions() != null) {
+            target.setTemperature(config.getGenerateOptions().getTemperature());
+            target.setTopP(config.getGenerateOptions().getTopP());
+            target.setMaxTokens(config.getGenerateOptions().getMaxTokens());
+        }
+        target.setSkillIds(config.getSkillIds());
+        if (config.getTools() != null) {
+            target.setTools(config.getTools().stream().map(mount -> {
+                AgentSpecFlatConfigDTO.ToolMountDTO mountDTO = new AgentSpecFlatConfigDTO.ToolMountDTO();
+                mountDTO.setSource(mount.source().name());
+                mountDTO.setSourceId(mount.sourceId());
+                mountDTO.setAllowedTools(mount.allowedTools());
+                mountDTO.setSensitiveTools(mount.sensitiveTools());
+                return mountDTO;
+            }).toList());
+        }
+        if (config.getFolders() != null) {
+            target.setFolders(config.getFolders().stream().map(folder -> {
+                AgentSpecFlatConfigDTO.FolderMountDTO folderDTO = new AgentSpecFlatConfigDTO.FolderMountDTO();
+                folderDTO.setType(folder.type().name());
+                folderDTO.setName(folder.name());
+                folderDTO.setFiles(folder.files().stream().map(file -> {
+                    AgentSpecFlatConfigDTO.FolderFileDTO fileDTO = new AgentSpecFlatConfigDTO.FolderFileDTO();
+                    fileDTO.setPath(file.path());
+                    fileDTO.setUrl(file.url());
+                    fileDTO.setContentHash(file.contentHash());
+                    fileDTO.setSize(file.size());
+                    return fileDTO;
+                }).toList());
+                return folderDTO;
+            }).toList());
+        }
+        if (config.getExecutionEnv() != null) {
+            target.setWorkspaceEnabled(config.getExecutionEnv().isWorkspaceEnabled());
+            target.setSandboxEnabled(config.getExecutionEnv().isSandboxEnabled());
+            target.setCapabilities(config.getExecutionEnv().getCapabilities().stream()
+                    .map(Enum::name).toList());
+        }
     }
 
     default PageResult<AgentSpecDTO> toDTOPage(PageResult<AgentSpecDO> page) {
