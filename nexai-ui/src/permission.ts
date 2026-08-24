@@ -21,8 +21,7 @@ const whiteList = [
   '/auth-redirect',
   '/bind',
   '/register',
-  '/oauthLogin/gitee',
-  '/prototype/agentspec' // PROTOTYPE（throwaway）：UI 原型免登录直达，定案后移除
+  '/oauthLogin/gitee'
 ]
 
 // 路由加载前

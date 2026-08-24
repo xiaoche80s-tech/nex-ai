@@ -353,19 +353,6 @@ const remainingRouter: AppRouteRecordRaw[] = [
         }
       }
     ]
-  },
-  // PROTOTYPE（throwaway）：agentspec 管理页 UI 变体原型，定案后随原型目录一并移除
-  {
-    path: '/prototype/agentspec',
-    component: () => import('@/views/ai/agentspec/prototype/index.vue'),
-    name: 'PrototypeAgentspec',
-    meta: {
-      hidden: true,
-      noTagsView: true,
-      noCache: true,
-      canTo: true,
-      title: '原型 · 智能体规格'
-    }
   }
 ]
 
