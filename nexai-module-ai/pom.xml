@@ -32,6 +32,13 @@
             <version>${revision}</version>
         </dependency>
 
+        <!-- 系统模块 api：版本快照发布人经 AdminUserApi 批量解析昵称（工单 25） -->
+        <dependency>
+            <groupId>com.gkht.ai</groupId>
+            <artifactId>nexai-module-system</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- AI 智能体运行时：agentscope-java v2（库嵌入，ADR-0001；版本经 nexai-dependencies 的
              agentscope-bom 管理）。使用面：模型构造（连通性探测与运行时装配）
              + 运行时基座 HarnessAgent（workspace/沙箱/子代理/记忆/转录）
