@@ -53,7 +53,9 @@
               </div>
             </div>
             <div v-else class="self-start">
-              <div class="bg-[var(--el-fill-color-light)] rounded-8px px-12px py-8px max-w-260px whitespace-pre-wrap">
+              <div
+                class="bg-[var(--el-fill-color-light)] rounded-8px px-12px py-8px max-w-260px whitespace-pre-wrap"
+              >
                 {{ msg.content }}
               </div>
             </div>
@@ -69,7 +71,11 @@
             :disabled="!currentSessionId || streaming"
             @keyup.enter="handleSend"
           />
-          <el-button type="primary" :disabled="!currentSessionId || streaming || !inputContent" @click="handleSend">
+          <el-button
+            type="primary"
+            :disabled="!currentSessionId || streaming || !inputContent"
+            @click="handleSend"
+          >
             {{ t('ai.session.send') }}
           </el-button>
         </div>
@@ -81,15 +87,24 @@
           <div class="flex items-center justify-between">
             <span class="text-14px font-bold">{{ t('ai.session.eventFlow') }}</span>
             <div class="flex items-center gap-8px">
-              <el-tag v-if="sseConnected" type="success" size="small">{{ t('ai.session.connected') }}</el-tag>
+              <el-tag v-if="sseConnected" type="success" size="small">{{
+                t('ai.session.connected')
+              }}</el-tag>
               <el-tag v-else type="warning" size="small">{{ t('ai.session.disconnected') }}</el-tag>
-              <el-button size="small" :disabled="!currentSessionId || streaming" @click="handleInterrupt">
+              <el-button
+                size="small"
+                :disabled="!currentSessionId || streaming"
+                @click="handleInterrupt"
+              >
                 <Icon icon="ep:video-pause" class="mr-4px" />{{ t('ai.session.interrupt') }}
               </el-button>
             </div>
           </div>
         </template>
-        <div ref="eventFlowRef" class="flex-1 overflow-y-auto font-mono text-12px space-y-2px px-4px">
+        <div
+          ref="eventFlowRef"
+          class="flex-1 overflow-y-auto font-mono text-12px space-y-2px px-4px"
+        >
           <div
             v-for="(event, index) in eventList"
             :key="index"
@@ -141,7 +156,10 @@
               class="flex items-center gap-4px cursor-pointer px-8px py-4px rounded-4px hover:bg-[var(--el-fill-color-light)]"
               @click="handleReadFile(file)"
             >
-              <Icon :icon="file.endsWith('/') ? 'ep:folder' : 'ep:document'" class="text-gray-400" />
+              <Icon
+                :icon="file.endsWith('/') ? 'ep:folder' : 'ep:document'"
+                class="text-gray-400"
+              />
               <span class="text-12px">{{ file }}</span>
             </div>
             <el-button size="small" class="mt-8px" @click="handleRefreshFiles">
@@ -150,9 +168,10 @@
           </div>
         </div>
         <el-dialog v-model="fileDialogVisible" :title="currentFilePath" width="600px">
-          <pre class="bg-[var(--el-fill-color-light)] p-12px rounded-8px text-12px whitespace-pre-wrap max-h-400px overflow-auto">{{
-            currentFileContent
-          }}</pre>
+          <pre
+            class="bg-[var(--el-fill-color-light)] p-12px rounded-8px text-12px whitespace-pre-wrap max-h-400px overflow-auto"
+            >{{ currentFileContent }}</pre
+          >
         </el-dialog>
       </ContentWrap>
     </div>
@@ -215,7 +234,10 @@ let abortController: AbortController | null = null
 
 const handleCreateSession = async () => {
   if (!currentSpecId.value) return
-  const id = await createDebugSession({ title: '调试会话 ' + new Date().toLocaleTimeString(), specId: currentSpecId.value })
+  const id = await createDebugSession({
+    title: '调试会话 ' + new Date().toLocaleTimeString(),
+    specId: currentSpecId.value
+  })
   currentSessionId.value = id
   await loadSessions()
   await handleLoadSession()
@@ -232,12 +254,12 @@ const handleLoadSession = async () => {
     history.forEach((msg: any) => {
       const role = msg.role === 'USER' ? 'user' : 'assistant'
       const text = msg.content
-        ? (Array.isArray(msg.content)
-            ? msg.content
-                .map((b: any) => b.text || '')
-                .filter(Boolean)
-                .join('')
-            : msg.content)
+        ? Array.isArray(msg.content)
+          ? msg.content
+              .map((b: any) => b.text || '')
+              .filter(Boolean)
+              .join('')
+          : msg.content
         : ''
       if (text) chatMessages.value.push({ role, content: text })
     })

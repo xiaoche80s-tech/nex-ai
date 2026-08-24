@@ -774,7 +774,8 @@ export default {
       specScopeTip: '留空 = 本租户全部智能体；Key 仅能调用放行范围内的规格',
       allSpecs: '全部智能体',
       revoke: '吊销',
-      revokeConfirm: '确认吊选 API Key「{name}」？吊销后经此 Key 的调用立即失效（泄漏止损，不可恢复）',
+      revokeConfirm:
+        '确认吊选 API Key「{name}」？吊销后经此 Key 的调用立即失效（泄漏止损，不可恢复）',
       onceWarning: '明文 Key 仅此一次展示，关闭后无法再查看，请立即复制保存',
       copy: '复制',
       copied: '已复制到剪贴板',

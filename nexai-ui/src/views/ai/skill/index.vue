@@ -28,8 +28,20 @@
   <ContentWrap>
     <el-table v-loading="loading" :data="list">
       <el-table-column :label="t('ai.skill.tableId')" align="center" prop="id" width="80" />
-      <el-table-column :label="t('ai.skill.tableName')" align="center" prop="name" min-width="150" show-overflow-tooltip />
-      <el-table-column :label="t('ai.skill.tableDescription')" align="center" prop="description" min-width="200" show-overflow-tooltip />
+      <el-table-column
+        :label="t('ai.skill.tableName')"
+        align="center"
+        prop="name"
+        min-width="150"
+        show-overflow-tooltip
+      />
+      <el-table-column
+        :label="t('ai.skill.tableDescription')"
+        align="center"
+        prop="description"
+        min-width="200"
+        show-overflow-tooltip
+      />
       <el-table-column :label="t('ai.skill.tableOwner')" align="center" width="100">
         <template #default="{ row }">
           <el-tag v-if="row.ownerLevel === 'USER'" type="warning" disable-transitions>
@@ -46,22 +58,43 @@
           <el-tag v-else type="warning" disable-transitions>{{ t('ai.skill.noVersion') }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('ai.skill.tableCreateTime')" align="center" prop="createTime" width="180" :formatter="dateFormatter" />
+      <el-table-column
+        :label="t('ai.skill.tableCreateTime')"
+        align="center"
+        prop="createTime"
+        width="180"
+        :formatter="dateFormatter"
+      />
       <el-table-column :label="t('table.action')" align="center" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" v-hasPermi="['ai:skill:query']" @click="openVersions(row)">
             {{ t('ai.skill.versions') }}
           </el-button>
-          <el-button link type="primary" v-hasPermi="['ai:skill:update']" @click="openVersionForm(row)">
+          <el-button
+            link
+            type="primary"
+            v-hasPermi="['ai:skill:update']"
+            @click="openVersionForm(row)"
+          >
             {{ t('ai.skill.newVersion') }}
           </el-button>
-          <el-button link type="danger" v-hasPermi="['ai:skill:delete']" @click="handleDelete(row.id)">
+          <el-button
+            link
+            type="danger"
+            v-hasPermi="['ai:skill:delete']"
+            @click="handleDelete(row.id)"
+          >
             {{ t('table.del') }}
           </el-button>
         </template>
       </el-table-column>
     </el-table>
-    <Pagination :total="total" v-model:page="queryParams.pageNo" v-model:limit="queryParams.pageSize" @pagination="getList" />
+    <Pagination
+      :total="total"
+      v-model:page="queryParams.pageNo"
+      v-model:limit="queryParams.pageSize"
+      @pagination="getList"
+    />
   </ContentWrap>
 
   <!-- 创建 Skill 表单 -->
@@ -102,14 +135,33 @@
   <!-- 版本列表 -->
   <el-dialog v-model="versionsVisible" :title="t('ai.skill.versionsDialog')" width="560px">
     <el-table :data="versionList" v-loading="versionsLoading">
-      <el-table-column :label="t('ai.skill.versionNo')" align="center" prop="versionNo" width="100" />
-      <el-table-column :label="t('ai.skill.versionNote')" align="center" prop="note" min-width="150" show-overflow-tooltip />
+      <el-table-column
+        :label="t('ai.skill.versionNo')"
+        align="center"
+        prop="versionNo"
+        width="100"
+      />
+      <el-table-column
+        :label="t('ai.skill.versionNote')"
+        align="center"
+        prop="note"
+        min-width="150"
+        show-overflow-tooltip
+      />
       <el-table-column :label="t('ai.skill.versionCurrent')" align="center" width="90">
         <template #default="{ row }">
-          <el-tag v-if="row.current" type="success" disable-transitions>{{ t('ai.skill.current') }}</el-tag>
+          <el-tag v-if="row.current" type="success" disable-transitions>{{
+            t('ai.skill.current')
+          }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('ai.skill.versionTime')" align="center" prop="createTime" width="170" :formatter="dateFormatter" />
+      <el-table-column
+        :label="t('ai.skill.versionTime')"
+        align="center"
+        prop="createTime"
+        width="170"
+        :formatter="dateFormatter"
+      />
     </el-table>
   </el-dialog>
 </template>

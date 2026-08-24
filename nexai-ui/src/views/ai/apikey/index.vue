@@ -12,7 +12,9 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> {{ t('common.query') }}</el-button>
+        <el-button @click="handleQuery"
+          ><Icon icon="ep:search" class="mr-5px" /> {{ t('common.query') }}</el-button
+        >
         <el-button @click="resetQuery">
           <Icon icon="ep:refresh" class="mr-5px" /> {{ t('common.reset') }}
         </el-button>
@@ -87,7 +89,12 @@
   <Dialog v-model="dialogVisible" :title="t('ai.apiKey.create')" width="520">
     <!-- 生成结果：明文仅此一次展示 -->
     <div v-if="createdKey">
-      <el-alert :title="t('ai.apiKey.onceWarning')" type="warning" :closable="false" class="mb-12px" />
+      <el-alert
+        :title="t('ai.apiKey.onceWarning')"
+        type="warning"
+        :closable="false"
+        class="mb-12px"
+      />
       <el-input :model-value="createdKey" readonly class="mb-12px">
         <template #append>
           <el-button @click="copyKey">{{ t('ai.apiKey.copy') }}</el-button>
@@ -96,7 +103,11 @@
     </div>
     <el-form v-else ref="formRef" :model="formData" :rules="formRules" label-width="100px">
       <el-form-item :label="t('ai.apiKey.name')" prop="name">
-        <el-input v-model="formData.name" :maxlength="64" :placeholder="t('ai.apiKey.namePlaceholder')" />
+        <el-input
+          v-model="formData.name"
+          :maxlength="64"
+          :placeholder="t('ai.apiKey.namePlaceholder')"
+        />
       </el-form-item>
       <el-form-item :label="t('ai.apiKey.specScope')">
         <el-select

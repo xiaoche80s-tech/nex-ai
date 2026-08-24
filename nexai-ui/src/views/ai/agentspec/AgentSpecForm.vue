@@ -220,10 +220,22 @@
       <el-form-item :label="t('ai.spec.formFolders')">
         <div class="w-full">
           <template v-if="formData.workspaceEnabled">
-            <el-button plain type="primary" size="small" class="mb-8px mr-8px" @click="addFolder('ASSET')">
+            <el-button
+              plain
+              type="primary"
+              size="small"
+              class="mb-8px mr-8px"
+              @click="addFolder('ASSET')"
+            >
               <Icon icon="ep:folder-add" class="mr-5px" /> {{ t('ai.spec.addAssetFolder') }}
             </el-button>
-            <el-button plain type="primary" size="small" class="mb-8px" @click="addFolder('TOOLSET')">
+            <el-button
+              plain
+              type="primary"
+              size="small"
+              class="mb-8px"
+              @click="addFolder('TOOLSET')"
+            >
               <Icon icon="ep:folder-opened" class="mr-5px" /> {{ t('ai.spec.addToolsetFolder') }}
             </el-button>
             <div
@@ -232,8 +244,16 @@
               class="border border-gray-200 rounded-4px p-8px mb-8px"
             >
               <div class="flex items-center mb-4px">
-                <el-tag size="small" class="mr-8px" :type="folder.type === 'ASSET' ? 'success' : 'warning'">
-                  {{ folder.type === 'ASSET' ? t('ai.spec.folderTypeAsset') : t('ai.spec.folderTypeToolset') }}
+                <el-tag
+                  size="small"
+                  class="mr-8px"
+                  :type="folder.type === 'ASSET' ? 'success' : 'warning'"
+                >
+                  {{
+                    folder.type === 'ASSET'
+                      ? t('ai.spec.folderTypeAsset')
+                      : t('ai.spec.folderTypeToolset')
+                  }}
                 </el-tag>
                 <el-input
                   v-model="folder.name"
@@ -250,14 +270,24 @@
                     <Icon icon="ep:upload" class="mr-5px" /> {{ t('ai.spec.folderUpload') }}
                   </el-button>
                 </el-upload>
-                <el-button link type="danger" size="small" class="ml-auto" @click="removeFolder(folderIndex)">
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  class="ml-auto"
+                  @click="removeFolder(folderIndex)"
+                >
                   {{ t('table.del') }}
                 </el-button>
               </div>
               <el-table v-if="folder.files.length" :data="folder.files" size="small">
                 <el-table-column :label="t('ai.spec.folderFilePath')" min-width="180">
                   <template #default="{ row }">
-                    <el-input v-model="row.path" size="small" :placeholder="t('ai.spec.folderFilePath')" />
+                    <el-input
+                      v-model="row.path"
+                      size="small"
+                      :placeholder="t('ai.spec.folderFilePath')"
+                    />
                   </template>
                 </el-table-column>
                 <el-table-column prop="size" :label="t('ai.spec.folderFileSize')" width="110">
@@ -265,7 +295,9 @@
                 </el-table-column>
                 <el-table-column :label="t('ai.spec.folderFileHash')" min-width="140">
                   <template #default="{ row }">
-                    <span class="text-12px text-gray-400 font-mono">{{ row.contentHash.slice(0, 12) }}…</span>
+                    <span class="text-12px text-gray-400 font-mono"
+                      >{{ row.contentHash.slice(0, 12) }}…</span
+                    >
                   </template>
                 </el-table-column>
                 <el-table-column :label="t('table.action')" width="70" align="center">
@@ -414,7 +446,9 @@ const removeFolder = (index: number) => {
 
 /** 上传文件夹内单个文件：服务端签发凭证（url + 哈希 + 字节数），path 默认取原文件名 */
 const uploadFolderFile = async (folder: SpecApi.FolderMount, options: any) => {
-  const result = (await SpecApi.uploadFolderFile({ file: options.file })) as SpecApi.FolderFileUploadResult
+  const result = (await SpecApi.uploadFolderFile({
+    file: options.file
+  })) as SpecApi.FolderFileUploadResult
   folder.files.push({
     path: options.file.name,
     url: result.url,

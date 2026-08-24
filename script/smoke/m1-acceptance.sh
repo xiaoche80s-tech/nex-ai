@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# NexAI 智能体平台 · 工单 09 M1 集成验收冒烟脚本（spec Testing Decisions S5，接替已删除的 spike 冒烟）
+# NexAI 智能体平台 · 工单 17 MVP 集成验收冒烟脚本
 #
-# 用途：经正式 REST + SSE API（/admin-api/ai/**）端到端跑通 M1 最小闭环：
+# 用途：经正式 REST + SSE API（/admin-api/ai/**）端到端跑通 MVP 核心回路：
 #       配渠道 → 测连通 → 建模型 → 写规格 → 发布版本 → 调试会话多轮对话（跨请求记忆恢复）
-#       → 中断运行中的流 → 克隆重跑（历史复制）→ 提交问题反馈 → 管理员流转闭环。
+#       → 中断运行中的流并幂等重发。
 #       不进 CI——依赖运行中的 nexai-server 与（可选的）真实模型凭据。
+#
+# 已移交后续波次的功能（不在本脚本验证）：
+#   - 会话克隆（Session Clone）
+#   - 问题反馈聚合（Feedback）
+#   - 终端用户页面（工单 15）
 #
 # 两种模式：
 #   1) mock 模式（默认）：脚本自起 fake-openai-server.py（OpenAI 兼容 SSE mock），
@@ -60,11 +65,11 @@ consume_sse() { # $1=会话ID $2=消息内容 $3=期望回复子串（空则只�
         | python3 "$SCRIPT_DIR/sse-consumer.py" "$expect" $extra
 }
 
-echo "M1 集成验收冒烟（模式：${MODE}，目标：${BASE}）"
+echo "MVP 集成验收冒烟（模式：${MODE}，目标：${BASE}）"
 
 # ---------- 0. 凭据来源 ----------
 if [ "$MODE" = "mock" ]; then
-    step "0/9 自起 OpenAI 兼容 mock 模型服务（127.0.0.1:${MOCK_PORT}）"
+    step "0/6 自起 OpenAI 兼容 mock 模型服务（127.0.0.1:${MOCK_PORT}）"
     MOCK_LOG="$(mktemp /tmp/m1-fake-openai.XXXXXX)"
     python3 "$SCRIPT_DIR/fake-openai-server.py" "$MOCK_PORT" >"$MOCK_LOG" 2>&1 &
     MOCK_PID=$!
@@ -85,7 +90,7 @@ fi
 echo "  模型端点: $AI_BASE_URL  模型: $AI_MODEL"
 
 # ---------- 1. 登录 ----------
-step "1/9 登录管理后台（${USERNAME}）"
+step "1/6 登录管理后台（${USERNAME}）"
 TOKEN=$(curl -sf -X POST "$BASE/admin-api/system/auth/login" -H "tenant-id: $TENANT" \
     -H "Content-Type: application/json" \
     -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\"}" | jget "['data']['accessToken']") \
@@ -95,8 +100,8 @@ echo "  accessToken: ${TOKEN:0:20}..."
 TS=$(date +%s)
 
 # ---------- 2. 渠道：创建 + 表单凭据连通性（US7 保存前验证） ----------
-step "2/9 创建模型渠道 + 保存前连通性测试"
-CONN=$(api POST /admin-api/ai/channel/test-connectivity \
+step "2/6 创建模型渠道 + 保存前连通性测试"
+CONN=$(api POST /admin-api/ai/channel/connectivity-test \
     "{\"provider\":\"openai-compat\",\"baseUrl\":\"$AI_BASE_URL\",\"apiKey\":\"$AI_API_KEY\",\"modelId\":\"$AI_MODEL\"}") \
     || die "连通性测试请求失败"
 [ "$(echo "$CONN" | jget "['data']['success']")" = "True" ] \
@@ -109,23 +114,23 @@ CHANNEL_ID=$(api POST /admin-api/ai/channel/create \
 echo "  渠道编号: $CHANNEL_ID"
 
 # ---------- 3. 模型：创建 ----------
-step "3/9 登记模型（modelId 即调用端点的真实模型标识）"
+step "3/6 登记模型（modelId 即调用端点的真实模型标识）"
 MODEL_ID=$(api POST /admin-api/ai/model/create \
     "{\"channelId\":$CHANNEL_ID,\"modelId\":\"$AI_MODEL\",\"name\":\"M1验收模型-$TS\",\"contextWindow\":128000,\"inputPrice\":0.5,\"outputPrice\":2.0,\"capabilities\":[\"chat\"]}" \
     | jget "['data']") || die "创建模型失败"
 echo "  模型编号: ${MODEL_ID}（标识 ${AI_MODEL}——运行时以 ai_model.modelId 作 modelName 直发端点，须登记端点真实标识；可重跑性靠每轮新建渠道规避同渠道 modelId 唯一约束）"
 
 # ---------- 4. 规格：创建 + 发布（不可变版本） ----------
-step "4/9 创建智能体规格并发布版本"
+step "4/6 创建智能体规格并发布版本"
 SPEC_ID=$(api POST /admin-api/ai/spec/create \
-    "{\"name\":\"M1验收规格-$TS\",\"description\":\"M1 集成验收冒烟自动创建\",\"modelId\":$MODEL_ID,\"systemPrompt\":\"你是 M1 验收演示助手，回答简洁。\",\"maxIters\":5,\"temperature\":0.7}" \
+    "{\"name\":\"M1验收规格-$TS\",\"specCode\":\"m1-smoke-$TS\",\"description\":\"M1 集成验收冒烟自动创建\",\"modelId\":$MODEL_ID,\"systemPrompt\":\"你是 M1 验收演示助手，回答简洁。\",\"maxIters\":5,\"temperature\":0.7}" \
     | jget "['data']") || die "创建规格失败"
 VERSION_NO=$(api POST /admin-api/ai/spec/publish "{\"id\":$SPEC_ID,\"remark\":\"M1 验收冒烟发布\"}" | jget "['data']") \
     || die "发布版本失败"
 echo "  规格编号: ${SPEC_ID}，发布版本号: v$VERSION_NO"
 
 # ---------- 5. 调试会话：两轮对话验证跨请求记忆恢复 ----------
-step "5/9 创建调试会话，两轮对话验证跨请求记忆恢复（状态存储）"
+step "5/6 创建调试会话，两轮对话验证跨请求记忆恢复（状态存储）"
 SESSION_ID=$(api POST /admin-api/ai/session/debug/create \
     "{\"specId\":$SPEC_ID,\"title\":\"M1验收会话-$TS\"}" | jget "['data']") || die "创建调试会话失败"
 echo "  会话编号: $SESSION_ID"
@@ -143,7 +148,7 @@ else
 fi
 
 # ---------- 6. 中断正在运行的流 ----------
-step "6/9 中断正在运行的事件流"
+step "6/6 中断正在运行的事件流 + 幂等重发"
 INTERRUPT_STREAM="$(mktemp /tmp/m1-interrupt-stream.XXXXXX)"
 curl -sN --max-time 120 -X POST "$BASE/admin-api/ai/session/$SESSION_ID/message" \
     -H "tenant-id: $TENANT" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -171,37 +176,7 @@ INTR2=$(api POST "/admin-api/ai/session/$SESSION_ID/interrupt" "") || true
 echo "  幂等重发中断返回: ${INTR2}（无运行中流时应为 false）"
 rm -f "$INTERRUPT_STREAM"
 
-# ---------- 7. 克隆重跑（历史复制 + 参数微调） ----------
-step "7/9 克隆会话并微调参数重跑（历史应被复制）"
-CLONE_ID=$(api POST "/admin-api/ai/session/$SESSION_ID/clone" \
-    "{\"title\":\"M1验收克隆-$TS\",\"temperature\":0.1}" | jget "['data']") || die "克隆失败"
-echo "  克隆会话编号: ${CLONE_ID}（override temperature=0.1）"
-DETAIL=$(api GET "/admin-api/ai/session/page?pageNo=1&pageSize=10" | \
-    python3 -c "import sys,json; d=json.load(sys.stdin); print(next((s['overrideTemperature'] for s in d['data']['list'] if s['id']==$CLONE_ID), 'MISSING'))")
-[ "$DETAIL" = "0.1" ] || die "克隆会话的参数覆盖未生效（overrideTemperature=${DETAIL}）"
-echo "-- 克隆会话追问（历史已复制，应仍知道名字）"
-if [ "$MODE" = "mock" ]; then
-    consume_sse "$CLONE_ID" "我叫什么名字？" "你叫小明"
-else
-    consume_sse "$CLONE_ID" "我叫什么名字？" "" --min-input-tokens 60
-fi
-
-# ---------- 8. 问题反馈：提交（关联会话） ----------
-step "8/9 提交问题反馈（关联会话 ${SESSION_ID}）"
-FEEDBACK_ID=$(api POST /admin-api/ai/feedback/create \
-    "{\"content\":\"M1 验收冒烟自动提交：事件流与记忆恢复正常，此条用于验证反馈闭环。\",\"screenshotUrls\":[],\"sessionId\":\"$SESSION_ID\"}" \
-    | jget "['data']") || die "创建反馈失败"
-echo "  反馈编号: $FEEDBACK_ID"
-
-# ---------- 9. 管理员流转闭环 ----------
-step "9/9 管理员流转反馈状态（待处理 → 处理中 → 已解决）"
-api PUT /admin-api/ai/feedback/transition "{\"id\":$FEEDBACK_ID,\"targetStatus\":20}" >/dev/null || die "流转到处理中失败"
-api PUT /admin-api/ai/feedback/transition "{\"id\":$FEEDBACK_ID,\"targetStatus\":30}" >/dev/null || die "流转到已解决失败"
-STATUS=$(api GET "/admin-api/ai/feedback/get?id=$FEEDBACK_ID" | jget "['data']['status']")
-[ "$STATUS" = "30" ] || die "反馈终态不是已解决（status=${STATUS}）"
-echo "  反馈终态: 已解决（30）✓"
-
 echo
-echo "✅ M1 集成验收冒烟全流程通过（模式：${MODE}）"
-echo "   本轮创建：渠道 $CHANNEL_ID / 模型 $MODEL_ID / 规格 $SPEC_ID v$VERSION_NO / 会话 $SESSION_ID + 克隆 $CLONE_ID / 反馈 $FEEDBACK_ID"
-echo "   （演示数据保留在租户 ${TENANT}，可在管理界面查看；HITL 三态确认由 S1 自动化测试覆盖——M1 生产链路无触发 ASK 的工具）"
+echo "✅ MVP 集成验收冒烟全流程通过（模式：${MODE}）"
+echo "   本轮创建：渠道 $CHANNEL_ID / 模型 $MODEL_ID / 规格 $SPEC_ID v$VERSION_NO / 会话 $SESSION_ID"
+echo "   （演示数据保留在租户 ${TENANT}，可在管理界面查看；HITL 三态确认由单元/集成测试覆盖——MVP 生产链路无触发 ASK 的工具）"

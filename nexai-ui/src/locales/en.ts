@@ -781,11 +781,14 @@ export default {
       revoked: 'Revoked',
       specScope: 'Spec Scope',
       specScopePlaceholder: 'Select allowed agents (multi-select)',
-      specScopeTip: 'Empty = all agents of this tenant; the key can only call specs within the allowed scope',
+      specScopeTip:
+        'Empty = all agents of this tenant; the key can only call specs within the allowed scope',
       allSpecs: 'All agents',
       revoke: 'Revoke',
-      revokeConfirm: 'Revoke API key "{name}"? Calls via this key will fail immediately (leak containment, irreversible)',
-      onceWarning: 'The plaintext key is shown only once. Copy and store it now — it cannot be viewed again',
+      revokeConfirm:
+        'Revoke API key "{name}"? Calls via this key will fail immediately (leak containment, irreversible)',
+      onceWarning:
+        'The plaintext key is shown only once. Copy and store it now — it cannot be viewed again',
       copy: 'Copy',
       copied: 'Copied to clipboard',
       created: 'API key generated'
