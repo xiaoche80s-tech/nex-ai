@@ -171,7 +171,7 @@ public class MultiTenantIsolationTest extends BaseDbUnitTest {
         SkillVersionDO version = new SkillVersionDO();
         version.setSkillId(1L);
         version.setVersionNo(1);
-        version.setContent("# 隔离测试技能内容");
+        version.setSkillMarkdown("# 隔离测试技能内容");
         skillVersionMapper.insert(version);
 
         assertEquals(1, skillVersionMapper.selectList().size());

@@ -310,7 +310,7 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 public Skill findById(Long id) {
                     return Long.valueOf(5L).equals(id)
                             ? Skill.reconstitute(5L, "order-helper", "订单技能",
-                                    SkillOwnerLevel.TENANT, null, 1, null)
+                                    SkillOwnerLevel.TENANT, null, 1, false, null, null)
                             : null;
                 }
 
@@ -335,6 +335,11 @@ public class DebugSessionControllerTest extends BaseDbUnitTest {
                 @Override
                 public Long saveVersion(SkillVersion version) {
                     return 1L;
+                }
+
+                @Override
+                public SkillVersion findVersion(Long skillId, Integer versionNo) {
+                    return null;
                 }
 
                 @Override

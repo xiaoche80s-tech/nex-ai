@@ -8,8 +8,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * Skill 版本 DO（贫血模型，不可变：只插不改不删）。content 列存能力包内容 JSON
- * （{markdown, resources}），版本号按 skill 内严格递增（唯一索引兜底并发）。
+ * Skill 版本 DO（贫血模型，不可变：只插不改不删）。skill_markdown 列存 SKILL.md 全文
+ * （YAML frontmatter + 正文），资源文件在 ai_skill_resources（工单 26 拆表），
+ * 版本号按 skill 内严格递增（唯一索引兜底并发）。
  */
 @TableName("ai_skill_version")
 @KeySequence("ai_skill_version_seq")
@@ -31,9 +32,9 @@ public class SkillVersionDO extends TenantBaseDO {
      */
     private Integer versionNo;
     /**
-     * 能力包内容 JSON（{markdown, resources}）
+     * SKILL.md 全文（YAML frontmatter + 正文）；资源文件在 ai_skill_resources
      */
-    private String content;
+    private String skillMarkdown;
     /**
      * 版本备注
      */

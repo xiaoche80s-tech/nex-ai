@@ -1,7 +1,6 @@
 package com.gkht.ai.nexai.module.ai.skill.infrastructure.converter;
 
 import com.gkht.ai.nexai.framework.common.pojo.PageResult;
-import com.gkht.ai.nexai.framework.common.util.json.JsonUtils;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionDTO;
 import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
@@ -9,19 +8,20 @@ import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillContent;
 import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillOwnerLevel;
 import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillVersion;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillDO;
+import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillResourceDO;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.dataobject.SkillVersionDO;
-import lombok.Data;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Skill 转换器：领域模型 → DO（Repository 反方向在 RepositoryImpl 经 reconstitute）、
- * 领域模型/DO → 出参 DTO。能力包内容在 DO 侧为 JSON 字符串、领域侧为 {@link SkillContent}，
- * 互转集中于此（ContentJSON 桥接 POJO，domain 值对象零框架依赖）。
+ * 领域模型/DO → 出参 DTO。版本内容已拆表（工单 26）：markdown 走 skill_markdown 列、
+ * 资源走 ai_skill_resources 行（本类提供 Map ↔ 行的双向转换），ContentJSON 桥接已移除。
  */
 @Mapper(componentModel = "spring")
 public interface SkillConverter {
@@ -30,7 +30,7 @@ public interface SkillConverter {
     @Mapping(target = "published", source = "published", qualifiedByName = "publishedToInt")
     SkillDO toDataObject(Skill skill);
 
-    @Mapping(target = "content", source = "content", qualifiedByName = "contentToJson")
+    @Mapping(target = "skillMarkdown", source = "content.markdown")
     SkillVersionDO toVersionDataObject(SkillVersion version);
 
     SkillDTO toDTO(SkillDO skillDO);
@@ -46,18 +46,30 @@ public interface SkillConverter {
 
     List<SkillVersionDTO> toVersionDTOList(List<SkillVersionDO> list);
 
-    /** 内容 JSON → 领域值对象（reconstitute 用） */
-    default SkillContent jsonToContent(String json) {
-        if (json == null || json.isBlank()) {
-            return null;
+    /** 版本资源 Map → 资源行（versionId 为版本落库后的 DB 主键） */
+    default List<SkillResourceDO> contentToResourceDOs(Long versionId, SkillContent content) {
+        if (content == null || content.getResources().isEmpty()) {
+            return List.of();
         }
-        ContentJSON parsed = JsonUtils.parseObject(json, ContentJSON.class);
-        return parsed == null ? null : parsed.toDomain();
+        return content.getResources().entrySet().stream()
+                .map(entry -> {
+                    SkillResourceDO row = new SkillResourceDO();
+                    row.setVersionId(versionId);
+                    row.setResourcePath(entry.getKey());
+                    row.setResourceContent(entry.getValue());
+                    return row;
+                })
+                .toList();
     }
 
-    @Named("contentToJson")
-    default String contentToJson(SkillContent content) {
-        return content == null ? null : JsonUtils.toJsonString(ContentJSON.from(content));
+    /** 资源行 + markdown → 领域值对象（reconstitute 用） */
+    default SkillContent toContent(String markdown, List<SkillResourceDO> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return SkillContent.of(markdown, null);
+        }
+        Map<String, String> resources = new LinkedHashMap<>(rows.size());
+        rows.forEach(row -> resources.put(row.getResourcePath(), row.getResourceContent()));
+        return SkillContent.of(markdown, resources);
     }
 
     @Named("ownerLevelToString")
@@ -69,27 +81,6 @@ public interface SkillConverter {
     @Named("publishedToInt")
     default Integer publishedToInt(boolean published) {
         return published ? 1 : 0;
-    }
-
-    /**
-     * JSON 编解码桥接 POJO：能力包内容（markdown + resources Map）。
-     */
-    @Data
-    class ContentJSON {
-
-        private String markdown;
-        private Map<String, String> resources;
-
-        static ContentJSON from(SkillContent content) {
-            ContentJSON json = new ContentJSON();
-            json.setMarkdown(content.getMarkdown());
-            json.setResources(content.resourcesCopy());
-            return json;
-        }
-
-        SkillContent toDomain() {
-            return SkillContent.of(markdown, resources);
-        }
     }
 
 }

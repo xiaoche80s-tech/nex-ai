@@ -6266,7 +6266,7 @@ CREATE TABLE ai_skill_version (
     id int8 NOT NULL,
     skill_id int8 NOT NULL,
     version_no int4 NOT NULL,
-    content text NOT NULL,
+    skill_markdown text NOT NULL,
     note varchar(255) NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -6284,7 +6284,7 @@ CREATE UNIQUE INDEX uk_ai_skill_version ON ai_skill_version (tenant_id, skill_id
 COMMENT ON COLUMN ai_skill_version.id IS '技能版本编号';
 COMMENT ON COLUMN ai_skill_version.skill_id IS '所属技能编号（ai_skill.id，聚合根引用）';
 COMMENT ON COLUMN ai_skill_version.version_no IS '版本号（技能内严格递增，1 起；发布后不可变）';
-COMMENT ON COLUMN ai_skill_version.content IS '技能版本内容 JSON（文档与挂载件随版本快照固化）';
+COMMENT ON COLUMN ai_skill_version.skill_markdown IS 'SKILL.md 全文（YAML frontmatter + 正文）；资源文件在 ai_skill_resources（工单 26 拆表）';
 COMMENT ON COLUMN ai_skill_version.note IS '发布备注';
 COMMENT ON COLUMN ai_skill_version.creator IS '创建者';
 COMMENT ON COLUMN ai_skill_version.create_time IS '创建时间';
@@ -6294,12 +6294,47 @@ COMMENT ON COLUMN ai_skill_version.deleted IS '是否删除';
 COMMENT ON COLUMN ai_skill_version.tenant_id IS '租户编号';
 COMMENT ON TABLE ai_skill_version IS 'AI 平台技能版本快照表（不可变：只插不改不删）';
 
+-- ----------------------------
+-- Table structure for ai_skill_resources（NexAI 智能体平台：Skill 版本资源文件，工单 26）
+-- ----------------------------
+DROP SEQUENCE IF EXISTS ai_skill_resources_seq;
+DROP TABLE IF EXISTS ai_skill_resources;
+CREATE TABLE ai_skill_resources (
+    id int8 NOT NULL,
+    version_id int8 NOT NULL,
+    resource_path varchar(500) NOT NULL,
+    resource_content text NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ai_skill_resources ADD CONSTRAINT pk_ai_skill_resources PRIMARY KEY (id);
+
+-- 版本内资源路径唯一（部分唯一索引：仅存活行；无数据库级 FK，项目惯例逻辑关联）
+CREATE UNIQUE INDEX uk_ai_skill_resources ON ai_skill_resources (version_id, resource_path) WHERE deleted = 0;
+
+COMMENT ON COLUMN ai_skill_resources.id IS '资源行编号';
+COMMENT ON COLUMN ai_skill_resources.version_id IS '所属版本编号（ai_skill_version.id，软关联）';
+COMMENT ON COLUMN ai_skill_resources.resource_path IS '资源相对路径（版本内唯一）';
+COMMENT ON COLUMN ai_skill_resources.resource_content IS '资源内容（文本或 base64: 前缀二进制）';
+COMMENT ON COLUMN ai_skill_resources.deleted IS '是否删除';
+COMMENT ON COLUMN ai_skill_resources.tenant_id IS '租户编号';
+COMMENT ON TABLE ai_skill_resources IS 'AI 平台技能版本资源表（不可变：只插不改；随版本级联清理）';
+
 DROP SEQUENCE IF EXISTS ai_skill_seq;
 CREATE SEQUENCE ai_skill_seq
     START 1;
 
 DROP SEQUENCE IF EXISTS ai_skill_version_seq;
 CREATE SEQUENCE ai_skill_version_seq
+    START 1;
+
+DROP SEQUENCE IF EXISTS ai_skill_resources_seq;
+CREATE SEQUENCE ai_skill_resources_seq
     START 1;
 
 -- ----------------------------

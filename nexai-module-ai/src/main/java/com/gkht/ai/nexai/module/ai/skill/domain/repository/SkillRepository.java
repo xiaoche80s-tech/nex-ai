@@ -45,6 +45,11 @@ public interface SkillRepository {
     Integer findMaxVersionNo(Long skillId);
 
     /**
+     * 精确读取某版本（含 markdown 与资源），不存在返回 null
+     */
+    SkillVersion findVersion(Long skillId, Integer versionNo);
+
+    /**
      * 更新 skill 主体（描述/当前版本指针）
      */
     void update(Skill skill);

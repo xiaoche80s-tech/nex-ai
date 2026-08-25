@@ -41,7 +41,6 @@ public class AgentscopeSkillMaterializationGateway implements SkillMaterializati
     public String materialize(Skill skill, Long tenantId, SkillContent content) {
         Path root = runtimeProperties.getSkills().resolvedRoot();
         Path dir = switch (skill.getOwnerLevel()) {
-            case PLATFORM -> root.resolve("platform").resolve("skills").resolve(skill.getName());
             case TENANT -> root.resolve("t" + tenantId).resolve("skills").resolve(skill.getName());
             case USER -> root.resolve("t" + tenantId).resolve("u" + skill.getOwnerUserId())
                     .resolve("skills").resolve(skill.getName());

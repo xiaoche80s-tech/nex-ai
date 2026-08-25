@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS ai_skill_version (
     id int8 NOT NULL,
     skill_id int8 NOT NULL,
     version_no int4 NOT NULL,
-    content text NOT NULL,
+    skill_markdown text NOT NULL,
     note varchar(255) NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -146,6 +146,24 @@ CREATE TABLE IF NOT EXISTS ai_skill_version (
 -- 同一 skill 内版本号唯一（并发兜底）
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_skill_version ON ai_skill_version (
     tenant_id, skill_id, version_no) WHERE deleted = 0;
+
+CREATE SEQUENCE IF NOT EXISTS ai_skill_resources_seq START 1;
+CREATE TABLE IF NOT EXISTS ai_skill_resources (
+    id int8 NOT NULL,
+    version_id int8 NOT NULL,
+    resource_path varchar(500) NOT NULL,
+    resource_content text NOT NULL,
+    creator varchar(64) NULL DEFAULT '',
+    create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) NULL DEFAULT '',
+    update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted int2 NOT NULL DEFAULT 0,
+    tenant_id int8 NOT NULL DEFAULT 0,
+    CONSTRAINT pk_ai_skill_resources PRIMARY KEY (id)
+);
+-- 版本内资源路径唯一（部分唯一索引：仅存活行）
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_skill_resources ON ai_skill_resources (
+    version_id, resource_path) WHERE deleted = 0;
 
 CREATE SEQUENCE IF NOT EXISTS ai_mcp_server_seq START 1;
 CREATE TABLE IF NOT EXISTS ai_mcp_server (

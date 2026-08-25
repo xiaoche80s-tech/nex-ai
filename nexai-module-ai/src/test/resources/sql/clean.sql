@@ -9,6 +9,7 @@ DELETE FROM "ai_model";
 
 DELETE FROM "ai_session";
 
+DELETE FROM "ai_skill_resources";
 DELETE FROM "ai_skill_version";
 DELETE FROM "ai_skill";
 
