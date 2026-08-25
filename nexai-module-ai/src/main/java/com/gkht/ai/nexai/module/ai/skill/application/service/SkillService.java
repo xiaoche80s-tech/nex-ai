@@ -44,4 +44,14 @@ public interface SkillService {
      */
     void deleteSkill(Long id, Long userId);
 
+    /**
+     * 上架（进入终端技能目录）
+     */
+    void publishSkill(Long id, Long userId);
+
+    /**
+     * 下架（移出终端技能目录）
+     */
+    void unpublishSkill(Long id, Long userId);
+
 }

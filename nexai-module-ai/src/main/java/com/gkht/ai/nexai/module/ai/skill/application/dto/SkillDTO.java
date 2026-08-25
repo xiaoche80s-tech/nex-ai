@@ -30,6 +30,12 @@ public class SkillDTO {
     @Schema(description = "当前生效版本号（运行时物化采用），null = 尚无版本", example = "3")
     private Integer currentVersionNo;
 
+    @Schema(description = "是否上架（0=下架 1=上架，终端技能目录曝光位）", example = "1")
+    private Integer published;
+
+    @Schema(description = "Git 同步源编号（自建为 null）", example = "1")
+    private Long gitSourceId;
+
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
 

@@ -75,4 +75,20 @@ public class SkillController {
         return success(true);
     }
 
+    @PostMapping("/publish")
+    @Operation(summary = "上架 Skill", description = "进入终端技能目录（版本推进不影响上架位）")
+    @PreAuthorize("@ss.hasPermission('ai:skill:update')")
+    public CommonResult<Boolean> publishSkill(@RequestParam("id") Long id) {
+        skillService.publishSkill(id, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/unpublish")
+    @Operation(summary = "下架 Skill", description = "移出终端技能目录")
+    @PreAuthorize("@ss.hasPermission('ai:skill:update')")
+    public CommonResult<Boolean> unpublishSkill(@RequestParam("id") Long id) {
+        skillService.unpublishSkill(id, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
 }

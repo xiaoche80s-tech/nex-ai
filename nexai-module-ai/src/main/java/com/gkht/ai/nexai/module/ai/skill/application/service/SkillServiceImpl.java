@@ -136,6 +136,20 @@ public class SkillServiceImpl implements SkillService {
         skillRepository.deleteByIdCascade(id);
     }
 
+    @Override
+    public void publishSkill(Long id, Long userId) {
+        Skill skill = requireSkill(id);
+        skill.publish();
+        skillRepository.update(skill);
+    }
+
+    @Override
+    public void unpublishSkill(Long id, Long userId) {
+        Skill skill = requireSkill(id);
+        skill.unpublish();
+        skillRepository.update(skill);
+    }
+
     private Skill requireSkill(Long id) {
         Skill skill = skillRepository.findById(id);
         if (skill == null) {
