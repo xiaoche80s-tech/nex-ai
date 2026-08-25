@@ -112,19 +112,15 @@ public class SkillControllerTest extends BaseDbUnitTest {
     @DisplayName("上架/下架：published 位切换并透出，不存在报错")
     public void publishAndUnpublishToggles() {
         Long id = skillService.createSkill(createCommand("data-clean"), 1L);
-        assertEquals(0, skillService.getSkillPage(
-                new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery(), 1L)
-                .getList().get(0).getPublished(), "创建默认未上架");
+        var pageQuery = new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery();
+        assertEquals(0, skillService.getSkillPage(pageQuery, 1L).getList().get(0).getPublished(),
+                "创建默认未上架");
 
         skillService.publishSkill(id, 1L);
-        assertEquals(1, skillService.getSkillPage(
-                new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery(), 1L)
-                .getList().get(0).getPublished());
+        assertEquals(1, skillService.getSkillPage(pageQuery, 1L).getList().get(0).getPublished());
 
         skillService.unpublishSkill(id, 1L);
-        assertEquals(0, skillService.getSkillPage(
-                new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery(), 1L)
-                .getList().get(0).getPublished());
+        assertEquals(0, skillService.getSkillPage(pageQuery, 1L).getList().get(0).getPublished());
 
         assertServiceException(() -> skillService.publishSkill(999L, 1L), SKILL_NOT_EXISTS);
     }

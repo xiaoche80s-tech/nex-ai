@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -68,11 +69,11 @@ class SkillTest {
     @DisplayName("上架位：创建默认未上架，publish/unpublish 切换，reconstitute 恢复")
     void publishTogglesAndReconstitutes() {
         Skill skill = Skill.create("data-clean", "数据清洗能力包", SkillOwnerLevel.TENANT, null);
-        assertTrue(!skill.isPublished(), "创建默认未上架");
+        assertFalse(skill.isPublished(), "创建默认未上架");
         skill.publish();
         assertTrue(skill.isPublished());
         skill.unpublish();
-        assertTrue(!skill.isPublished());
+        assertFalse(skill.isPublished());
 
         Skill restored = Skill.reconstitute(9L, "data-clean", "描述", SkillOwnerLevel.TENANT,
                 null, 2, true, 55L, null);
