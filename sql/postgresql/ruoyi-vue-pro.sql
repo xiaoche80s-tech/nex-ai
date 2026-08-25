@@ -6220,11 +6220,13 @@ DROP SEQUENCE IF EXISTS ai_skill_seq;
 DROP TABLE IF EXISTS ai_skill;
 CREATE TABLE ai_skill (
     id int8 NOT NULL,
-    name varchar(64) NOT NULL,
+    name varchar(255) NOT NULL,
     description varchar(512) NOT NULL,
     owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
     owner_user_id int8 NULL DEFAULT NULL,
     current_version_no int4 NULL DEFAULT NULL,
+    published int4 NOT NULL DEFAULT 0,
+    git_source_id int8 NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater varchar(64) NULL DEFAULT '',
@@ -6245,6 +6247,8 @@ COMMENT ON COLUMN ai_skill.description IS '技能描述';
 COMMENT ON COLUMN ai_skill.owner_level IS '归属层级（TENANT/USER）';
 COMMENT ON COLUMN ai_skill.owner_user_id IS '归属用户编号（用户级 = 创建者），非用户级为 NULL';
 COMMENT ON COLUMN ai_skill.current_version_no IS '当前生效版本号（NULL 表示从未发布）';
+COMMENT ON COLUMN ai_skill.published IS '是否上架（0=下架 1=上架；上架才进终端技能目录，ADR-0006）';
+COMMENT ON COLUMN ai_skill.git_source_id IS 'Git 同步源编号（软关联 ai_skill_git_source，工单 29；自建为 NULL）';
 COMMENT ON COLUMN ai_skill.creator IS '创建者';
 COMMENT ON COLUMN ai_skill.create_time IS '创建时间';
 COMMENT ON COLUMN ai_skill.updater IS '更新者';

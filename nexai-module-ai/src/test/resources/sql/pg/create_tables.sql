@@ -109,11 +109,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_session_key ON ai_session (tenant_id, se
 CREATE SEQUENCE IF NOT EXISTS ai_skill_seq START 1;
 CREATE TABLE IF NOT EXISTS ai_skill (
     id int8 NOT NULL,
-    name varchar(64) NOT NULL,
+    name varchar(255) NOT NULL,
     description varchar(512) NOT NULL,
     owner_level varchar(16) NOT NULL DEFAULT 'TENANT',
     owner_user_id int8 NULL DEFAULT NULL,
     current_version_no int4 NULL DEFAULT NULL,
+    published int4 NOT NULL DEFAULT 0,
+    git_source_id int8 NULL DEFAULT NULL,
     creator varchar(64) NULL DEFAULT '',
     create_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updater varchar(64) NULL DEFAULT '',

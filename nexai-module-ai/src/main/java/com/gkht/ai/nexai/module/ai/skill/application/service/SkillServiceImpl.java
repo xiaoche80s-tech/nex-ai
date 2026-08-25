@@ -144,17 +144,13 @@ public class SkillServiceImpl implements SkillService {
         return skill;
     }
 
-    /** 归属层级解析：null → TENANT（默认）；PLATFORM 后置开放 */
+    /** 归属层级解析：null → TENANT（默认） */
     private SkillOwnerLevel parseOwnerLevel(String code) {
         if (code == null || code.isBlank()) {
             return SkillOwnerLevel.TENANT;
         }
         try {
-            SkillOwnerLevel level = SkillOwnerLevel.valueOf(code);
-            if (level == SkillOwnerLevel.PLATFORM) {
-                throw exception(SKILL_OWNER_LEVEL_UNSUPPORTED);
-            }
-            return level;
+            return SkillOwnerLevel.valueOf(code);
         } catch (IllegalArgumentException ex) {
             throw exception(SKILL_OWNER_LEVEL_UNSUPPORTED);
         }

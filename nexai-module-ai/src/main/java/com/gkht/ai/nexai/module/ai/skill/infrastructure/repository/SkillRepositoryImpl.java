@@ -80,7 +80,8 @@ public class SkillRepositoryImpl implements SkillRepository {
         return Skill.reconstitute(dataObject.getId(), dataObject.getName(),
                 dataObject.getDescription(), SkillOwnerLevel.valueOf(dataObject.getOwnerLevel()),
                 dataObject.getOwnerUserId(), dataObject.getCurrentVersionNo(),
-                dataObject.getCreateTime());
+                dataObject.getPublished() != null && dataObject.getPublished() == 1,
+                dataObject.getGitSourceId(), dataObject.getCreateTime());
     }
 
     private SkillVersion reconstituteVersion(SkillVersionDO dataObject) {

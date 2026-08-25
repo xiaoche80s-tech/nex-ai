@@ -27,6 +27,7 @@ import java.util.Map;
 public interface SkillConverter {
 
     @Mapping(target = "ownerLevel", source = "ownerLevel", qualifiedByName = "ownerLevelToString")
+    @Mapping(target = "published", source = "published", qualifiedByName = "publishedToInt")
     SkillDO toDataObject(Skill skill);
 
     @Mapping(target = "content", source = "content", qualifiedByName = "contentToJson")
@@ -62,6 +63,12 @@ public interface SkillConverter {
     @Named("ownerLevelToString")
     default String ownerLevelToString(SkillOwnerLevel level) {
         return level == null ? null : level.name();
+    }
+
+    /** 上架位 boolean → Integer（0=下架 1=上架，DDL int4） */
+    @Named("publishedToInt")
+    default Integer publishedToInt(boolean published) {
+        return published ? 1 : 0;
     }
 
     /**

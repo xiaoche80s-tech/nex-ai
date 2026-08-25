@@ -6,15 +6,16 @@ import java.util.Objects;
 /**
  * Skill 资产聚合根（充血模型，零框架依赖）：租户/用户级可复用能力包——
  * 名称/描述/归属层级 + 不可变版本链（{@link SkillVersion}）。管理页上传/编辑形成版本链，
- * 运行时物化为文件目录供 agentscope 文件仓库源读取（ADR-0003 TENANT/USER 轨）。
+ * 运行时物化为文件目录供 agentscope 文件仓库源读取（ADR-0005 统一资产双来源，
+ * Git 同步源导入见工单 29）。
  *
  * <p>版本语义：每次编辑产生新版本（版本号严格递增），只增不改——能力包可追溯、可回退。
  * 当前版本指针 {@link #currentVersionNo} 指向运行时物化采用的版本。</p>
  */
 public class Skill {
 
-    /** 名称长度上限（字符） */
-    static final int NAME_MAX_LENGTH = 64;
+    /** 名称长度上限（字符），对齐 DDL varchar(255)（工单 26 放宽） */
+    static final int NAME_MAX_LENGTH = 255;
     /** 描述长度上限（字符） */
     static final int DESCRIPTION_MAX_LENGTH = 512;
 
@@ -30,17 +31,24 @@ public class Skill {
     private final Long ownerUserId;
     /** 当前生效版本号，null 表示尚无版本 */
     private Integer currentVersionNo;
+    /** 是否上架（终端技能目录曝光位，ADR-0006：上架才进终端目录） */
+    private boolean published;
+    /** Git 同步源编号（软关联 ai_skill_git_source，工单 29 建），自建为 null；只读标记 */
+    private final Long gitSourceId;
     /** 创建时间，由持久化填充，新建时为 null */
     private LocalDateTime createTime;
 
     private Skill(Long id, String name, String description, SkillOwnerLevel ownerLevel,
-                  Long ownerUserId, Integer currentVersionNo, LocalDateTime createTime) {
+                  Long ownerUserId, Integer currentVersionNo, boolean published,
+                  Long gitSourceId, LocalDateTime createTime) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.ownerLevel = ownerLevel;
         this.ownerUserId = ownerUserId;
         this.currentVersionNo = currentVersionNo;
+        this.published = published;
+        this.gitSourceId = gitSourceId;
         this.createTime = createTime;
     }
 
@@ -71,7 +79,7 @@ public class Skill {
             throw new IllegalArgumentException("非用户级技能不携带归属用户");
         }
         return new Skill(null, name.strip(), description.strip(), ownerLevel, ownerUserId,
-                null, null);
+                null, false, null, null);
     }
 
     /**
@@ -79,9 +87,10 @@ public class Skill {
      */
     public static Skill reconstitute(Long id, String name, String description,
                                      SkillOwnerLevel ownerLevel, Long ownerUserId,
-                                     Integer currentVersionNo, LocalDateTime createTime) {
+                                     Integer currentVersionNo, boolean published,
+                                     Long gitSourceId, LocalDateTime createTime) {
         return new Skill(id, name, description, ownerLevel, ownerUserId, currentVersionNo,
-                createTime);
+                published, gitSourceId, createTime);
     }
 
     /**
@@ -120,6 +129,16 @@ public class Skill {
         this.id = id;
     }
 
+    /** 上架（进入终端技能目录；版本推进不影响本位，ADR-0005 决策） */
+    public void publish() {
+        this.published = true;
+    }
+
+    /** 下架（移出终端技能目录） */
+    public void unpublish() {
+        this.published = false;
+    }
+
     public Long getId() {
         return id;
     }
@@ -146,6 +165,14 @@ public class Skill {
 
     public boolean hasVersion() {
         return currentVersionNo != null;
+    }
+
+    public boolean isPublished() {
+        return published;
+    }
+
+    public Long getGitSourceId() {
+        return gitSourceId;
     }
 
     public LocalDateTime getCreateTime() {

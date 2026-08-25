@@ -31,7 +31,7 @@ public class SkillDO extends TenantBaseDO {
      */
     private String description;
     /**
-     * 归属层级（TENANT/USER/PLATFORM）
+     * 归属层级（TENANT/USER）
      */
     private String ownerLevel;
     /**
@@ -42,5 +42,13 @@ public class SkillDO extends TenantBaseDO {
      * 当前生效版本号（运行时物化采用），null = 尚无版本
      */
     private Integer currentVersionNo;
+    /**
+     * 是否上架（0=下架 1=上架，终端技能目录曝光位）
+     */
+    private Integer published;
+    /**
+     * Git 同步源编号（软关联 ai_skill_git_source，工单 29 建），自建为 null
+     */
+    private Long gitSourceId;
 
 }
