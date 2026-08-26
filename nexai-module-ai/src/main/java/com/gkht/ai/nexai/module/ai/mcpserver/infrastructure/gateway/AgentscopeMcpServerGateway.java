@@ -11,6 +11,7 @@ import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.List;
@@ -39,8 +40,11 @@ public class AgentscopeMcpServerGateway implements McpServerGateway {
         McpClientWrapper client = null;
         try {
             client = mcpClientFactory.buildSync(server.toConnectionConfig(probeTimeout(server)));
+            // listTools() 的 initialized 守卫在链组装期求值，而置位在 initialize() 订阅后——
+            // 必须用 Mono.defer 延迟组装（与 agentscope McpClientManager 的链法一致），否则
+            // initialize 成功后仍报 "not initialized"
             List<McpSchema.Tool> tools = client.initialize()
-                    .then(client.listTools())
+                    .then(Mono.defer(client::listTools))
                     .block(PROBE_TIMEOUT_CAP);
             List<McpToolSummary> summaries = tools == null ? List.of() : tools.stream()
                     .map(tool -> McpToolSummary.of(tool.name(), tool.description()))
