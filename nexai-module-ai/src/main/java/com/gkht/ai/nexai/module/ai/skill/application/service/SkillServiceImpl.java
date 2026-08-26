@@ -5,6 +5,7 @@ import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillCreateCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillVersionCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDTO;
+import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionContentDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery;
 import com.gkht.ai.nexai.module.ai.skill.domain.gateway.SkillMaterializationGateway;
@@ -30,6 +31,7 @@ import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_NAME_DU
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_OWNER_LEVEL_UNSUPPORTED;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_CONFIG_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_TENANT_CONTEXT_MISSING;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_VERSION_NOT_EXISTS;
 
 /**
  * Skill 资产应用服务实现。写走聚合（Repository 端口）+ 物化网关（agentscope 直用），
@@ -114,7 +116,8 @@ public class SkillServiceImpl implements SkillService {
 
     @Override
     public PageResult<SkillDTO> getSkillPage(SkillPageQuery query, Long userId) {
-        return skillConverter.toDTOPage(skillMapper.selectPage(query, query.getName(), userId));
+        return skillConverter.toDTOPage(skillMapper.selectPage(query, query.getName(), userId,
+                query.getPublished(), query.getSourceType()));
     }
 
     @Override
@@ -127,6 +130,23 @@ public class SkillServiceImpl implements SkillService {
         versions.forEach(v ->
                 v.setCurrent(currentVersionNo != null && currentVersionNo.equals(v.getVersionNo())));
         return versions;
+    }
+
+    @Override
+    public SkillVersionContentDTO getVersionContent(Long skillId, Integer versionNo) {
+        requireSkill(skillId);
+        SkillVersion version = skillRepository.findVersion(skillId, versionNo);
+        if (version == null) {
+            throw exception(SKILL_VERSION_NOT_EXISTS);
+        }
+        SkillVersionContentDTO dto = new SkillVersionContentDTO();
+        dto.setSkillId(skillId);
+        dto.setVersionNo(version.getVersionNo());
+        dto.setNote(version.getNote());
+        dto.setMarkdown(version.getContent().getMarkdown());
+        dto.setResourcePaths(List.copyOf(version.getContent().getResources().keySet()));
+        dto.setCreateTime(version.getCreateTime());
+        return dto;
     }
 
     @Override

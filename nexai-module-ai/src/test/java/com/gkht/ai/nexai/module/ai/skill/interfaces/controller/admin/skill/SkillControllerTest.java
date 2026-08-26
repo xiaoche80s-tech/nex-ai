@@ -125,6 +125,44 @@ public class SkillControllerTest extends BaseDbUnitTest {
         assertServiceException(() -> skillService.publishSkill(999L, 1L), SKILL_NOT_EXISTS);
     }
 
+    @Test
+    @DisplayName("分页筛选：上架位与来源（自建/Git）过滤")
+    public void pageFilterByPublishedAndSource() {
+        Long idA = skillService.createSkill(createCommand("data-clean"), 1L);
+        skillService.publishSkill(idA, 1L);
+        skillService.createSkill(createCommand("report-writer"), 1L);
+
+        var publishedQuery = new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery();
+        publishedQuery.setPublished(1);
+        assertEquals(1, skillService.getSkillPage(publishedQuery, 1L).getTotal(), "仅上架的 1 条");
+
+        var createdQuery = new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery();
+        createdQuery.setSourceType("created");
+        assertEquals(2, skillService.getSkillPage(createdQuery, 1L).getTotal(), "自建 2 条");
+
+        var gitQuery = new com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery();
+        gitQuery.setSourceType("git");
+        assertEquals(0, skillService.getSkillPage(gitQuery, 1L).getTotal(), "Git 来源 0 条");
+    }
+
+    @Test
+    @DisplayName("版本内容预览：返回 markdown 与资源路径清单，版本不存在报错")
+    public void getVersionContentPreview() {
+        Long id = skillService.createSkill(createCommand("data-clean"), 1L);
+        SkillVersionCommand vc = new SkillVersionCommand();
+        vc.setSkillId(id);
+        vc.setMarkdown("---\nname: data-clean\ndescription: v2\n---\n# v2");
+        vc.setResources(Map.of("rules/a.md", "规则A", "scripts/run.sh", "base64:AAAA"));
+        skillService.addSkillVersion(vc, 1L);
+
+        var dto = skillService.getVersionContent(id, 2);
+        assertEquals("---\nname: data-clean\ndescription: v2\n---\n# v2", dto.getMarkdown());
+        assertEquals(java.util.List.of("rules/a.md", "scripts/run.sh"), dto.getResourcePaths());
+
+        assertServiceException(() -> skillService.getVersionContent(id, 9),
+                com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_VERSION_NOT_EXISTS);
+    }
+
     private SkillCreateCommand createCommand(String name) {
         SkillCreateCommand command = new SkillCreateCommand();
         command.setName(name);

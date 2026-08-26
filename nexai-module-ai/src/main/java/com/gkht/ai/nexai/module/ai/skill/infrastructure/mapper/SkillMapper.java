@@ -15,12 +15,21 @@ import org.apache.ibatis.annotations.Mapper;
 public interface SkillMapper extends BaseMapperX<SkillDO> {
 
     /**
-     * 分页查询（MVP 可见性口径：租户级租户内全见 + 用户级仅归属用户可见，与规格一致）
+     * 分页查询（MVP 可见性口径：租户级租户内全见 + 用户级仅归属用户可见，与规格一致）。
+     * 上架位/来源过滤：published 为 null 不过滤；sourceType 为 "git" 查 Git 导入、
+     * "created" 查自建、其余值不过滤。
      */
-    default PageResult<SkillDO> selectPage(PageParam pageParam, String name, Long currentUserId) {
+    default PageResult<SkillDO> selectPage(PageParam pageParam, String name, Long currentUserId,
+                                           Integer published, String sourceType) {
         LambdaQueryWrapperX<SkillDO> query = new LambdaQueryWrapperX<SkillDO>()
                 .likeIfPresent(SkillDO::getName, name)
-                .orderByDesc(SkillDO::getId);
+                .eq(published != null, SkillDO::getPublished, published);
+        if ("git".equals(sourceType)) {
+            query.isNotNull(SkillDO::getGitSourceId);
+        } else if ("created".equals(sourceType)) {
+            query.isNull(SkillDO::getGitSourceId);
+        }
+        query.orderByDesc(SkillDO::getId);
         String userLevel = SkillOwnerLevel.USER.name();
         if (currentUserId == null) {
             query.ne(SkillDO::getOwnerLevel, userLevel);

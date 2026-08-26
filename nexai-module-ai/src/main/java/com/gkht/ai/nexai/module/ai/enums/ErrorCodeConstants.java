@@ -45,6 +45,7 @@ public interface ErrorCodeConstants {
     ErrorCode SKILL_OWNER_LEVEL_UNSUPPORTED = new ErrorCode(1_022_006_002, "MVP 仅支持租户级（TENANT）与用户级（USER）Skill，平台级后置开放");
     ErrorCode SKILL_CONFIG_INVALID = new ErrorCode(1_022_006_003, "Skill 配置校验失败：{}");
     ErrorCode SKILL_TENANT_CONTEXT_MISSING = new ErrorCode(1_022_006_004, "租户上下文缺失，无法物化 Skill");
+    ErrorCode SKILL_VERSION_NOT_EXISTS = new ErrorCode(1_022_006_005, "Skill 版本不存在");
 
     // ========== MCP Server 1-022-007-000 ==========
     ErrorCode MCP_SERVER_NOT_EXISTS = new ErrorCode(1_022_007_000, "MCP Server 不存在");

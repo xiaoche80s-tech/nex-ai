@@ -4,6 +4,7 @@ import com.gkht.ai.nexai.framework.common.pojo.PageResult;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillCreateCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillVersionCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDTO;
+import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionContentDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery;
 
@@ -38,6 +39,11 @@ public interface SkillService {
      * Skill 版本列表（当前版本标识 + 物化路径）
      */
     List<SkillVersionDTO> listSkillVersions(Long skillId, Long userId);
+
+    /**
+     * 读取指定版本全量内容（markdown + 资源路径清单，预览用）
+     */
+    SkillVersionContentDTO getVersionContent(Long skillId, Integer versionNo);
 
     /**
      * 删除 skill 及其版本链（级联）

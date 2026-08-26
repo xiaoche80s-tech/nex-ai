@@ -6,6 +6,7 @@ import com.gkht.ai.nexai.framework.security.core.util.SecurityFrameworkUtils;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillCreateCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.command.SkillVersionCommand;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillDTO;
+import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionContentDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.dto.SkillVersionDTO;
 import com.gkht.ai.nexai.module.ai.skill.application.query.SkillPageQuery;
 import com.gkht.ai.nexai.module.ai.skill.application.service.SkillService;
@@ -65,6 +66,14 @@ public class SkillController {
     @PreAuthorize("@ss.hasPermission('ai:skill:query')")
     public CommonResult<List<SkillVersionDTO>> listSkillVersions(@RequestParam("skillId") Long skillId) {
         return success(skillService.listSkillVersions(skillId, SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/version-get")
+    @Operation(summary = "获得 Skill 版本内容", description = "markdown 全文 + 资源路径清单（版本预览用，对齐 agentspec version-get 先例）")
+    @PreAuthorize("@ss.hasPermission('ai:skill:query')")
+    public CommonResult<SkillVersionContentDTO> getVersionContent(
+            @RequestParam("skillId") Long skillId, @RequestParam("versionNo") Integer versionNo) {
+        return success(skillService.getVersionContent(skillId, versionNo));
     }
 
     @DeleteMapping("/delete")
