@@ -135,7 +135,7 @@
             {{ activeSkill.published === 1 ? t('ai.skill.unpublish') : t('ai.skill.publish') }}
           </el-button>
           <el-button type="danger" plain v-hasPermi="['ai:skill:delete']" @click="handleDelete(activeSkill)">
-            {{ t('table.del') }}
+            {{ t('action.del') }}
           </el-button>
         </div>
       </header>
@@ -229,7 +229,7 @@
     </el-form>
     <template #footer>
       <el-button type="primary" :loading="formLoading" @click="submitForm">
-        {{ t('common.confirm') }}
+        {{ t('common.ok') }}
       </el-button>
       <el-button @click="formVisible = false">{{ t('common.cancel') }}</el-button>
     </template>

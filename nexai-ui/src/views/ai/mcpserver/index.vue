@@ -112,7 +112,7 @@
             v-hasPermi="['ai:mcp-server:update']"
             @click="openForm(row)"
           >
-            {{ t('table.edit') }}
+            {{ t('action.edit') }}
           </el-button>
           <el-button
             link
@@ -120,7 +120,7 @@
             v-hasPermi="['ai:mcp-server:delete']"
             @click="handleDelete(row.id)"
           >
-            {{ t('table.del') }}
+            {{ t('action.del') }}
           </el-button>
         </template>
       </el-table-column>
@@ -234,7 +234,7 @@
     </el-form>
     <template #footer>
       <el-button type="primary" :loading="formLoading" @click="submitForm">
-        {{ t('common.confirm') }}
+        {{ t('common.ok') }}
       </el-button>
       <el-button @click="formVisible = false">{{ t('common.cancel') }}</el-button>
     </template>
@@ -273,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -410,6 +410,8 @@ const openForm = async (row?: McpServerVO) => {
     allowedTools: row?.allowedTools ? [...row.allowedTools] : []
   })
   formVisible.value = true
+  await nextTick()
+  formRef.value?.clearValidate()
 }
 
 /** 传输类型切换：互斥字段清空 */

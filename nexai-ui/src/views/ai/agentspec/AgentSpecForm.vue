@@ -230,7 +230,7 @@
             <el-table-column :label="t('table.action')" width="70" align="center">
               <template #default="{ $index }">
                 <el-button link type="danger" @click="formData.tools!.splice($index, 1)">
-                  {{ t('table.del') }}
+                  {{ t('action.del') }}
                 </el-button>
               </template>
             </el-table-column>
@@ -301,7 +301,7 @@
                   class="ml-auto"
                   @click="removeFolder(folderIndex)"
                 >
-                  {{ t('table.del') }}
+                  {{ t('action.del') }}
                 </el-button>
               </div>
               <el-table v-if="folder.files.length" :data="folder.files" size="small">
@@ -327,7 +327,7 @@
                 <el-table-column :label="t('table.action')" width="70" align="center">
                   <template #default="{ $index }">
                     <el-button link type="danger" @click="folder.files.splice($index, 1)">
-                      {{ t('table.del') }}
+                      {{ t('action.del') }}
                     </el-button>
                   </template>
                 </el-table-column>
