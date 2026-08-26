@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/web_starter
+title: Nexai Web Spring Boot Starter（Web 能力自动装配）
+scope:
+    - nexai-framework/nexai-spring-boot-starter-web/
+source_files: []
+depends_on: []
+related_to: []

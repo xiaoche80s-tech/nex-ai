@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/jobs_and_mq
+title: 系统模块定时任务与消息通信
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/job/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/mq/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/message/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ui/shared_components
+title: NexAI 通用 UI 组件库
+scope:
+    - nexai-ui/src/components/
+source_files: []
+depends_on: []
+related_to: []

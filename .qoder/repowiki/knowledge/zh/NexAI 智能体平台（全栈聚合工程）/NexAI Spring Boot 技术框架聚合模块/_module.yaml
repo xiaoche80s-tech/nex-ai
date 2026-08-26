@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework
+title: NexAI Spring Boot 技术框架聚合模块
+scope:
+    - nexai-framework/
+source_files: []
+depends_on: []
+related_to: []

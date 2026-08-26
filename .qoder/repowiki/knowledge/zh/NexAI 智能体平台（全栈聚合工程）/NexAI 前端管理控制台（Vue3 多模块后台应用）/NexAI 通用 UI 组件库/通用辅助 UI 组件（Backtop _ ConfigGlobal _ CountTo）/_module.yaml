@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/misc_utilities
+title: 通用辅助 UI 组件（Backtop / ConfigGlobal / CountTo）
+scope:
+    - nexai-ui/src/components/Backtop/
+    - nexai-ui/src/components/ConfigGlobal/
+    - nexai-ui/src/components/CountTo/
+source_files: []
+depends_on: []
+related_to: []

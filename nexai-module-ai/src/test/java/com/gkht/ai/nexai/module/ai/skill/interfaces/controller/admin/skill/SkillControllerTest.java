@@ -6,14 +6,13 @@ import com.gkht.ai.nexai.module.ai.skill.application.command.SkillVersionCommand
 import com.gkht.ai.nexai.module.ai.skill.application.service.SkillService;
 import com.gkht.ai.nexai.module.ai.skill.application.service.SkillServiceImpl;
 import com.gkht.ai.nexai.module.ai.skill.domain.gateway.SkillMaterializationGateway;
-import com.gkht.ai.nexai.module.ai.skill.domain.model.Skill;
-import com.gkht.ai.nexai.module.ai.skill.domain.model.SkillContent;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.converter.SkillConverterImpl;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillMapper;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.mapper.SkillVersionMapper;
 import com.gkht.ai.nexai.module.ai.skill.infrastructure.repository.SkillRepositoryImpl;
 import com.gkht.ai.nexai.module.ai.support.TenantDbTestConfiguration;
 import com.gkht.ai.nexai.framework.tenant.core.context.TenantContextHolder;
+import io.agentscope.core.skill.util.SkillUtil;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +25,7 @@ import org.springframework.context.annotation.Import;
 import java.util.Map;
 
 import static com.gkht.ai.nexai.framework.test.core.util.AssertUtils.assertServiceException;
+import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_CONFIG_INVALID;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_NAME_DUPLICATE;
 import static com.gkht.ai.nexai.module.ai.enums.ErrorCodeConstants.SKILL_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +76,28 @@ public class SkillControllerTest extends BaseDbUnitTest {
         skillService.createSkill(createCommand("data-clean"), 1L);
         assertServiceException(() -> skillService.createSkill(createCommand("data-clean"), 1L),
                 SKILL_NAME_DUPLICATE, "data-clean");
+    }
+
+    @Test
+    @DisplayName("创建 Skill：markdown 缺 YAML frontmatter 报配置校验异常（不漏 500）")
+    public void createSkillRejectsMarkdownWithoutFrontmatter() {
+        SkillCreateCommand command = createCommand("data-clean");
+        command.setMarkdown("# 只有正文");
+        assertServiceException(() -> skillService.createSkill(command, 1L), SKILL_CONFIG_INVALID,
+                "The SKILL.md must have a YAML Front Matter including"
+                        + " `name` and `description` fields.");
+    }
+
+    @Test
+    @DisplayName("登记新版本：markdown 缺 YAML frontmatter 报配置校验异常")
+    public void addVersionRejectsMarkdownWithoutFrontmatter() {
+        Long id = skillService.createSkill(createCommand("data-clean"), 1L);
+        SkillVersionCommand versionCommand = new SkillVersionCommand();
+        versionCommand.setSkillId(id);
+        versionCommand.setMarkdown("裸正文");
+        assertServiceException(() -> skillService.addSkillVersion(versionCommand, 1L), SKILL_CONFIG_INVALID,
+                "The SKILL.md must have a YAML Front Matter including"
+                        + " `name` and `description` fields.");
     }
 
     @Test
@@ -171,18 +193,16 @@ public class SkillControllerTest extends BaseDbUnitTest {
         return command;
     }
 
-    /** 物化网关桩：记录物化调用（不落真实磁盘），供断言 */
+    /** 物化网关桩：不落真实磁盘，但复用 agentscope 的 SKILL.md 解析校验——异常行为与真实网关一致 */
     @TestConfiguration
     static class FakeMaterializationConfiguration {
 
         @Bean
         public SkillMaterializationGateway skillMaterializationGateway() {
-            return new SkillMaterializationGateway() {
-                @Override
-                public String materialize(Skill skill, Long tenantId, SkillContent content) {
-                    // 物化契约由真实网关测试保障，此处仅记录
-                    return "/tmp/fake-skill-materialize/" + skill.getName();
-                }
+            return (skill, tenantId, content) -> {
+                // createFrom 只解析不落盘；缺 frontmatter 时抛 IllegalArgumentException，复刻真实网关的透传行为
+                SkillUtil.createFrom(content.getMarkdown(), content.resourcesCopy(), "nexai:test");
+                return "/tmp/fake-skill-materialize/" + skill.getName();
             };
         }
     }

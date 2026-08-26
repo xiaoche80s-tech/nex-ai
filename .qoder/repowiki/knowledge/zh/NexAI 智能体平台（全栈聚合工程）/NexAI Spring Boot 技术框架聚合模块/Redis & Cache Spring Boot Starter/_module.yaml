@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/redis_starter
+title: Redis & Cache Spring Boot Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-redis/
+source_files: []
+depends_on: []
+related_to: []

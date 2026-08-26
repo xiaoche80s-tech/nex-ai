@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ui/shared_components/editors_designers/diy_editor_mobile_components
+title: 移动端 DIY 页面编辑器组件集
+scope:
+    - nexai-ui/src/components/DiyEditor/
+source_files: []
+depends_on: []
+related_to: []

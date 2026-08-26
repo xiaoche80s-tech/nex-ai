@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/common
+title: NexAI 框架通用基础库 (nexai-common)
+scope:
+    - nexai-framework/nexai-common/
+source_files: []
+depends_on: []
+related_to: []

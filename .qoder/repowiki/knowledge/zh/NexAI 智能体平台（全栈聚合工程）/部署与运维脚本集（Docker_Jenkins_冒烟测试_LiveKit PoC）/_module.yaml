@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: scripts
+title: 部署与运维脚本集（Docker/Jenkins/冒烟测试/LiveKit PoC）
+scope:
+    - script/
+source_files: []
+depends_on: []
+related_to: []

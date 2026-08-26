@@ -7,9 +7,12 @@ const { t } = useI18n() // 国际化
 export function hasPermi(app: App<Element>) {
   app.directive('hasPermi', (el, binding) => {
     const { value } = binding
+    ;(window as any).__DBG_permi = ((window as any).__DBG_permi ?? 0) + 1 // [DEBUG-mcpbtn]
+    ;(window as any).__DBG_permiLast = String(value) // [DEBUG-mcpbtn]
 
     if (value && value instanceof Array && value.length > 0) {
       const hasPermissions = hasPermission(value)
+      ;(window as any).__DBG_permiResult = String(hasPermissions) // [DEBUG-mcpbtn]
 
       if (!hasPermissions) {
         el.parentNode && el.parentNode.removeChild(el)

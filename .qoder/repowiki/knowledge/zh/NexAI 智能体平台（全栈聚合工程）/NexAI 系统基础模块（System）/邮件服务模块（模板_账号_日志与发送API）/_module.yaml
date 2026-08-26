@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/mail_service
+title: 邮件服务模块（模板/账号/日志与发送API）
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/mail/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/mail/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/mail/
+source_files: []
+depends_on: []
+related_to: []

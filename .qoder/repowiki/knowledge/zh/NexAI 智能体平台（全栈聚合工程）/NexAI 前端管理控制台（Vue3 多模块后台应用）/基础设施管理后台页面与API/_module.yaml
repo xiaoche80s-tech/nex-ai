@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ui/infra_feature
+title: 基础设施管理后台页面与API
+scope:
+    - nexai-ui/src/views/infra/
+    - nexai-ui/src/api/infra/
+source_files: []
+depends_on: []
+related_to: []

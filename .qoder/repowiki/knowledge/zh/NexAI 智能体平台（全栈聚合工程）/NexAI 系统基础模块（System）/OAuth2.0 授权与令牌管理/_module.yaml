@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/auth_and_oauth2
+title: OAuth2.0 授权与令牌管理
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/oauth2/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/oauth2/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/oauth2/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/framework_core
+title: 基础设施框架核心与对外 API
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/framework/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/websocket/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/job_starter
+title: Quartz 定时任务与异步任务 Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-job/
+source_files: []
+depends_on: []
+related_to: []

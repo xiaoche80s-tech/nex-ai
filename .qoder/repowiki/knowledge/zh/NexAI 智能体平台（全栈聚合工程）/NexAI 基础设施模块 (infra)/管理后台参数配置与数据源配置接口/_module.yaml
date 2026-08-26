@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/config_and_db
+title: 管理后台参数配置与数据源配置接口
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/config/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/db/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/config/
+source_files: []
+depends_on: []
+related_to: []

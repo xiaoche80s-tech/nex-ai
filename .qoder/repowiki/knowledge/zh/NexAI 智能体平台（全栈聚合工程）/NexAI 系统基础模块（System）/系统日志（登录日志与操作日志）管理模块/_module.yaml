@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/logging_and_notice
+title: 系统日志（登录日志与操作日志）管理模块
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/logger/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/logger/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/logger/
+source_files: []
+depends_on: []
+related_to: []

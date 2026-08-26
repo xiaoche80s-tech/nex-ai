@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/editors_designers
+title: 可视化编辑器组件集（DIY/表单/BPMN）
+scope:
+    - nexai-ui/src/components/DiyEditor/
+    - nexai-ui/src/components/FormCreate/
+    - nexai-ui/src/components/bpmnProcessDesigner/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/excel_starter
+title: Excel 与数据字典 Spring Boot Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-excel/
+source_files: []
+depends_on: []
+related_to: []

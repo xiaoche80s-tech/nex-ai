@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/framework_infrastructure
+title: System 模块框架基础设施（验证码/短信/JustAuth/操作日志/数据权限等）
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/framework/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/util/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/enums/
+source_files: []
+depends_on: []
+related_to: []

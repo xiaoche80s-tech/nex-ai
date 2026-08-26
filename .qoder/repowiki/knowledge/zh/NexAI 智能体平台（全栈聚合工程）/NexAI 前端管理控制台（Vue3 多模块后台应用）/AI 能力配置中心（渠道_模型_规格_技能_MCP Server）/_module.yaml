@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ui/ai_feature
+title: AI 能力配置中心（渠道/模型/规格/技能/MCP Server）
+scope:
+    - nexai-ui/src/views/ai/
+    - nexai-ui/src/api/ai/
+source_files: []
+depends_on: []
+related_to: []

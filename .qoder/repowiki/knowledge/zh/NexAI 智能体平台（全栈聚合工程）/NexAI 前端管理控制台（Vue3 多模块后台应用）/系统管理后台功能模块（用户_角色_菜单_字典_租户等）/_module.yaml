@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ui/system_feature
+title: 系统管理后台功能模块（用户/角色/菜单/字典/租户等）
+scope:
+    - nexai-ui/src/views/system/
+    - nexai-ui/src/api/system/
+source_files: []
+depends_on: []
+related_to: []

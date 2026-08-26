@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/navigation_routing
+title: 搜索与导航路由组件集
+scope:
+    - nexai-ui/src/components/Search/
+    - nexai-ui/src/components/RouterSearch/
+    - nexai-ui/src/components/ShortcutDateRangePicker/
+source_files: []
+depends_on: []
+related_to: []

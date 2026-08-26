@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/layout_presentation
+title: 通用布局与内容展示容器组件
+scope:
+    - nexai-ui/src/components/Card/
+    - nexai-ui/src/components/ContentDetailWrap/
+    - nexai-ui/src/components/ContentWrap/
+source_files: []
+depends_on: []
+related_to: []

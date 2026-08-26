@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/notify_service
+title: 站内信通知服务（消息与模板管理）
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/notify/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/notify/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/notify/
+source_files: []
+depends_on: []
+related_to: []

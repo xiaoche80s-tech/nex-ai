@@ -87,6 +87,9 @@ public class SkillServiceImpl implements SkillService {
             return skillId;
         } catch (DuplicateKeyException ex) {
             throw exception(SKILL_NAME_DUPLICATE, command.getName());
+        } catch (IllegalArgumentException ex) {
+            // 物化网关透传 agentscope 的 SKILL.md 契约校验（如缺 frontmatter）→ 业务错误码
+            throw exception(SKILL_CONFIG_INVALID, ex.getMessage());
         }
     }
 
@@ -110,6 +113,9 @@ public class SkillServiceImpl implements SkillService {
             materializationGateway.materialize(skill, requireTenantId(), version.getContent());
         } catch (DuplicateKeyException ex) {
             throw exception(SKILL_NAME_DUPLICATE, "版本号冲突，请重试");
+        } catch (IllegalArgumentException ex) {
+            // 物化网关透传 agentscope 的 SKILL.md 契约校验（如缺 frontmatter）→ 业务错误码
+            throw exception(SKILL_CONFIG_INVALID, ex.getMessage());
         }
         return version.getVersionNo();
     }

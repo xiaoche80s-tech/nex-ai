@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/api_logging
+title: API 访问日志与错误日志管理
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/logger/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/logger/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/logger/
+source_files: []
+depends_on: []
+related_to: []

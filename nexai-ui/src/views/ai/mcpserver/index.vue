@@ -394,6 +394,7 @@ const formRules = {
 }
 
 const openForm = async (row?: McpServerVO) => {
+  ;(window as any).__DBG_openForm = ((window as any).__DBG_openForm ?? 0) + 1 // [DEBUG-mcpbtn]
   editing.value = !!row
   headersPreserved.value = !!row?.headersConfigured
   headersText.value = ''

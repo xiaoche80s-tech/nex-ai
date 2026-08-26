@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/mq_starter
+title: NexAI Spring Boot MQ Starter（Redis/RabbitMQ 消息队列）
+scope:
+    - nexai-framework/nexai-spring-boot-starter-mq/
+source_files: []
+depends_on: []
+related_to: []

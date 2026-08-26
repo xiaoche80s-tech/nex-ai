@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: server
+title: NexAI 后端服务启动容器（Spring Boot 应用）
+scope:
+    - nexai-server/
+source_files: []
+depends_on: []
+related_to: []

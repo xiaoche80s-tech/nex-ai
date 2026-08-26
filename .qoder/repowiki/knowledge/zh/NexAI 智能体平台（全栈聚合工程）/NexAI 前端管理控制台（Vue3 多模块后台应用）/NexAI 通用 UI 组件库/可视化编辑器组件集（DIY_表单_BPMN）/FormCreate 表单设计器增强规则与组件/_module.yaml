@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ui/shared_components/editors_designers/form_create_rules
+title: FormCreate 表单设计器增强规则与组件
+scope:
+    - nexai-ui/src/components/FormCreate/
+source_files: []
+depends_on: []
+related_to: []

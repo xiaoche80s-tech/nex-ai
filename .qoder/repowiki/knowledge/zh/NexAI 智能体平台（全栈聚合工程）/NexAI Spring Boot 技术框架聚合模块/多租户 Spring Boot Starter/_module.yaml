@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/tenant_starter
+title: 多租户 Spring Boot Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-biz-tenant/
+source_files: []
+depends_on: []
+related_to: []

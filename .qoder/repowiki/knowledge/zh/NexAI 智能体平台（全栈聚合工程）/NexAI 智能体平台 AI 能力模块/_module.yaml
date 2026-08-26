@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: module_ai
+title: NexAI 智能体平台 AI 能力模块
+scope:
+    - nexai-module-ai/
+source_files: []
+depends_on: []
+related_to: []

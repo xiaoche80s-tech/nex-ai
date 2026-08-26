@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: ""
+title: NexAI 智能体平台（全栈聚合工程）
+scope:
+    - README.md
+    - .gitignore
+    - lombok.config
+    - pom.xml
+    - Dockerfile
+source_files: []
+depends_on: []
+related_to: []

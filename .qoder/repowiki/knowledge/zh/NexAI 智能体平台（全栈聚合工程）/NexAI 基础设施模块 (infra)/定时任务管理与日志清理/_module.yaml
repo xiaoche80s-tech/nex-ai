@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/job_scheduling
+title: 定时任务管理与日志清理
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/job/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/job/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/job/
+source_files: []
+depends_on: []
+related_to: []

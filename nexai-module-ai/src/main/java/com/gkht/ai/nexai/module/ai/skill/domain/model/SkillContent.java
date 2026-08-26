@@ -1,5 +1,6 @@
 package com.gkht.ai.nexai.module.ai.skill.domain.model;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,12 +42,16 @@ public final class SkillContent {
         if (markdown.length() > MARKDOWN_MAX_LENGTH) {
             throw new IllegalArgumentException("能力包 Markdown 不能超过 " + MARKDOWN_MAX_LENGTH + " 个字符");
         }
-        Map<String, String> normalized = resources == null ? Map.of() : Map.copyOf(resources);
+        // 保持插入序（LinkedHashMap）：物化与路径透出的稳定装配顺序（资源表按路径升序读出）
+        Map<String, String> normalized = new LinkedHashMap<>();
+        if (resources != null) {
+            normalized.putAll(resources);
+        }
         if (normalized.size() > RESOURCES_MAX_SIZE) {
             throw new IllegalArgumentException("资源文件不能超过 " + RESOURCES_MAX_SIZE + " 个");
         }
         normalized.keySet().forEach(SkillContent::validateResourcePath);
-        return new SkillContent(markdown, normalized);
+        return new SkillContent(markdown, Collections.unmodifiableMap(normalized));
     }
 
     /** 资源相对路径校验：非空、不以 / 开头、不含 .. 逃逸 */

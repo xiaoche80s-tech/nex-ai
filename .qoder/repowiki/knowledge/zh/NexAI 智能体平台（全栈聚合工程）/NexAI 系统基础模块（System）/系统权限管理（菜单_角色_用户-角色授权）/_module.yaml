@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/permission_management
+title: 系统权限管理（菜单/角色/用户-角色授权）
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/permission/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/permission/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/permission/
+source_files: []
+depends_on: []
+related_to: []

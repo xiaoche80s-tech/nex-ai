@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/mybatis_starter
+title: MyBatis Plus 数据访问 Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-mybatis/
+source_files: []
+depends_on: []
+related_to: []

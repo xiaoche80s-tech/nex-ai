@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/auth_and_common_views
+title: 登录与通用页面视图（Login/Home/Error）
+scope:
+    - nexai-ui/src/views/Login/
+    - nexai-ui/src/views/Home/
+    - nexai-ui/src/views/Error/
+source_files: []
+depends_on: []
+related_to: []

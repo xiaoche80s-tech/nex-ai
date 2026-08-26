@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: ui/bpm_feature
+title: BPM 流程管理前端模块
+scope:
+    - nexai-ui/src/views/bpm/
+    - nexai-ui/src/api/bpm/
+source_files: []
+depends_on: []
+related_to: []

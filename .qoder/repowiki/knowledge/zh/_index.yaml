@@ -1,0 +1,826 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: implement-20280803
+nodes_managed: true
+exported_at: "2026-08-26T04:29:15Z"
+modules:
+    "":
+        dir_name: NexAI 智能体平台（全栈聚合工程）
+        title: NexAI 智能体平台（全栈聚合工程）
+        scope:
+            - README.md
+            - .gitignore
+            - lombok.config
+            - pom.xml
+            - Dockerfile
+        source_files: []
+        children:
+            - docs
+            - module_ai
+            - module_infra
+            - module_system
+            - nexai_framework
+            - scripts
+            - server
+            - sql_scripts
+            - ui
+        depends_on: []
+        related_to: []
+    docs:
+        dir_name: 项目文档与架构决策记录
+        title: 项目文档与架构决策记录
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai:
+        dir_name: NexAI 智能体平台 AI 能力模块
+        title: NexAI 智能体平台 AI 能力模块
+        scope:
+            - nexai-module-ai/
+        source_files: []
+        children:
+            - module_ai/agentspec
+            - module_ai/apikey
+            - module_ai/audit
+            - module_ai/channel
+            - module_ai/mcpserver
+            - module_ai/session
+            - module_ai/shared_framework
+            - module_ai/skill
+            - module_ai/usage
+        depends_on: []
+        related_to: []
+    module_ai/agentspec:
+        dir_name: 智能体规格（AgentSpec）领域模块
+        title: 智能体规格（AgentSpec）领域模块
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/agentspec/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/agentspec/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/apikey:
+        dir_name: 租户 API Key 认证与鉴权模块
+        title: 租户 API Key 认证与鉴权模块
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/apikey/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/apikey/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/audit:
+        dir_name: AI Agent 审计事件采集与落库
+        title: AI Agent 审计事件采集与落库
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/audit/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/audit/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/channel:
+        dir_name: AI 模型渠道（BYOK）管理模块
+        title: AI 模型渠道（BYOK）管理模块
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/channel/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/channel/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/mcpserver:
+        dir_name: MCP Server 接入管理模块（BYO-MCP）
+        title: MCP Server 接入管理模块（BYO-MCP）
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/mcpserver/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/mcpserver/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/session:
+        dir_name: AI 会话与 Agent 运行时管理模块
+        title: AI 会话与 Agent 运行时管理模块
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/session/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/session/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/shared_framework:
+        dir_name: AI 模块共享框架与运行时基础设施
+        title: AI 模块共享框架与运行时基础设施
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/shared/
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/framework/
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/enums/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/skill:
+        dir_name: Skill 技能资产模块（DDD 分层）
+        title: Skill 技能资产模块（DDD 分层）
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/skill/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/skill/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_ai/usage:
+        dir_name: AI 模型用量采集与持久化
+        title: AI 模型用量采集与持久化
+        scope:
+            - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/usage/
+            - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/usage/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra:
+        dir_name: NexAI 基础设施模块 (infra)
+        title: NexAI 基础设施模块 (infra)
+        scope:
+            - nexai-module-infra/
+        source_files: []
+        children:
+            - module_infra/api_logging
+            - module_infra/codegen
+            - module_infra/config_and_db
+            - module_infra/file_storage
+            - module_infra/framework_core
+            - module_infra/job_scheduling
+            - module_infra/shared_types
+            - module_infra/tests
+        depends_on: []
+        related_to: []
+    module_infra/api_logging:
+        dir_name: API 访问日志与错误日志管理
+        title: API 访问日志与错误日志管理
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/logger/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/logger/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/logger/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/codegen:
+        dir_name: 代码生成器元数据管理
+        title: 代码生成器元数据管理
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/codegen/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/dal/dataobject/codegen/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/dal/mysql/codegen/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/config_and_db:
+        dir_name: 管理后台参数配置与数据源配置接口
+        title: 管理后台参数配置与数据源配置接口
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/config/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/db/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/config/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/file_storage:
+        dir_name: 文件存储抽象与多后端客户端
+        title: 文件存储抽象与多后端客户端
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/framework/file/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/file/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/file/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/framework_core:
+        dir_name: 基础设施框架核心与对外 API
+        title: 基础设施框架核心与对外 API
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/framework/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/websocket/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/job_scheduling:
+        dir_name: 定时任务管理与日志清理
+        title: 定时任务管理与日志清理
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/job/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/service/job/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/job/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/shared_types:
+        dir_name: Infra 模块共享类型与转换层
+        title: Infra 模块共享类型与转换层
+        scope:
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/enums/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/convert/
+            - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/mq/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_infra/tests:
+        dir_name: 基础设施模块单元测试套件
+        title: 基础设施模块单元测试套件
+        scope:
+            - nexai-module-infra/src/test/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system:
+        dir_name: NexAI 系统基础模块（System）
+        title: NexAI 系统基础模块（System）
+        scope:
+            - nexai-module-system/
+        source_files: []
+        children:
+            - module_system/auth_and_oauth2
+            - module_system/dept_and_dict
+            - module_system/dict_data
+            - module_system/framework_infrastructure
+            - module_system/jobs_and_mq
+            - module_system/logging_and_notice
+            - module_system/mail_service
+            - module_system/notice_board
+            - module_system/notify_service
+            - module_system/permission_management
+            - module_system/sms_service
+            - module_system/social_login
+            - module_system/tenant_management
+            - module_system/user_and_permission
+        depends_on: []
+        related_to: []
+    module_system/auth_and_oauth2:
+        dir_name: OAuth2.0 授权与令牌管理
+        title: OAuth2.0 授权与令牌管理
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/oauth2/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/oauth2/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/oauth2/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/dept_and_dict:
+        dir_name: 部门与岗位管理模块
+        title: 部门与岗位管理模块
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/dept/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/dept/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/dept/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/dict_data:
+        dir_name: 系统字典数据与类型管理
+        title: 系统字典数据与类型管理
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/dict/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/dict/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/dict/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/framework_infrastructure:
+        dir_name: System 模块框架基础设施（验证码_短信_JustAuth_操作日志_数据权限等）
+        title: System 模块框架基础设施（验证码/短信/JustAuth/操作日志/数据权限等）
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/framework/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/util/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/enums/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/jobs_and_mq:
+        dir_name: 系统模块定时任务与消息通信
+        title: 系统模块定时任务与消息通信
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/job/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/mq/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/message/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/logging_and_notice:
+        dir_name: 系统日志（登录日志与操作日志）管理模块
+        title: 系统日志（登录日志与操作日志）管理模块
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/logger/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/logger/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/logger/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/mail_service:
+        dir_name: 邮件服务模块（模板_账号_日志与发送API）
+        title: 邮件服务模块（模板/账号/日志与发送API）
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/mail/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/mail/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/mail/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/notice_board:
+        dir_name: 通知公告管理模块
+        title: 通知公告管理模块
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/notice/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/notice/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/dal/dataobject/notice/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/notify_service:
+        dir_name: 站内信通知服务（消息与模板管理）
+        title: 站内信通知服务（消息与模板管理）
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/notify/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/notify/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/notify/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/permission_management:
+        dir_name: 系统权限管理（菜单_角色_用户-角色授权）
+        title: 系统权限管理（菜单/角色/用户-角色授权）
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/permission/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/permission/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/permission/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/sms_service:
+        dir_name: 短信服务模块（验证码、模板与渠道管理）
+        title: 短信服务模块（验证码、模板与渠道管理）
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/sms/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/sms/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/sms/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/social_login:
+        dir_name: 社交登录与第三方平台集成
+        title: 社交登录与第三方平台集成
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/social/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/socail/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/social/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/tenant_management:
+        dir_name: 多租户管理与套餐配置
+        title: 多租户管理与套餐配置
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/tenant/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/tenant/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/tenant/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    module_system/user_and_permission:
+        dir_name: 管理员用户与权限管理
+        title: 管理员用户与权限管理
+        scope:
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/user/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/user/
+            - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/user/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework:
+        dir_name: NexAI Spring Boot 技术框架聚合模块
+        title: NexAI Spring Boot 技术框架聚合模块
+        scope:
+            - nexai-framework/
+        source_files: []
+        children:
+            - nexai_framework/common
+            - nexai_framework/data_permission_starter
+            - nexai_framework/excel_starter
+            - nexai_framework/ip_starter
+            - nexai_framework/job_starter
+            - nexai_framework/monitor_starter
+            - nexai_framework/mq_starter
+            - nexai_framework/mybatis_starter
+            - nexai_framework/protection_starter
+            - nexai_framework/redis_starter
+            - nexai_framework/security_starter
+            - nexai_framework/tenant_starter
+            - nexai_framework/test_starter
+            - nexai_framework/web_starter
+            - nexai_framework/websocket_starter
+        depends_on: []
+        related_to: []
+    nexai_framework/common:
+        dir_name: NexAI 框架通用基础库 (nexai-common)
+        title: NexAI 框架通用基础库 (nexai-common)
+        scope:
+            - nexai-framework/nexai-common/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/data_permission_starter:
+        dir_name: 数据权限 Starter（MyBatis-Plus 规则注入）
+        title: 数据权限 Starter（MyBatis-Plus 规则注入）
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-biz-data-permission/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/excel_starter:
+        dir_name: Excel 与数据字典 Spring Boot Starter
+        title: Excel 与数据字典 Spring Boot Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-excel/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/ip_starter:
+        dir_name: IP 与行政区划查询 Starter
+        title: IP 与行政区划查询 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-biz-ip/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/job_starter:
+        dir_name: Quartz 定时任务与异步任务 Starter
+        title: Quartz 定时任务与异步任务 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-job/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/monitor_starter:
+        dir_name: NexAI 监控与链路追踪 Starter
+        title: NexAI 监控与链路追踪 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-monitor/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/mq_starter:
+        dir_name: NexAI Spring Boot MQ Starter（Redis_RabbitMQ 消息队列）
+        title: NexAI Spring Boot MQ Starter（Redis/RabbitMQ 消息队列）
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-mq/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/mybatis_starter:
+        dir_name: MyBatis Plus 数据访问 Starter
+        title: MyBatis Plus 数据访问 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-mybatis/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/protection_starter:
+        dir_name: 服务保护 Spring Boot Starter（限流_幂等_分布式锁_API签名）
+        title: 服务保护 Spring Boot Starter（限流/幂等/分布式锁/API签名）
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-protection/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/redis_starter:
+        dir_name: Redis & Cache Spring Boot Starter
+        title: Redis & Cache Spring Boot Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-redis/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/security_starter:
+        dir_name: Spring Security & 操作日志 Starter
+        title: Spring Security & 操作日志 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-security/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/tenant_starter:
+        dir_name: 多租户 Spring Boot Starter
+        title: 多租户 Spring Boot Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-biz-tenant/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/test_starter:
+        dir_name: Spring Boot 测试 Starter（单元测试基类与内嵌中间件）
+        title: Spring Boot 测试 Starter（单元测试基类与内嵌中间件）
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-test/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/web_starter:
+        dir_name: Nexai Web Spring Boot Starter（Web 能力自动装配）
+        title: Nexai Web Spring Boot Starter（Web 能力自动装配）
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-web/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    nexai_framework/websocket_starter:
+        dir_name: Spring Boot WebSocket 多节点广播 Starter
+        title: Spring Boot WebSocket 多节点广播 Starter
+        scope:
+            - nexai-framework/nexai-spring-boot-starter-websocket/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    scripts:
+        dir_name: 部署与运维脚本集（Docker_Jenkins_冒烟测试_LiveKit PoC）
+        title: 部署与运维脚本集（Docker/Jenkins/冒烟测试/LiveKit PoC）
+        scope:
+            - script/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    server:
+        dir_name: NexAI 后端服务启动容器（Spring Boot 应用）
+        title: NexAI 后端服务启动容器（Spring Boot 应用）
+        scope:
+            - nexai-server/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    sql_scripts:
+        dir_name: 多数据库初始化脚本与达梦适配补丁
+        title: 多数据库初始化脚本与达梦适配补丁
+        scope:
+            - sql/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui:
+        dir_name: NexAI 前端管理控制台（Vue3 多模块后台应用）
+        title: NexAI 前端管理控制台（Vue3 多模块后台应用）
+        scope:
+            - nexai-ui/
+        source_files: []
+        children:
+            - ui/ai_feature
+            - ui/app_shell
+            - ui/auth_and_common_views
+            - ui/bpm_feature
+            - ui/core_framework
+            - ui/infra_feature
+            - ui/shared_components
+            - ui/system_feature
+        depends_on: []
+        related_to: []
+    ui/ai_feature:
+        dir_name: AI 能力配置中心（渠道_模型_规格_技能_MCP Server）
+        title: AI 能力配置中心（渠道/模型/规格/技能/MCP Server）
+        scope:
+            - nexai-ui/src/views/ai/
+            - nexai-ui/src/api/ai/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/app_shell:
+        dir_name: 应用外壳：布局、路由与全局状态
+        title: 应用外壳：布局、路由与全局状态
+        scope:
+            - nexai-ui/src/layout/
+            - nexai-ui/src/router/
+            - nexai-ui/src/store/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/auth_and_common_views:
+        dir_name: 登录与通用页面视图（Login_Home_Error）
+        title: 登录与通用页面视图（Login/Home/Error）
+        scope:
+            - nexai-ui/src/views/Login/
+            - nexai-ui/src/views/Home/
+            - nexai-ui/src/views/Error/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/bpm_feature:
+        dir_name: BPM 流程管理前端模块
+        title: BPM 流程管理前端模块
+        scope:
+            - nexai-ui/src/views/bpm/
+            - nexai-ui/src/api/bpm/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/core_framework:
+        dir_name: 前端核心基础设施（Axios 请求、权限指令与通用 Hooks）
+        title: 前端核心基础设施（Axios 请求、权限指令与通用 Hooks）
+        scope:
+            - nexai-ui/src/config/
+            - nexai-ui/src/directives/
+            - nexai-ui/src/hooks/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/infra_feature:
+        dir_name: 基础设施管理后台页面与API
+        title: 基础设施管理后台页面与API
+        scope:
+            - nexai-ui/src/views/infra/
+            - nexai-ui/src/api/infra/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components:
+        dir_name: NexAI 通用 UI 组件库
+        title: NexAI 通用 UI 组件库
+        scope:
+            - nexai-ui/src/components/
+        source_files: []
+        children:
+            - ui/shared_components/data_display
+            - ui/shared_components/editors_designers
+            - ui/shared_components/feedback_widgets
+            - ui/shared_components/form_inputs
+            - ui/shared_components/layout_presentation
+            - ui/shared_components/misc_utilities
+            - ui/shared_components/navigation_routing
+        depends_on: []
+        related_to: []
+    ui/shared_components/data_display:
+        dir_name: 数据展示组件库（Table _ Echart _ Descriptions）
+        title: 数据展示组件库（Table / Echart / Descriptions）
+        scope:
+            - nexai-ui/src/components/Table/
+            - nexai-ui/src/components/Echart/
+            - nexai-ui/src/components/Descriptions/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/editors_designers:
+        dir_name: 可视化编辑器组件集（DIY_表单_BPMN）
+        title: 可视化编辑器组件集（DIY/表单/BPMN）
+        scope:
+            - nexai-ui/src/components/DiyEditor/
+            - nexai-ui/src/components/FormCreate/
+            - nexai-ui/src/components/bpmnProcessDesigner/
+        source_files: []
+        children:
+            - ui/shared_components/editors_designers/bpmn_process_designer
+            - ui/shared_components/editors_designers/diy_editor_mobile_components
+            - ui/shared_components/editors_designers/form_create_rules
+        depends_on: []
+        related_to: []
+    ui/shared_components/editors_designers/bpmn_process_designer:
+        dir_name: BPMN 业务流程设计器
+        title: BPMN 业务流程设计器
+        scope:
+            - nexai-ui/src/components/bpmnProcessDesigner/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/editors_designers/diy_editor_mobile_components:
+        dir_name: 移动端 DIY 页面编辑器组件集
+        title: 移动端 DIY 页面编辑器组件集
+        scope:
+            - nexai-ui/src/components/DiyEditor/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/editors_designers/form_create_rules:
+        dir_name: FormCreate 表单设计器增强规则与组件
+        title: FormCreate 表单设计器增强规则与组件
+        scope:
+            - nexai-ui/src/components/FormCreate/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/feedback_widgets:
+        dir_name: 反馈类通用 UI 组件（Dialog _ ImageViewer _ Infotip）
+        title: 反馈类通用 UI 组件（Dialog / ImageViewer / Infotip）
+        scope:
+            - nexai-ui/src/components/Dialog/
+            - nexai-ui/src/components/ImageViewer/
+            - nexai-ui/src/components/Infotip/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/form_inputs:
+        dir_name: 表单输入组件集（AppLinkInput _ ColorInput _ Crontab）
+        title: 表单输入组件集（AppLinkInput / ColorInput / Crontab）
+        scope:
+            - nexai-ui/src/components/AppLinkInput/
+            - nexai-ui/src/components/ColorInput/
+            - nexai-ui/src/components/Crontab/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/layout_presentation:
+        dir_name: 通用布局与内容展示容器组件
+        title: 通用布局与内容展示容器组件
+        scope:
+            - nexai-ui/src/components/Card/
+            - nexai-ui/src/components/ContentDetailWrap/
+            - nexai-ui/src/components/ContentWrap/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/misc_utilities:
+        dir_name: 通用辅助 UI 组件（Backtop _ ConfigGlobal _ CountTo）
+        title: 通用辅助 UI 组件（Backtop / ConfigGlobal / CountTo）
+        scope:
+            - nexai-ui/src/components/Backtop/
+            - nexai-ui/src/components/ConfigGlobal/
+            - nexai-ui/src/components/CountTo/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/shared_components/navigation_routing:
+        dir_name: 搜索与导航路由组件集
+        title: 搜索与导航路由组件集
+        scope:
+            - nexai-ui/src/components/Search/
+            - nexai-ui/src/components/RouterSearch/
+            - nexai-ui/src/components/ShortcutDateRangePicker/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    ui/system_feature:
+        dir_name: 系统管理后台功能模块（用户_角色_菜单_字典_租户等）
+        title: 系统管理后台功能模块（用户/角色/菜单/字典/租户等）
+        scope:
+            - nexai-ui/src/views/system/
+            - nexai-ui/src/api/system/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: module_system
+title: NexAI 系统基础模块（System）
+scope:
+    - nexai-module-system/
+source_files: []
+depends_on: []
+related_to: []

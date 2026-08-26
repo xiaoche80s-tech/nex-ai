@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/security_starter
+title: Spring Security & 操作日志 Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-security/
+source_files: []
+depends_on: []
+related_to: []

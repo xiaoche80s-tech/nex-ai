@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/data_display
+title: 数据展示组件库（Table / Echart / Descriptions）
+scope:
+    - nexai-ui/src/components/Table/
+    - nexai-ui/src/components/Echart/
+    - nexai-ui/src/components/Descriptions/
+source_files: []
+depends_on: []
+related_to: []

@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/file_storage
+title: 文件存储抽象与多后端客户端
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/framework/file/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/controller/admin/file/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/api/file/
+source_files: []
+depends_on: []
+related_to: []

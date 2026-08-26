@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: sql_scripts
+title: 多数据库初始化脚本与达梦适配补丁
+scope:
+    - sql/
+source_files: []
+depends_on: []
+related_to: []

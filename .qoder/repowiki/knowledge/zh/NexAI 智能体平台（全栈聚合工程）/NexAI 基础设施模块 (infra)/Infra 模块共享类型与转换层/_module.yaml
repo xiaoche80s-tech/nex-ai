@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_infra/shared_types
+title: Infra 模块共享类型与转换层
+scope:
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/enums/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/convert/
+    - nexai-module-infra/src/main/java/com/gkht/ai/nexai/module/infra/mq/
+source_files: []
+depends_on: []
+related_to: []

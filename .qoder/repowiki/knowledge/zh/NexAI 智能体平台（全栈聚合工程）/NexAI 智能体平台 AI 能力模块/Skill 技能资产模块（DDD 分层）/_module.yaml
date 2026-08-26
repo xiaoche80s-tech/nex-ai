@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: module_ai/skill
+title: Skill 技能资产模块（DDD 分层）
+scope:
+    - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/skill/
+    - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/skill/
+source_files: []
+depends_on: []
+related_to: []

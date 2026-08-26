@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/social_login
+title: 社交登录与第三方平台集成
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/social/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/socail/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/social/
+source_files: []
+depends_on: []
+related_to: []

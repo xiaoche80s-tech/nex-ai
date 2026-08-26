@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: module_infra
+title: NexAI 基础设施模块 (infra)
+scope:
+    - nexai-module-infra/
+source_files: []
+depends_on: []
+related_to: []

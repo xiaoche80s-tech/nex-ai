@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/ip_starter
+title: IP 与行政区划查询 Starter
+scope:
+    - nexai-framework/nexai-spring-boot-starter-biz-ip/
+source_files: []
+depends_on: []
+related_to: []

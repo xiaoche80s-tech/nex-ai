@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/core_framework
+title: 前端核心基础设施（Axios 请求、权限指令与通用 Hooks）
+scope:
+    - nexai-ui/src/config/
+    - nexai-ui/src/directives/
+    - nexai-ui/src/hooks/
+source_files: []
+depends_on: []
+related_to: []

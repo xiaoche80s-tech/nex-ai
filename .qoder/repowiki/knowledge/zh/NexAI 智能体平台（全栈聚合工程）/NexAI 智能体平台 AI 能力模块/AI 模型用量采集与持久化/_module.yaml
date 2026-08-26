@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: module_ai/usage
+title: AI 模型用量采集与持久化
+scope:
+    - nexai-module-ai/src/main/java/com/gkht/ai/nexai/module/ai/usage/
+    - nexai-module-ai/src/test/java/com/gkht/ai/nexai/module/ai/usage/
+source_files: []
+depends_on: []
+related_to: []

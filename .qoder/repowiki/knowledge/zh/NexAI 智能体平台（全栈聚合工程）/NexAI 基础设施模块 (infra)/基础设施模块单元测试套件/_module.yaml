@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: module_infra/tests
+title: 基础设施模块单元测试套件
+scope:
+    - nexai-module-infra/src/test/
+source_files: []
+depends_on: []
+related_to: []

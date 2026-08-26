@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ui/shared_components/editors_designers/bpmn_process_designer
+title: BPMN 业务流程设计器
+scope:
+    - nexai-ui/src/components/bpmnProcessDesigner/
+source_files: []
+depends_on: []
+related_to: []

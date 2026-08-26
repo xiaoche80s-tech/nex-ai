@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ui/shared_components/form_inputs
+title: 表单输入组件集（AppLinkInput / ColorInput / Crontab）
+scope:
+    - nexai-ui/src/components/AppLinkInput/
+    - nexai-ui/src/components/ColorInput/
+    - nexai-ui/src/components/Crontab/
+source_files: []
+depends_on: []
+related_to: []

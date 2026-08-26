@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/test_starter
+title: Spring Boot 测试 Starter（单元测试基类与内嵌中间件）
+scope:
+    - nexai-framework/nexai-spring-boot-starter-test/
+source_files: []
+depends_on: []
+related_to: []

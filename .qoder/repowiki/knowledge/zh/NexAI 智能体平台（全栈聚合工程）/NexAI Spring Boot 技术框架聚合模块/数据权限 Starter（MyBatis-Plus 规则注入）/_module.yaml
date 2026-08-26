@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/data_permission_starter
+title: 数据权限 Starter（MyBatis-Plus 规则注入）
+scope:
+    - nexai-framework/nexai-spring-boot-starter-biz-data-permission/
+source_files: []
+depends_on: []
+related_to: []

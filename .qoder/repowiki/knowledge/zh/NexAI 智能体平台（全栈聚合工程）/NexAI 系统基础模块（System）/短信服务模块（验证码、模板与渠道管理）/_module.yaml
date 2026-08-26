@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/sms_service
+title: 短信服务模块（验证码、模板与渠道管理）
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/api/sms/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/sms/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/sms/
+source_files: []
+depends_on: []
+related_to: []

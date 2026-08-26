@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: ui
+title: NexAI 前端管理控制台（Vue3 多模块后台应用）
+scope:
+    - nexai-ui/
+source_files: []
+depends_on: []
+related_to: []

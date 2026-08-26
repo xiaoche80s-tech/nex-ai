@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: nexai_framework/protection_starter
+title: 服务保护 Spring Boot Starter（限流/幂等/分布式锁/API签名）
+scope:
+    - nexai-framework/nexai-spring-boot-starter-protection/
+source_files: []
+depends_on: []
+related_to: []

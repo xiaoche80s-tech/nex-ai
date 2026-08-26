@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: module_system/notice_board
+title: 通知公告管理模块
+scope:
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/controller/admin/notice/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/service/notice/
+    - nexai-module-system/src/main/java/com/gkht/ai/nexai/module/system/dal/dataobject/notice/
+source_files: []
+depends_on: []
+related_to: []
